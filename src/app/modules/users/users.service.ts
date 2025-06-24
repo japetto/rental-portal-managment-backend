@@ -25,7 +25,7 @@ const userRegister = async (payload: IUser): Promise<IAuthUser> => {
 const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
   const { email, password } = payload;
 
-  const isExists = await Users.findOne({ email: email });
+  const isExists = await Users.findOne({ email: email }).select("+password");
 
   if (!isExists) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid Email Or Password");
