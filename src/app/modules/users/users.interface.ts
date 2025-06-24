@@ -1,68 +1,38 @@
-export type userRoleEnums = "hotelOwner" | "customer";
-export type linkedProvidersEnums = "CUSTOM" | "FACEBOOK" | "TWITTER" | "GOOGLE";
-export type genderEnums = "MALE" | "FEMALE";
+import { Document } from "mongoose";
 
-export interface IUser {
-  userName: string;
+export type userRoleEnums = "SUPER_ADMIN" | "TENANT";
+
+export interface IUser extends Document {
   email: string;
-  contactNumber: string;
   password: string;
-  profileImage: string;
+  confirmPassword: string;
+  name: string;
+  slug: string;
   role: userRoleEnums;
-  uid: string;
-  linkedProviders: Array<linkedProvidersEnums>;
-  location: {
-    street: string;
-    city: string;
-    district: string;
-    country: string;
-  };
-  socialLinks: {
-    facebook: string;
-    instagram: string;
-    twitter: string;
-    linkedin: string;
-  };
-  gender?: genderEnums;
-  dateOfBirth: {
-    date: string;
-    month: string;
-    year: string;
-  };
+  isInvited?: boolean;
+  isVerified?: boolean;
+  profileImage?: string;
+  bio?: string;
+  profileUrl: string;
+  phoneNumber: string;
+  preferredLocation: string;
+  comparePassword(candidate: string): Promise<boolean>;
 }
 
 export interface ICheckUserExists {
-  authMethod: linkedProvidersEnums;
   email: string;
 }
 
 export interface IUserWithoutPassword {
   _id: string;
-  userName: string;
   email: string;
-  contactNumber: string;
-  profileImage: string;
+  name: string;
   role: userRoleEnums;
-  uid: string;
-  linkedProviders: Array<linkedProvidersEnums>;
-  location: {
-    street: string;
-    city: string;
-    district: string;
-    country: string;
-  };
-  socialLinks: {
-    facebook: string;
-    instagram: string;
-    twitter: string;
-    linkedin: string;
-  };
-  gender?: genderEnums;
-  dateOfBirth: {
-    date: string;
-    month: string;
-    year: string;
-  };
+  isVerified: boolean;
+  profileImage?: string;
+  bio?: string;
+  phoneNumber: string;
+  preferredLocation: string;
   createdAt: Date;
   updatedAt: Date;
 }

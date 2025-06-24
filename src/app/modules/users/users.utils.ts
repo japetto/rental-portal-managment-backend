@@ -27,18 +27,13 @@ export function generateUID(userRole: "hotelOwner" | "customer") {
 export function encryptData(user: IUserWithoutPassword) {
   const authData = {
     _id: user._id.toString(),
-    userName: user.userName,
+    name: user.name,
     email: user.email,
-    contactNumber: user.contactNumber,
+    phoneNumber: user.phoneNumber,
     profileImage: user.profileImage,
     role: user.role,
-    uid: user.uid,
-    location: user.location,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    socialLinks: user.socialLinks,
-    gender: user?.gender,
-    dateOfBirth: user.dateOfBirth,
   };
 
   const encryptedData = CryptoJS.AES.encrypt(
@@ -52,7 +47,7 @@ export function encryptData(user: IUserWithoutPassword) {
 export const generateAuthToken = (user: IUserWithoutPassword) => {
   const accessToken = jwtHelpers.createToken(
     {
-      id: user.uid,
+      id: user._id.toString(),
     },
     config.jwt_secret as Secret,
     config.jwt_expires_in as string,

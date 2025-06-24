@@ -1,52 +1,20 @@
-import { Redis } from "@upstash/redis";
 import bcrypt from "bcrypt";
-import crypto from "crypto";
 import httpStatus from "http-status";
-import { Secret } from "jsonwebtoken";
-import nodemailer from "nodemailer";
-import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
-import { jwtHelpers } from "../../../helpers/jwtHelpers";
-import {
-  IAuthUser,
-  ICheckUserExists,
-  IForgetPasswordValidator,
-  ILoginUser,
-  IUpdatePassword,
-  IUpdatePasswordValidator,
-  IUser,
-  linkedProvidersEnums,
-} from "./users.interface";
+import { IAuthUser, ILoginUser, IUser } from "./users.interface";
 import { Users } from "./users.schema";
-import {
-  decryptForgotPasswordResponse,
-  encryptForgotPasswordResponse,
-  generateAuthToken,
-  generateUID,
-} from "./users.utils";
+import { generateAuthToken } from "./users.utils";
 
 //* User Register Custom
 const userRegister = async (payload: IUser): Promise<IAuthUser> => {
-  const { email, contactNumber, role } = payload;
+  const { email, phoneNumber } = payload;
 
   const isExistsUser = await Users.findOne({
-    $or: [{ email }, { contactNumber }],
+    $or: [{ email }, { phoneNumber }],
   });
   if (isExistsUser) {
     throw new ApiError(httpStatus.CONFLICT, "Email or Contact Already Exists");
   }
-
-  const uid = generateUID(role);
-  const isUIDExists = await Users.findOne({ uid: uid });
-  if (isUIDExists) {
-    throw new ApiError(
-      httpStatus.CONFLICT,
-      "Something went wrong! Please try again",
-    );
-  }
-  payload.uid = uid as string;
-
-  payload.linkedProviders = ["CUSTOM"];
 
   const user = await Users.create(payload);
 
@@ -72,370 +40,350 @@ const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
   return generateAuthToken(isExists as any);
 };
 
-//* Check User for Provider Login
-const checkUserForProviderLogin = async (
-  payload: ICheckUserExists,
-): Promise<IAuthUser | null> => {
-  const { authMethod, email } = payload;
+// //* Check User for Provider Login
+// const checkUserForProviderLogin = async (
+//   payload: ICheckUserExists,
+// ): Promise<IAuthUser | null> => {
+//   const { email } = payload;
 
-  const isExistsUser = await Users.findOne({ email });
-  if (!isExistsUser) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User Dose Not Exists!");
-  }
+//   const isExistsUser = await Users.findOne({ email });
+//   if (!isExistsUser) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "User Dose Not Exists!");
+//   }
 
-  const linkedProviders = isExistsUser.linkedProviders;
+//   if (isExistsUser) {
+//     const updatedUser = await Users.findOneAndUpdate({ email }, isExistsUser, {
+//       new: true,
+//     });
+//     return generateAuthToken(updatedUser as any);
+//   }
 
-  if (isExistsUser && !linkedProviders.includes(authMethod)) {
-    linkedProviders.push(authMethod);
-    const updatedUser = await Users.findOneAndUpdate({ email }, isExistsUser, {
-      new: true,
-    });
-    return generateAuthToken(updatedUser as any);
-  }
+//   return null;
+// };
 
-  if (isExistsUser && linkedProviders.includes(authMethod)) {
-    return generateAuthToken(isExistsUser as any);
-  }
+// //* Provider Login
+// const providerLogin = async (payload: IUser): Promise<IAuthUser> => {
+//   const { email } = payload;
 
-  return null;
-};
+//   const isExistsUser = await Users.findOne({ email });
+//   if (isExistsUser) {
+//     if (!isExistsUser.isInvited) {
+//       const updatedUser = await Users.findOneAndUpdate(
+//         { email },
+//         isExistsUser,
+//         {
+//           new: true,
+//         },
+//       );
+//       return generateAuthToken(updatedUser as any);
+//     }
 
-//* Provider Login
-const providerLogin = async (
-  payload: IUser,
-  authMethod: linkedProvidersEnums,
-): Promise<IAuthUser> => {
-  const { email, role } = payload;
+//     if (isExistsUser.isInvited) {
+//       return generateAuthToken(isExistsUser as any);
+//     }
+//   }
 
-  const isExistsUser = await Users.findOne({ email });
-  if (isExistsUser) {
-    const linkedProviders = isExistsUser.linkedProviders;
-    if (!linkedProviders.includes(authMethod)) {
-      linkedProviders.push(authMethod);
-      const updatedUser = await Users.findOneAndUpdate(
-        { email },
-        isExistsUser,
-        {
-          new: true,
-        },
-      );
-      return generateAuthToken(updatedUser as any);
-    }
+//   const isEmailExists = await Users.findOne({ email: email });
+//   if (isEmailExists) {
+//     throw new ApiError(
+//       httpStatus.CONFLICT,
+//       "Something went wrong! Please try again",
+//     );
+//   }
 
-    if (linkedProviders.includes(authMethod)) {
-      return generateAuthToken(isExistsUser as any);
-    }
-  }
+//   const user = await Users.create(payload);
 
-  const uid = generateUID(role);
-  const isUIDExists = await Users.findOne({ uid: uid });
-  if (isUIDExists) {
-    throw new ApiError(
-      httpStatus.CONFLICT,
-      "Something went wrong! Please try again",
-    );
-  }
-  payload.uid = uid as string;
+//   return generateAuthToken(user as any);
+// };
 
-  payload.linkedProviders = ["CUSTOM", authMethod];
+// //* Update User
+// const updateUser = async (
+//   userID: string,
+//   payload: Partial<IUser>,
+//   token: string,
+// ): Promise<IAuthUser | null> => {
+//   jwtHelpers.jwtVerify(token, config.jwt_secret as Secret);
 
-  const user = await Users.create(payload);
+//   const isExistsUser = await Users.findById({ _id: userID });
+//   if (!isExistsUser) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "User Not Found");
+//   }
 
-  return generateAuthToken(user as any);
-};
+//   const {
+//     email,
+//     phoneNumber,
+//     ...updatePayload
+//   } = payload;
 
-//* Update User
-const updateUser = async (
-  userID: string,
-  payload: Partial<IUser>,
-  token: string,
-): Promise<IAuthUser | null> => {
-  jwtHelpers.jwtVerify(token, config.jwt_secret as Secret);
+//   if (email !== undefined || phoneNumber !== undefined) {
+//     throw new ApiError(
+//       httpStatus.UNAUTHORIZED,
+//       "Permission Denied! Please Try Again.",
+//     );
+//   }
 
-  const isExistsUser = await Users.findById({ _id: userID });
-  if (!isExistsUser) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User Not Found");
-  }
+//   if (payload.email) {
+//     const isExists = await Users.findOne({ email: payload.email });
+//     if (isExists) {
+//       throw new ApiError(
+//         httpStatus.FORBIDDEN,
+//         "Email Already Exists! Try Another One.",
+//       );
+//     }
+//     updatePayload.email = payload.email;
+//   }
 
-  const {
-    role,
-    uid,
-    password,
-    location,
-    socialLinks,
-    dateOfBirth,
-    ...updatePayload
-  } = payload;
+//   if (payload.phoneNumber) {
+//     const isExists = await Users.findOne({
+//       phoneNumber: payload.phoneNumber,
+//     });
+//     if (isExists) {
+//       throw new ApiError(
+//         httpStatus.FORBIDDEN,
+//         "Contact Number Already Exists! Try Another One.",
+//       );
+//     }
+//     updatePayload.contactNumber = payload.contactNumber;
+//   }
 
-  if (role !== undefined || uid !== undefined || password !== undefined) {
-    throw new ApiError(
-      httpStatus.UNAUTHORIZED,
-      "Permission Denied! Please Try Again.",
-    );
-  }
+//   if (location && Object.keys(location).length > 0) {
+//     Object.keys(location).map(key => {
+//       const locationsKey = `location.${key}`;
+//       (updatePayload as any)[locationsKey] =
+//         location[key as keyof typeof location];
+//     });
+//   }
 
-  if (payload.email) {
-    const isExists = await Users.findOne({ email: payload.email });
-    if (isExists) {
-      throw new ApiError(
-        httpStatus.FORBIDDEN,
-        "Email Already Exists! Try Another One.",
-      );
-    }
-    updatePayload.email = payload.email;
-  }
+//   if (socialLinks && Object.keys(socialLinks).length > 0) {
+//     Object.keys(socialLinks).map(key => {
+//       const locationsKey = `socialLinks.${key}`;
+//       (updatePayload as any)[locationsKey] =
+//         socialLinks[key as keyof typeof socialLinks];
+//     });
+//   }
 
-  if (payload.contactNumber) {
-    const isExists = await Users.findOne({
-      contactNumber: payload.contactNumber,
-    });
-    if (isExists) {
-      throw new ApiError(
-        httpStatus.FORBIDDEN,
-        "Contact Number Already Exists! Try Another One.",
-      );
-    }
-    updatePayload.contactNumber = payload.contactNumber;
-  }
+//   if (dateOfBirth && Object.keys(dateOfBirth).length > 0) {
+//     Object.keys(dateOfBirth).map(key => {
+//       const locationsKey = `dateOfBirth.${key}`;
+//       (updatePayload as any)[locationsKey] =
+//         dateOfBirth[key as keyof typeof dateOfBirth];
+//     });
+//   }
 
-  if (location && Object.keys(location).length > 0) {
-    Object.keys(location).map(key => {
-      const locationsKey = `location.${key}`;
-      (updatePayload as any)[locationsKey] =
-        location[key as keyof typeof location];
-    });
-  }
+//   const user = await Users.findOneAndUpdate({ _id: userID }, updatePayload, {
+//     new: true,
+//   });
 
-  if (socialLinks && Object.keys(socialLinks).length > 0) {
-    Object.keys(socialLinks).map(key => {
-      const locationsKey = `socialLinks.${key}`;
-      (updatePayload as any)[locationsKey] =
-        socialLinks[key as keyof typeof socialLinks];
-    });
-  }
+//   return generateAuthToken(user as any);
+// };
 
-  if (dateOfBirth && Object.keys(dateOfBirth).length > 0) {
-    Object.keys(dateOfBirth).map(key => {
-      const locationsKey = `dateOfBirth.${key}`;
-      (updatePayload as any)[locationsKey] =
-        dateOfBirth[key as keyof typeof dateOfBirth];
-    });
-  }
+// // * For Updating the password
+// const updatePassword = async (
+//   payload: IUpdatePassword,
+//   token: string,
+// ): Promise<IAuthUser | null> => {
+//   jwtHelpers.jwtVerify(token, config.jwt_secret as Secret);
 
-  const user = await Users.findOneAndUpdate({ _id: userID }, updatePayload, {
-    new: true,
-  });
+//   const { userId, currentPassword, newPassword, confirmPassword } = payload;
 
-  return generateAuthToken(user as any);
-};
+//   const isExistsUser = await Users.findById({ _id: userId });
+//   if (!isExistsUser) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "User Not Found");
+//   }
 
-// * For Updating the password
-const updatePassword = async (
-  payload: IUpdatePassword,
-  token: string,
-): Promise<IAuthUser | null> => {
-  jwtHelpers.jwtVerify(token, config.jwt_secret as Secret);
+//   const isPassMatched = await bcrypt.compare(
+//     currentPassword,
+//     isExistsUser.password as string,
+//   );
 
-  const { userId, currentPassword, newPassword, confirmPassword } = payload;
+//   if (!isPassMatched) {
+//     throw new ApiError(
+//       httpStatus.UNAUTHORIZED,
+//       "Incorrect current password. Please try again.",
+//     );
+//   }
 
-  const isExistsUser = await Users.findById({ _id: userId });
-  if (!isExistsUser) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User Not Found");
-  }
+//   const isPreviousPass = await bcrypt.compare(
+//     newPassword,
+//     isExistsUser.password as string,
+//   );
 
-  const isPassMatched = await bcrypt.compare(
-    currentPassword,
-    isExistsUser.password as string,
-  );
+//   if (isPreviousPass || currentPassword === newPassword) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "New Password Cannot be The Previous Password",
+//     );
+//   }
 
-  if (!isPassMatched) {
-    throw new ApiError(
-      httpStatus.UNAUTHORIZED,
-      "Incorrect current password. Please try again.",
-    );
-  }
+//   if (newPassword !== confirmPassword) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "New Password and Confirm Password must match.",
+//     );
+//   }
 
-  const isPreviousPass = await bcrypt.compare(
-    newPassword,
-    isExistsUser.password as string,
-  );
+//   const pass = await bcrypt.hash(newPassword, Number(config.salt_round));
+//   isExistsUser.password = pass;
 
-  if (isPreviousPass || currentPassword === newPassword) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "New Password Cannot be The Previous Password",
-    );
-  }
+//   const user = await Users.findOneAndUpdate({ _id: userId }, isExistsUser, {
+//     new: true,
+//   });
 
-  if (newPassword !== confirmPassword) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "New Password and Confirm Password must match.",
-    );
-  }
+//   return generateAuthToken(user as any);
+// };
 
-  const pass = await bcrypt.hash(newPassword, Number(config.salt_round));
-  isExistsUser.password = pass;
+// //* Forgot Password Part-1 Find user via email
+// const findUserForForgotPassword = async (
+//   email: string,
+// ): Promise<IForgetPasswordValidator> => {
+//   const user = await Users.findOne(
+//     { email: email },
+//     {
+//       _id: 0,
+//       email: 1,
+//     },
+//   ).lean();
 
-  const user = await Users.findOneAndUpdate({ _id: userId }, isExistsUser, {
-    new: true,
-  });
+//   if (!user) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
+//   }
 
-  return generateAuthToken(user as any);
-};
+//   const redis = new Redis({
+//     url: config.redis_host,
+//     token: config.redis_password,
+//   });
 
-//* Forgot Password Part-1 Find user via email
-const findUserForForgotPassword = async (
-  email: string,
-): Promise<IForgetPasswordValidator> => {
-  const user = await Users.findOne(
-    { email: email },
-    {
-      _id: 0,
-      email: 1,
-    },
-  ).lean();
-  
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
-  }
+//   const otp = crypto.randomInt(100000, 999999).toString();
+//   const dataToEncrypt = JSON.stringify({ otp: otp, verified: false });
+//   const encryptData = encryptForgotPasswordResponse(dataToEncrypt);
+//   await redis.set(email, encryptData, { ex: 180 });
 
-  const redis = new Redis({
-    url: config.redis_host,
-    token: config.redis_password,
-  });
+//   const transporter = nodemailer.createTransport({
+//     host: "smtp.gmail.com",
+//     port: 587,
+//     secure: false,
+//     auth: {
+//       user: config.nodemailer_user,
+//       pass: config.nodemailer_pass,
+//     },
+//   });
 
-  const otp = crypto.randomInt(100000, 999999).toString();
-  const dataToEncrypt = JSON.stringify({ otp: otp, verified: false });
-  const encryptData = encryptForgotPasswordResponse(dataToEncrypt);
-  await redis.set(email, encryptData, { ex: 180 });
+//   await transporter.sendMail({
+//     to: email,
+//     subject: "OTP For Reset Password",
+//     text: `Your OTP is ${otp}`,
+//   });
 
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: config.nodemailer_user,
-      pass: config.nodemailer_pass,
-    },
-  });
+//   return user;
+// };
 
-  await transporter.sendMail({
-    to: email,
-    subject: "OTP For Reset Password",
-    text: `Your OTP is ${otp}`,
-  });
+// //* Forgot Password Part-2
+// const verifyOtpForForgotPassword = async (email: string, otp: string) => {
+//   const user = await Users.findOne(
+//     { email: email },
+//     {
+//       _id: 0,
+//       email: 1,
+//     },
+//   ).lean();
+//   if (!user) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
+//   }
 
-  return user;
-};
+//   const redis = new Redis({
+//     url: config.redis_host,
+//     token: config.redis_password,
+//   });
 
-//* Forgot Password Part-2
-const verifyOtpForForgotPassword = async (email: string, otp: string) => {
-  const user = await Users.findOne(
-    { email: email },
-    {
-      _id: 0,
-      email: 1,
-    },
-  ).lean();
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
-  }
+//   const encryptData = await redis.get(email);
+//   if (!encryptData) {
+//     throw new ApiError(httpStatus.BAD_REQUEST, "OTP expired or not found.");
+//   }
 
-  const redis = new Redis({
-    url: config.redis_host,
-    token: config.redis_password,
-  });
+//   const decryptedData = decryptForgotPasswordResponse(encryptData as string);
+//   const { otp: storedOtp, verified } = JSON.parse(decryptedData);
 
-  const encryptData = await redis.get(email);
-  if (!encryptData) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "OTP expired or not found.");
-  }
+//   if (Number(storedOtp) !== Number(otp)) {
+//     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid OTP!");
+//   }
 
-  const decryptedData = decryptForgotPasswordResponse(encryptData as string);
-  const { otp: storedOtp, verified } = JSON.parse(decryptedData);
+//   if (verified === true) {
+//     throw new ApiError(httpStatus.BAD_REQUEST, "OTP Already Verified!");
+//   }
 
-  if (Number(storedOtp) !== Number(otp)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid OTP!");
-  }
+//   const updatedData = JSON.stringify({ otp: storedOtp, verified: true });
+//   const encryptUpdatedData = encryptForgotPasswordResponse(updatedData);
+//   await redis.set(email, encryptUpdatedData, { ex: 180 });
 
-  if (verified === true) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "OTP Already Verified!");
-  }
+//   return { message: "OTP verified successfully." };
+// };
 
-  const updatedData = JSON.stringify({ otp: storedOtp, verified: true });
-  const encryptUpdatedData = encryptForgotPasswordResponse(updatedData);
-  await redis.set(email, encryptUpdatedData, { ex: 180 });
+// //* Forgot Password Part-3
+// const forgotPassword = async (
+//   payload: IUpdatePasswordValidator,
+// ): Promise<string | null> => {
+//   const { email, password } = payload;
+//   const isExistsUser = await Users.findOne({ email: email });
+//   if (!isExistsUser) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
+//   }
 
-  return { message: "OTP verified successfully." };
-};
+//   const redis = new Redis({
+//     url: config.redis_host,
+//     token: config.redis_password,
+//   });
 
-//* Forgot Password Part-3
-const forgotPassword = async (
-  payload: IUpdatePasswordValidator,
-): Promise<string | null> => {
-  const { email, password } = payload;
-  const isExistsUser = await Users.findOne({ email: email });
-  if (!isExistsUser) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
-  }
+//   const encryptedRedisResponse = await redis.get(email);
+//   if (!encryptedRedisResponse) {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "Failed to Update! Please try again.",
+//     );
+//   }
 
-  const redis = new Redis({
-    url: config.redis_host,
-    token: config.redis_password,
-  });
+//   const decryptedData = decryptForgotPasswordResponse(
+//     encryptedRedisResponse as string,
+//   );
+//   const { verified } = JSON.parse(decryptedData);
 
-  const encryptedRedisResponse = await redis.get(email);
-  if (!encryptedRedisResponse) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Failed to Update! Please try again.",
-    );
-  }
+//   if (verified !== true) {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "Failed to Update! Please try again.",
+//     );
+//   }
 
-  const decryptedData = decryptForgotPasswordResponse(
-    encryptedRedisResponse as string,
-  );
-  const { verified } = JSON.parse(decryptedData);
+//   const isPreviousPass = await bcrypt.compare(
+//     password,
+//     isExistsUser.password as string,
+//   );
 
-  if (verified !== true) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Failed to Update! Please try again.",
-    );
-  }
+//   if (isPreviousPass) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "New Password Cannot be The Previous Password",
+//     );
+//   }
+//   const newPass = await bcrypt.hash(password, Number(config.salt_round));
+//   payload.password = newPass;
 
-  const isPreviousPass = await bcrypt.compare(
-    password,
-    isExistsUser.password as string,
-  );
+//   await Users.findOneAndUpdate({ email: email }, payload, {
+//     new: true,
+//   });
 
-  if (isPreviousPass) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "New Password Cannot be The Previous Password",
-    );
-  }
-  const newPass = await bcrypt.hash(password, Number(config.salt_round));
-  payload.password = newPass;
+//   await redis.del(email);
 
-  await Users.findOneAndUpdate({ email: email }, payload, {
-    new: true,
-  });
-
-  await redis.del(email);
-
-  return null;
-};
+//   return null;
+// };
 
 export const UserService = {
   userRegister,
   userLogin,
-  checkUserForProviderLogin,
-  providerLogin,
-  updateUser,
-  updatePassword,
-  findUserForForgotPassword,
-  verifyOtpForForgotPassword,
-  forgotPassword,
+  // checkUserForProviderLogin,
+  // providerLogin,
+  // updateUser,
+  // updatePassword,
+  // findUserForForgotPassword,
+  // verifyOtpForForgotPassword,
+  // forgotPassword,
 };
