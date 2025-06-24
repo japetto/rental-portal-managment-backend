@@ -46,7 +46,6 @@ export const usersSchema = new Schema<IUser>(
       type: String,
       required: true,
     },
-    slug: { type: String, required: true, unique: true },
   },
   {
     timestamps: true,
