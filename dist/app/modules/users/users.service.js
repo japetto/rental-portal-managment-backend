@@ -33,7 +33,7 @@ const userRegister = (payload) => __awaiter(void 0, void 0, void 0, function* ()
 //* User Login Custom
 const userLogin = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = payload;
-    const isExists = yield users_schema_1.Users.findOne({ email: email });
+    const isExists = yield users_schema_1.Users.findOne({ email: email }).select("+password");
     if (!isExists) {
         throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Invalid Email Or Password");
     }
