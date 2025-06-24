@@ -29,18 +29,13 @@ function generateUID(userRole) {
 function encryptData(user) {
     const authData = {
         _id: user._id.toString(),
-        userName: user.userName,
+        name: user.name,
         email: user.email,
-        contactNumber: user.contactNumber,
+        phoneNumber: user.phoneNumber,
         profileImage: user.profileImage,
         role: user.role,
-        uid: user.uid,
-        location: user.location,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-        socialLinks: user.socialLinks,
-        gender: user === null || user === void 0 ? void 0 : user.gender,
-        dateOfBirth: user.dateOfBirth,
     };
     const encryptedData = crypto_js_1.default.AES.encrypt(JSON.stringify(authData), String(config_1.default.jwt_secret)).toString();
     return encryptedData;
@@ -48,7 +43,7 @@ function encryptData(user) {
 // Generate AuthToken
 const generateAuthToken = (user) => {
     const accessToken = jwtHelpers_1.jwtHelpers.createToken({
-        id: user.uid,
+        id: user._id.toString(),
     }, config_1.default.jwt_secret, config_1.default.jwt_expires_in);
     const encryptedUserData = encryptData(user);
     return {

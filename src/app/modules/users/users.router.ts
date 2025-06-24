@@ -1,6 +1,6 @@
 import express from "express";
-import { UserController } from "./users.controller";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
+import { UserController } from "./users.controller";
 import { UserValidation } from "./users.validation";
 
 const router = express.Router();
@@ -17,40 +17,40 @@ router.post(
   UserController.userLogin,
 );
 
-router.post(
-  "/checkUserForProviderLogin",
-  zodValidationRequest(UserValidation.checkUserForProviderLoginValidation),
-  UserController.checkUserForProviderLogin,
-);
+// router.post(
+//   "/checkUserForProviderLogin",
+//   zodValidationRequest(UserValidation.checkUserForProviderLoginValidation),
+//   UserController.checkUserForProviderLogin,
+// );
 
-router.post(
-  "/providerLogin",
-  zodValidationRequest(UserValidation.providerLoginZodSchema),
-  UserController.providerLogin,
-);
+// router.post(
+//   "/providerLogin",
+//   zodValidationRequest(UserValidation.providerLoginZodSchema),
+//   UserController.providerLogin,
+// );
 
-router.patch(
-  "/updateUser/:id",
-  zodValidationRequest(UserValidation.userUpdateZodSchema),
-  UserController.updatedUser,
-);
+// router.patch(
+//   "/updateUser/:id",
+//   zodValidationRequest(UserValidation.userUpdateZodSchema),
+//   UserController.updatedUser,
+// );
 
-router.patch(
-  "/updatePassword",
-  zodValidationRequest(UserValidation.updatePasswordZodSchema),
-  UserController.updatePassword,
-);
+// router.patch(
+//   "/updatePassword",
+//   zodValidationRequest(UserValidation.updatePasswordZodSchema),
+//   UserController.updatePassword,
+// );
 
-router.post(
-  "/findUserForForgotPassword",
-  UserController.findUserForForgotPassword,
-);
+// router.post(
+//   "/findUserForForgotPassword",
+//   UserController.findUserForForgotPassword,
+// );
 
-router.post(
-  "/verifyOtpForForgotPassword",
-  UserController.verifyOtpForForgotPassword,
-);
+// router.post(
+//   "/verifyOtpForForgotPassword",
+//   UserController.verifyOtpForForgotPassword,
+// );
 
-router.patch("/forgotPassword", UserController.forgotPassword);
+// router.patch("/forgotPassword", UserController.forgotPassword);
 
 export const UserRouter = router;

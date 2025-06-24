@@ -24,11 +24,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserController = void 0;
-const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
-const users_service_1 = require("./users.service");
-const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const http_status_1 = __importDefault(require("http-status"));
-const verifyAuthToken_1 = require("../../../util/verifyAuthToken");
+const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
+const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
+const users_service_1 = require("./users.service");
 // User Register
 const userRegister = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const userInfo = __rest(req.body, []);
@@ -51,94 +50,100 @@ const userLogin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
         data: result,
     });
 }));
-// Check User Exists
-const checkUserForProviderLogin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const userInfo = __rest(req.body, []);
-    const result = yield users_service_1.UserService.checkUserForProviderLogin(userInfo);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "Login Successful",
-        data: result,
-    });
-}));
-// Check User Exists
-const providerLogin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userInfo, authMethod } = req.body;
-    const result = yield users_service_1.UserService.providerLogin(userInfo, authMethod);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "Login Successful",
-        data: result,
-    });
-}));
-// Update User
-const updatedUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const payload = __rest(req.body, []);
-    const token = (0, verifyAuthToken_1.verifyAuthToken)(req);
-    const result = yield users_service_1.UserService.updateUser(id, payload, token);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "User Updated Successfully",
-        data: result,
-    });
-}));
-// Update User
-const updatePassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const payload = __rest(req.body, []);
-    const token = (0, verifyAuthToken_1.verifyAuthToken)(req);
-    const result = yield users_service_1.UserService.updatePassword(payload, token);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "User Updated Successfully",
-        data: result,
-    });
-}));
-// Find User For Forgot Password
-const findUserForForgotPassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email } = req.body;
-    const result = yield users_service_1.UserService.findUserForForgotPassword(email);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "OTP has been sent to your email",
-        data: result,
-    });
-}));
-// Find User For Forgot Password
-const verifyOtpForForgotPassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email, otp } = req.body;
-    const result = yield users_service_1.UserService.verifyOtpForForgotPassword(email, otp);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "OTP Successfully Verified!",
-        data: result,
-    });
-}));
-// Forgot Password
-const forgotPassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const payload = __rest(req.body, []);
-    const result = yield users_service_1.UserService.forgotPassword(payload);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "Password Updated Successfully",
-        data: result,
-    });
-}));
+// // Check User Exists
+// const checkUserForProviderLogin = catchAsync(
+//   async (req: Request, res: Response) => {
+//     const { ...userInfo } = req.body;
+//     const result = await UserService.checkUserForProviderLogin(userInfo);
+//     sendResponse(res, {
+//       success: true,
+//       statusCode: httpStatus.OK,
+//       message: "Login Successful",
+//       data: result,
+//     });
+//   },
+// );
+// // Check User Exists
+// const providerLogin = catchAsync(async (req: Request, res: Response) => {
+//   const { userInfo, authMethod } = req.body;
+//   const result = await UserService.providerLogin(userInfo, authMethod);
+//   sendResponse(res, {
+//     success: true,
+//     statusCode: httpStatus.OK,
+//     message: "Login Successful",
+//     data: result,
+//   });
+// });
+// // Update User
+// const updatedUser = catchAsync(async (req: Request, res: Response) => {
+//   const { id } = req.params;
+//   const { ...payload } = req.body;
+//   const token = verifyAuthToken(req);
+//   const result = await UserService.updateUser(id, payload, token);
+//   sendResponse(res, {
+//     success: true,
+//     statusCode: httpStatus.OK,
+//     message: "User Updated Successfully",
+//     data: result,
+//   });
+// });
+// // Update User
+// const updatePassword = catchAsync(async (req: Request, res: Response) => {
+//   const { ...payload } = req.body;
+//   const token = verifyAuthToken(req);
+//   const result = await UserService.updatePassword(payload, token);
+//   sendResponse(res, {
+//     success: true,
+//     statusCode: httpStatus.OK,
+//     message: "User Updated Successfully",
+//     data: result,
+//   });
+// });
+// // Find User For Forgot Password
+// const findUserForForgotPassword = catchAsync(
+//   async (req: Request, res: Response) => {
+//     const { email } = req.body;
+//     const result = await UserService.findUserForForgotPassword(email);
+//     sendResponse(res, {
+//       success: true,
+//       statusCode: httpStatus.OK,
+//       message: "OTP has been sent to your email",
+//       data: result,
+//     });
+//   },
+// );
+// // Find User For Forgot Password
+// const verifyOtpForForgotPassword = catchAsync(
+//   async (req: Request, res: Response) => {
+//     const { email, otp } = req.body;
+//     const result = await UserService.verifyOtpForForgotPassword(email, otp);
+//     sendResponse(res, {
+//       success: true,
+//       statusCode: httpStatus.OK,
+//       message: "OTP Successfully Verified!",
+//       data: result,
+//     });
+//   },
+// );
+// // Forgot Password
+// const forgotPassword = catchAsync(async (req: Request, res: Response) => {
+//   const { ...payload } = req.body;
+//   const result = await UserService.forgotPassword(payload);
+//   sendResponse(res, {
+//     success: true,
+//     statusCode: httpStatus.OK,
+//     message: "Password Updated Successfully",
+//     data: result,
+//   });
+// });
 exports.UserController = {
     userRegister,
     userLogin,
-    checkUserForProviderLogin,
-    providerLogin,
-    updatedUser,
-    updatePassword,
-    findUserForForgotPassword,
-    verifyOtpForForgotPassword,
-    forgotPassword,
+    // checkUserForProviderLogin,
+    // providerLogin,
+    // updatedUser,
+    // updatePassword,
+    // findUserForForgotPassword,
+    // verifyOtpForForgotPassword,
+    // forgotPassword,
 };

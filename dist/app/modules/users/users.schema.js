@@ -13,53 +13,52 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Users = exports.usersSchema = void 0;
-const mongoose_1 = require("mongoose");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const mongoose_1 = require("mongoose");
 const config_1 = __importDefault(require("../../../config/config"));
 const user_constant_1 = require("./user.constant");
 exports.usersSchema = new mongoose_1.Schema({
-    userName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    contactNumber: { type: String, required: true },
+    name: { type: String, required: true },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true,
+        match: [/^\S+@\S+\.\S+$/, "Please use a valid email address"],
+    },
+    phoneNumber: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true,
+    },
     profileImage: {
         type: String,
         required: true,
         default: "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
     },
-    password: { type: String, required: true },
-    role: { type: String, required: true, enum: user_constant_1.UserRoleEnums },
-    uid: { type: String, required: true, unique: true },
-    linkedProviders: {
-        type: [
-            {
-                type: String,
-                enum: user_constant_1.LinkedProvidersEnums,
-            },
-        ],
+    password: {
+        type: String,
+        required: true,
+        select: false,
+        minlength: [6, "Password must be at least 6 characters long"],
+    },
+    role: {
+        type: String,
+        required: true,
+        enum: user_constant_1.UserRoleEnums,
+        default: "TENANT",
+    },
+    isInvited: { type: Boolean, required: false, default: false },
+    isVerified: { type: Boolean, required: false, default: false },
+    bio: { type: String, required: false, default: "Not Updated Yet!" },
+    preferredLocation: {
+        type: String,
         required: true,
     },
-    location: {
-        street: { type: String, required: true, default: "Not Updated Yet!" },
-        city: { type: String, required: true, default: "Not Updated Yet!" },
-        district: { type: String, required: true, default: "Not Updated Yet!" },
-        country: { type: String, required: true, default: "Bangladesh" },
-    },
-    socialLinks: {
-        facebook: { type: String, required: true, default: "Not Updated Yet!" },
-        instagram: { type: String, required: true, default: "Not Updated Yet!" },
-        twitter: { type: String, required: true, default: "Not Updated Yet!" },
-        linkedin: { type: String, required: true, default: "Not Updated Yet!" },
-    },
-    gender: {
-        type: String,
-        enum: user_constant_1.GenderEnums,
-        required: false,
-    },
-    dateOfBirth: {
-        date: { type: String, required: true, default: "Not Updated Yet!" },
-        year: { type: String, required: true, default: "Not Updated Yet!" },
-        month: { type: String, required: true, default: "Not Updated Yet!" },
-    },
+    slug: { type: String, required: true, unique: true },
 }, {
     timestamps: true,
     toJSON: {
