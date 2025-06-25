@@ -5,8 +5,10 @@ import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import {
   ICreateProperty,
+  ICreateSpot,
   IInviteTenant,
   IUpdateProperty,
+  IUpdateSpot,
 } from "./admin.interface";
 import { AdminService } from "./admin.service";
 
@@ -154,6 +156,67 @@ const deleteProperty = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const createSpot = catchAsync(async (req: Request, res: Response) => {
+  const spotData: ICreateSpot = req.body;
+  const result = await AdminService.createSpot(spotData);
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Spot created successfully",
+    data: result,
+  });
+});
+
+const getSpotsByProperty = catchAsync(async (req: Request, res: Response) => {
+  const { propertyId } = req.params;
+  const result = await AdminService.getSpotsByProperty(propertyId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Spots retrieved successfully",
+    data: result,
+  });
+});
+
+const getSpotById = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await AdminService.getSpotById(id);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Spot retrieved successfully",
+    data: result,
+  });
+});
+
+const updateSpot = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const updateData: IUpdateSpot = req.body;
+  const result = await AdminService.updateSpot(id, updateData);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Spot updated successfully",
+    data: result,
+  });
+});
+
+const deleteSpot = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  await AdminService.deleteSpot(id);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Spot deleted successfully",
+    data: null,
+  });
+});
+
 export const AdminController = {
   inviteTenant,
   createProperty,
@@ -161,4 +224,9 @@ export const AdminController = {
   getPropertyById,
   updateProperty,
   deleteProperty,
+  createSpot,
+  getSpotsByProperty,
+  getSpotById,
+  updateSpot,
+  deleteSpot,
 };

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserValidation = void 0;
+exports.UserValidation = exports.createUserValidationSchema = void 0;
 const zod_1 = require("zod");
 const user_constant_1 = require("./user.constant");
 const usersZodSchema = zod_1.z.object({
@@ -100,6 +100,24 @@ const updatePasswordZodSchema = zod_1.z.object({
         userId: zod_1.z.string({
             required_error: "UID is Required",
         }),
+    }),
+});
+exports.createUserValidationSchema = zod_1.z.object({
+    body: zod_1.z
+        .object({
+        name: zod_1.z.string().min(1, "Name is required"),
+        email: zod_1.z.string().email("Invalid email format"),
+        password: zod_1.z.string().min(6, "Password must be at least 6 characters"),
+        confirmPassword: zod_1.z
+            .string()
+            .min(6, "Confirm password must be at least 6 characters"),
+        phoneNumber: zod_1.z.string().min(1, "Phone number is required"),
+        role: zod_1.z.enum(["SUPER_ADMIN", "TENANT"]).default("TENANT"),
+        preferredLocation: zod_1.z.string().min(1, "Preferred location is required"),
+    })
+        .refine(data => data.password === data.confirmPassword, {
+        message: "Passwords don't match",
+        path: ["confirmPassword"],
     }),
 });
 exports.UserValidation = {

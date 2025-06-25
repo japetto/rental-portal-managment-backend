@@ -58,6 +58,19 @@ exports.usersSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    // Tenant-specific fields
+    propertyId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "Properties",
+        required: false,
+    },
+    spotId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Spots", required: false },
+    emergencyContact: {
+        name: { type: String, required: false },
+        phone: { type: String, required: false },
+        relationship: { type: String, required: false },
+    },
+    specialRequests: [{ type: String }],
 }, {
     timestamps: true,
     toJSON: {

@@ -35,4 +35,23 @@ router.patch(
 
 router.delete("/properties/:id", AdminController.deleteProperty);
 
+// Spot management routes
+router.post(
+  "/spots",
+  zodValidationRequest(AdminValidation.createSpotValidationSchema),
+  AdminController.createSpot,
+);
+
+router.get("/properties/:propertyId/spots", AdminController.getSpotsByProperty);
+
+router.get("/spots/:id", AdminController.getSpotById);
+
+router.patch(
+  "/spots/:id",
+  zodValidationRequest(AdminValidation.updateSpotValidationSchema),
+  AdminController.updateSpot,
+);
+
+router.delete("/spots/:id", AdminController.deleteSpot);
+
 export const AdminRouter = router;

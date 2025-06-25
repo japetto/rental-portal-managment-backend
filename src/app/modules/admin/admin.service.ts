@@ -3,13 +3,16 @@ import mongoose from "mongoose";
 import ApiError from "../../../errors/ApiError";
 import { IProperty } from "../properties/properties.interface";
 import { Properties } from "../properties/properties.schema";
+import { ISpot } from "../spots/spots.interface";
 import { Spots } from "../spots/spots.schema";
 import { IUser } from "../users/users.interface";
 import { Users } from "../users/users.schema";
 import {
   ICreateProperty,
+  ICreateSpot,
   IInviteTenant,
   IUpdateProperty,
+  IUpdateSpot,
 } from "./admin.interface";
 
 const inviteTenant = async (inviteData: IInviteTenant): Promise<IUser> => {
@@ -199,6 +202,159 @@ const deleteProperty = async (propertyId: string): Promise<void> => {
   await Properties.findByIdAndDelete(propertyId);
 };
 
+const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
+  // Validate ObjectId format for propertyId
+  if (!mongoose.Types.ObjectId.isValid(spotData.propertyId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+  }
+
+  // Check if property exists
+  const property = await Properties.findById(spotData.propertyId);
+  if (!property) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
+  }
+
+  // Check if property is active
+  if (!property.isActive) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot create spots for inactive property",
+    );
+  }
+
+  // Check if spot number already exists in this property
+  const existingSpot = await Spots.findOne({
+    propertyId: spotData.propertyId,
+    spotNumber: spotData.spotNumber,
+  });
+  if (existingSpot) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      "Spot number already exists in this property",
+    );
+  }
+
+  // Check if adding this spot would exceed property's total lots
+  const currentSpotsCount = await Spots.countDocuments({
+    propertyId: spotData.propertyId,
+  });
+  if (currentSpotsCount >= property.totalLots) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot create more spots than the property's total lots capacity",
+    );
+  }
+
+  // Create the spot
+  const spot = await Spots.create({
+    ...spotData,
+    status: "AVAILABLE",
+    isActive: true,
+  });
+
+  // Update property's available lots count
+  await Properties.findByIdAndUpdate(spotData.propertyId, {
+    $inc: { availableLots: 1 },
+  });
+
+  return spot;
+};
+
+const getSpotsByProperty = async (propertyId: string): Promise<ISpot[]> => {
+  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+  }
+
+  // Check if property exists
+  const property = await Properties.findById(propertyId);
+  if (!property) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
+  }
+
+  const spots = await Spots.find({ propertyId }).sort({ spotNumber: 1 });
+  return spots;
+};
+
+const getSpotById = async (spotId: string): Promise<ISpot> => {
+  if (!mongoose.Types.ObjectId.isValid(spotId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
+  }
+
+  const spot = await Spots.findById(spotId);
+  if (!spot) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
+  }
+
+  return spot;
+};
+
+const updateSpot = async (
+  spotId: string,
+  updateData: IUpdateSpot,
+): Promise<ISpot> => {
+  if (!mongoose.Types.ObjectId.isValid(spotId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
+  }
+
+  const spot = await Spots.findById(spotId);
+  if (!spot) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
+  }
+
+  // If updating spot number, check for uniqueness within the property
+  if (updateData.spotNumber && updateData.spotNumber !== spot.spotNumber) {
+    const existingSpot = await Spots.findOne({
+      propertyId: spot.propertyId,
+      spotNumber: updateData.spotNumber,
+      _id: { $ne: spotId },
+    });
+    if (existingSpot) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        "Spot number already exists in this property",
+      );
+    }
+  }
+
+  const updatedSpot = await Spots.findByIdAndUpdate(spotId, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  return updatedSpot!;
+};
+
+const deleteSpot = async (spotId: string): Promise<void> => {
+  if (!mongoose.Types.ObjectId.isValid(spotId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
+  }
+
+  const spot = await Spots.findById(spotId);
+  if (!spot) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
+  }
+
+  // Check if spot is occupied
+  if (spot.status === "OCCUPIED") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot delete an occupied spot",
+    );
+  }
+
+  // Check if spot is reserved
+  if (spot.status === "RESERVED") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Cannot delete a reserved spot");
+  }
+
+  await Spots.findByIdAndDelete(spotId);
+
+  // Update property's available lots count
+  await Properties.findByIdAndUpdate(spot.propertyId, {
+    $inc: { availableLots: -1 },
+  });
+};
+
 export const AdminService = {
   inviteTenant,
   createProperty,
@@ -206,4 +362,9 @@ export const AdminService = {
   getPropertyById,
   updateProperty,
   deleteProperty,
+  createSpot,
+  getSpotsByProperty,
+  getSpotById,
+  updateSpot,
+  deleteSpot,
 };
