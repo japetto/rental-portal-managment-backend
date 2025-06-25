@@ -105,6 +105,25 @@ const updatePasswordZodSchema = z.object({
   }),
 });
 
+export const createUserValidationSchema = z.object({
+  body: z
+    .object({
+      name: z.string().min(1, "Name is required"),
+      email: z.string().email("Invalid email format"),
+      password: z.string().min(6, "Password must be at least 6 characters"),
+      confirmPassword: z
+        .string()
+        .min(6, "Confirm password must be at least 6 characters"),
+      phoneNumber: z.string().min(1, "Phone number is required"),
+      role: z.enum(["SUPER_ADMIN", "TENANT"]).default("TENANT"),
+      preferredLocation: z.string().min(1, "Preferred location is required"),
+    })
+    .refine(data => data.password === data.confirmPassword, {
+      message: "Passwords don't match",
+      path: ["confirmPassword"],
+    }),
+});
+
 export const UserValidation = {
   usersZodSchema,
   loginUserZodSchema,

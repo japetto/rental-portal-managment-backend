@@ -5,7 +5,7 @@ import {
 } from "../interface/error";
 
 const handleCastError = (
-  error: mongoose.Error.CastError
+  error: mongoose.Error.CastError,
 ): IGenericErrorResponse => {
   const statusCode = 400;
   const errors: IGenericErrorMessages[] = [

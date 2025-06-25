@@ -1,4 +1,4 @@
-import { Document } from "mongoose";
+import { Document, Types } from "mongoose";
 
 export type userRoleEnums = "SUPER_ADMIN" | "TENANT";
 
@@ -15,6 +15,15 @@ export interface IUser extends Document {
   profileUrl: string;
   phoneNumber: string;
   preferredLocation: string;
+  // Tenant-specific fields (only for TENANT role)
+  propertyId?: Types.ObjectId; // Which property the tenant belongs to
+  spotId?: Types.ObjectId; // Which spot the tenant is assigned to
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  specialRequests?: string[];
   comparePassword(candidate: string): Promise<boolean>;
 }
 

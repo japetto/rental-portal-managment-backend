@@ -46,6 +46,19 @@ export const usersSchema = new Schema<IUser>(
       type: String,
       required: true,
     },
+    // Tenant-specific fields
+    propertyId: {
+      type: Schema.Types.ObjectId,
+      ref: "Properties",
+      required: false,
+    },
+    spotId: { type: Schema.Types.ObjectId, ref: "Spots", required: false },
+    emergencyContact: {
+      name: { type: String, required: false },
+      phone: { type: String, required: false },
+      relationship: { type: String, required: false },
+    },
+    specialRequests: [{ type: String }],
   },
   {
     timestamps: true,
