@@ -4,6 +4,7 @@ export interface IInviteTenant {
   phoneNumber: string;
   propertyId: string;
   spotId: string;
+  preferredLocation?: string;
 }
 
 export interface ICreateProperty {

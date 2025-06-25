@@ -75,7 +75,7 @@ const inviteTenant = async (inviteData: IInviteTenant): Promise<IUser> => {
     role: "TENANT" as const,
     isInvited: true,
     isVerified: false,
-    preferredLocation: property.address.city, // Default to property city
+    preferredLocation: inviteData.preferredLocation || property.address.city, // Use provided location or default to property city
     propertyId: inviteData.propertyId,
     spotId: inviteData.spotId,
   };

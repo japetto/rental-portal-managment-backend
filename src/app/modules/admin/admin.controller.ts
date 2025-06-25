@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
+import config from "../../../config/config";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import {
@@ -12,6 +13,63 @@ import { AdminService } from "./admin.service";
 const inviteTenant = catchAsync(async (req: Request, res: Response) => {
   const inviteData: IInviteTenant = req.body;
   const result = await AdminService.inviteTenant(inviteData);
+
+  // Generate URL with tenant data for auto-filling client UI
+  const baseUrl = config.client_url || "http://localhost:3000";
+  const tenantData = {
+    id: result._id,
+    name: result.name,
+    email: result.email,
+    phone: result.phoneNumber,
+    preferredLocation: result.preferredLocation,
+    propertyId: result.propertyId,
+    spotId: result.spotId,
+  };
+
+  // Encode the data as base64 to make it URL-safe
+  const encodedData = Buffer.from(JSON.stringify(tenantData)).toString(
+    "base64",
+  );
+  const autoFillUrl = `${baseUrl}/tenant-setup?data=${encodedData}`;
+
+  // Example of how to decode this URL on the client side:
+  //
+  // // In your React component or JavaScript file:
+  // const getTenantDataFromUrl = () => {
+  //   const urlParams = new URLSearchParams(window.location.search);
+  //   const encodedData = urlParams.get('data');
+  //
+  //   if (encodedData) {
+  //     try {
+  //       const tenantData = JSON.parse(atob(encodedData));
+  //       return {
+  //         id: tenantData.id,
+  //         name: tenantData.name,
+  //         email: tenantData.email,
+  //         phone: tenantData.phone,
+  //         preferredLocation: tenantData.preferredLocation,
+  //         propertyId: tenantData.propertyId,
+  //         spotId: tenantData.spotId,
+  //       };
+  //     } catch (error) {
+  //       console.error('Error decoding tenant data:', error);
+  //       return null;
+  //     }
+  //   }
+  //   return null;
+  // };
+  //
+  // // Usage in React component:
+  // const tenantData = getTenantDataFromUrl();
+  // if (tenantData) {
+  //   // Auto-fill your form fields
+  //   setFormData({
+  //     name: tenantData.name,
+  //     email: tenantData.email,
+  //     phone: tenantData.phone,
+  //     preferredLocation: tenantData.preferredLocation,
+  //   });
+  // }
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -27,7 +85,9 @@ const inviteTenant = catchAsync(async (req: Request, res: Response) => {
         isInvited: result.isInvited,
         propertyId: result.propertyId,
         spotId: result.spotId,
+        preferredLocation: result.preferredLocation,
       },
+      autoFillUrl: autoFillUrl,
       message:
         "Invitation sent successfully. Tenant will receive login credentials.",
     },

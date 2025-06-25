@@ -10,6 +10,7 @@ export const inviteTenantValidationSchema = z.object({
     phoneNumber: z.string().min(1, "Phone number is required"),
     propertyId: z.string().regex(objectIdRegex, "Invalid property ID format"),
     spotId: z.string().regex(objectIdRegex, "Invalid spot ID format"),
+    preferredLocation: z.string().optional(),
   }),
 });
 
