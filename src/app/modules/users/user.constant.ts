@@ -1,3 +1,1 @@
-import { userRoleEnums } from "./users.interface";
-
-export const UserRoleEnums: userRoleEnums[] = ["SUPER_ADMIN", "TENANT"];
+export const UserRoleEnums = ["SUPER_ADMIN", "TENANT"] as const;

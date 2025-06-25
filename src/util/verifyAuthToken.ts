@@ -9,7 +9,7 @@ export const verifyAuthToken = (req: Request) => {
   if (!authorizationHeader) {
     throw new ApiError(
       httpStatus.UNAUTHORIZED,
-      "Authorization Token is Missing"
+      "Authorization Token is Missing",
     );
   }
 
