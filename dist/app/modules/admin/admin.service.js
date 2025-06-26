@@ -50,6 +50,13 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
     if (existingUser) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, "User with this email already exists");
     }
+    // Check if user already exists with this phone number
+    const existingUserByPhone = yield users_schema_1.Users.findOne({
+        phoneNumber: inviteData.phoneNumber,
+    });
+    if (existingUserByPhone) {
+        throw new ApiError_1.default(http_status_1.default.CONFLICT, "User with this phone number already exists");
+    }
     // Check if spot is already assigned to another user
     const existingSpotUser = yield users_schema_1.Users.findOne({ spotId: inviteData.spotId });
     if (existingSpotUser) {
@@ -182,7 +189,7 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
     });
     return spot;
 });
-const getSpotsByProperty = (propertyId) => __awaiter(void 0, void 0, void 0, function* () {
+const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
     }
@@ -191,7 +198,17 @@ const getSpotsByProperty = (propertyId) => __awaiter(void 0, void 0, void 0, fun
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
-    const spots = yield spots_schema_1.Spots.find({ propertyId }).sort({ spotNumber: 1 });
+    // Build query
+    const query = { propertyId };
+    // Add status filter if provided
+    if (status) {
+        const validStatuses = ["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"];
+        if (!validStatuses.includes(status.toUpperCase())) {
+            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Must be one of: AVAILABLE, OCCUPIED, MAINTENANCE, RESERVED");
+        }
+        query.status = status.toUpperCase();
+    }
+    const spots = yield spots_schema_1.Spots.find(query).sort({ spotNumber: 1 });
     return spots;
 });
 const getSpotById = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -251,6 +268,26 @@ const deleteSpot = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
         $inc: { availableLots: -1 },
     });
 });
+const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
+    const tenants = yield users_schema_1.Users.find({ role: "TENANT" })
+        .populate("propertyId", "name address")
+        .populate("spotId", "spotNumber status size price description")
+        .sort({ createdAt: -1 });
+    // Transform the data to include lot number more prominently
+    const tenantsWithLotNumber = tenants.map(tenant => {
+        const tenantData = tenant.toObject();
+        // Add lot number as a direct field for easier access
+        if (tenantData.spotId && typeof tenantData.spotId === "object") {
+            tenantData.lotNumber = tenantData.spotId.spotNumber;
+            tenantData.lotStatus = tenantData.spotId.status;
+            tenantData.lotSize = tenantData.spotId.size;
+            tenantData.lotPrice = tenantData.spotId.price;
+            tenantData.lotDescription = tenantData.spotId.description;
+        }
+        return tenantData;
+    });
+    return tenantsWithLotNumber;
+});
 exports.AdminService = {
     inviteTenant,
     createProperty,
@@ -263,4 +300,5 @@ exports.AdminService = {
     getSpotById,
     updateSpot,
     deleteSpot,
+    getAllTenants,
 };

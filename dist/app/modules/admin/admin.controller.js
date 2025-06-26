@@ -94,6 +94,15 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         },
     });
 }));
+const getAllTenants = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield admin_service_1.AdminService.getAllTenants();
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Tenants retrieved successfully",
+        data: result,
+    });
+}));
 const createProperty = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const propertyData = req.body;
     const result = yield admin_service_1.AdminService.createProperty(propertyData);
@@ -156,11 +165,15 @@ const createSpot = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
 }));
 const getSpotsByProperty = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { propertyId } = req.params;
-    const result = yield admin_service_1.AdminService.getSpotsByProperty(propertyId);
+    const { status } = req.query;
+    const result = yield admin_service_1.AdminService.getSpotsByProperty(propertyId, status);
+    const message = status
+        ? `Spots with status '${status}' retrieved successfully`
+        : "All spots retrieved successfully";
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
-        message: "Spots retrieved successfully",
+        message,
         data: result,
     });
 }));
@@ -197,6 +210,7 @@ const deleteSpot = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
 }));
 exports.AdminController = {
     inviteTenant,
+    getAllTenants,
     createProperty,
     getAllProperties,
     getPropertyById,

@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.decryptForgotPasswordResponse = exports.encryptForgotPasswordResponse = exports.generateAuthToken = void 0;
 exports.generateUID = generateUID;
 exports.encryptData = encryptData;
-const crypto_js_1 = __importDefault(require("crypto-js"));
 const crypto_1 = __importDefault(require("crypto"));
+const crypto_js_1 = __importDefault(require("crypto-js"));
 const config_1 = __importDefault(require("../../../config/config"));
 const jwtHelpers_1 = require("../../../helpers/jwtHelpers");
 function generateUID(userRole) {

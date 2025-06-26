@@ -16,6 +16,9 @@ router.post(
   AdminController.inviteTenant,
 );
 
+// Get all tenants
+router.get("/tenants", AdminController.getAllTenants);
+
 // Property management routes
 router.post(
   "/properties",
@@ -23,16 +26,20 @@ router.post(
   AdminController.createProperty,
 );
 
+// Get all properties
 router.get("/properties", AdminController.getAllProperties);
 
+// Get a property by id
 router.get("/properties/:id", AdminController.getPropertyById);
 
+// Update a property
 router.patch(
   "/properties/:id",
   zodValidationRequest(AdminValidation.updatePropertyValidationSchema),
   AdminController.updateProperty,
 );
 
+// Delete a property
 router.delete("/properties/:id", AdminController.deleteProperty);
 
 // Spot management routes
@@ -42,8 +49,10 @@ router.post(
   AdminController.createSpot,
 );
 
+// Get all spots by property (nested under properties)
 router.get("/properties/:propertyId/spots", AdminController.getSpotsByProperty);
 
+// Get a spot by id
 router.get("/spots/:id", AdminController.getSpotById);
 
 router.patch(

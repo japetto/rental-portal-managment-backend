@@ -23,6 +23,13 @@ const adminAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     try {
         // Get token from request
         const token = (0, verifyAuthToken_1.verifyAuthToken)(req);
+        // Check if JWT configuration is set
+        if (!config_1.default.jwt_secret) {
+            throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Server configuration error: JWT_SECRET not set");
+        }
+        if (!config_1.default.jwt_expires_in) {
+            throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Server configuration error: JWT_EXPIRES_IN not set");
+        }
         // Verify token
         const verifiedToken = jwtHelpers_1.jwtHelpers.jwtVerify(token, config_1.default.jwt_secret);
         // Check if user exists
@@ -43,6 +50,29 @@ const adminAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function
         next();
     }
     catch (error) {
+        // Handle specific JWT errors
+        if (error instanceof Error) {
+            if (error.message.includes("jwt expired")) {
+                next(new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Token has expired. Please login again."));
+                return;
+            }
+            if (error.message.includes("jwt malformed")) {
+                next(new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Invalid token format."));
+                return;
+            }
+            if (error.message.includes("invalid signature")) {
+                next(new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Invalid token signature."));
+                return;
+            }
+            if (error.message.includes("JWT_SECRET is not configured")) {
+                next(new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Server configuration error: JWT_SECRET not set"));
+                return;
+            }
+            if (error.message.includes("JWT_EXPIRES_IN is not configured")) {
+                next(new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Server configuration error: JWT_EXPIRES_IN not set"));
+                return;
+            }
+        }
         next(error);
     }
 });

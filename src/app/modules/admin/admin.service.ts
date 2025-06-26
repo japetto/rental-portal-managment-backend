@@ -55,6 +55,17 @@ const inviteTenant = async (inviteData: IInviteTenant): Promise<IUser> => {
     );
   }
 
+  // Check if user already exists with this phone number
+  const existingUserByPhone = await Users.findOne({
+    phoneNumber: inviteData.phoneNumber,
+  });
+  if (existingUserByPhone) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      "User with this phone number already exists",
+    );
+  }
+
   // Check if spot is already assigned to another user
   const existingSpotUser = await Users.findOne({ spotId: inviteData.spotId });
   if (existingSpotUser) {
@@ -260,7 +271,10 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
   return spot;
 };
 
-const getSpotsByProperty = async (propertyId: string): Promise<ISpot[]> => {
+const getSpotsByProperty = async (
+  propertyId: string,
+  status?: string,
+): Promise<ISpot[]> => {
   if (!mongoose.Types.ObjectId.isValid(propertyId)) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
   }
@@ -271,7 +285,22 @@ const getSpotsByProperty = async (propertyId: string): Promise<ISpot[]> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
 
-  const spots = await Spots.find({ propertyId }).sort({ spotNumber: 1 });
+  // Build query
+  const query: any = { propertyId };
+
+  // Add status filter if provided
+  if (status) {
+    const validStatuses = ["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"];
+    if (!validStatuses.includes(status.toUpperCase())) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Invalid status. Must be one of: AVAILABLE, OCCUPIED, MAINTENANCE, RESERVED",
+      );
+    }
+    query.status = status.toUpperCase();
+  }
+
+  const spots = await Spots.find(query).sort({ spotNumber: 1 });
   return spots;
 };
 
@@ -355,6 +384,31 @@ const deleteSpot = async (spotId: string): Promise<void> => {
   });
 };
 
+const getAllTenants = async (): Promise<IUser[]> => {
+  const tenants = await Users.find({ role: "TENANT" })
+    .populate("propertyId", "name address")
+    .populate("spotId", "spotNumber status size price description")
+    .sort({ createdAt: -1 });
+
+  // Transform the data to include lot number more prominently
+  const tenantsWithLotNumber = tenants.map(tenant => {
+    const tenantData = tenant.toObject() as any;
+
+    // Add lot number as a direct field for easier access
+    if (tenantData.spotId && typeof tenantData.spotId === "object") {
+      tenantData.lotNumber = tenantData.spotId.spotNumber;
+      tenantData.lotStatus = tenantData.spotId.status;
+      tenantData.lotSize = tenantData.spotId.size;
+      tenantData.lotPrice = tenantData.spotId.price;
+      tenantData.lotDescription = tenantData.spotId.description;
+    }
+
+    return tenantData;
+  });
+
+  return tenantsWithLotNumber;
+};
+
 export const AdminService = {
   inviteTenant,
   createProperty,
@@ -367,4 +421,5 @@ export const AdminService = {
   getSpotById,
   updateSpot,
   deleteSpot,
+  getAllTenants,
 };

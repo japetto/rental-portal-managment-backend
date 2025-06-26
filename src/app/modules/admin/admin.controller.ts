@@ -96,6 +96,17 @@ const inviteTenant = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllTenants = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.getAllTenants();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Tenants retrieved successfully",
+    data: result,
+  });
+});
+
 const createProperty = catchAsync(async (req: Request, res: Response) => {
   const propertyData: ICreateProperty = req.body;
   const result = await AdminService.createProperty(propertyData);
@@ -170,12 +181,21 @@ const createSpot = catchAsync(async (req: Request, res: Response) => {
 
 const getSpotsByProperty = catchAsync(async (req: Request, res: Response) => {
   const { propertyId } = req.params;
-  const result = await AdminService.getSpotsByProperty(propertyId);
+  const { status } = req.query;
+
+  const result = await AdminService.getSpotsByProperty(
+    propertyId,
+    status as string,
+  );
+
+  const message = status
+    ? `Spots with status '${status}' retrieved successfully`
+    : "All spots retrieved successfully";
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Spots retrieved successfully",
+    message,
     data: result,
   });
 });
@@ -219,6 +239,7 @@ const deleteSpot = catchAsync(async (req: Request, res: Response) => {
 
 export const AdminController = {
   inviteTenant,
+  getAllTenants,
   createProperty,
   getAllProperties,
   getPropertyById,
