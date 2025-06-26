@@ -1,9 +1,9 @@
-import CryptoJS from "crypto-js";
 import crypto from "crypto";
-import config from "../../../config/config";
-import { IUserWithoutPassword } from "./users.interface";
-import { jwtHelpers } from "../../../helpers/jwtHelpers";
+import CryptoJS from "crypto-js";
 import { Secret } from "jsonwebtoken";
+import config from "../../../config/config";
+import { jwtHelpers } from "../../../helpers/jwtHelpers";
+import { IUserWithoutPassword } from "./users.interface";
 
 export function generateUID(userRole: "hotelOwner" | "customer") {
   const uidLength = 20;

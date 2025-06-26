@@ -15,6 +15,21 @@ export const adminAuth = async (
     // Get token from request
     const token = verifyAuthToken(req);
 
+    // Check if JWT configuration is set
+    if (!config.jwt_secret) {
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Server configuration error: JWT_SECRET not set",
+      );
+    }
+
+    if (!config.jwt_expires_in) {
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Server configuration error: JWT_EXPIRES_IN not set",
+      );
+    }
+
     // Verify token
     const verifiedToken = jwtHelpers.jwtVerify(token, config.jwt_secret);
 
@@ -41,6 +56,45 @@ export const adminAuth = async (
     req.user = user;
     next();
   } catch (error) {
+    // Handle specific JWT errors
+    if (error instanceof Error) {
+      if (error.message.includes("jwt expired")) {
+        next(
+          new ApiError(
+            httpStatus.UNAUTHORIZED,
+            "Token has expired. Please login again.",
+          ),
+        );
+        return;
+      }
+      if (error.message.includes("jwt malformed")) {
+        next(new ApiError(httpStatus.UNAUTHORIZED, "Invalid token format."));
+        return;
+      }
+      if (error.message.includes("invalid signature")) {
+        next(new ApiError(httpStatus.UNAUTHORIZED, "Invalid token signature."));
+        return;
+      }
+      if (error.message.includes("JWT_SECRET is not configured")) {
+        next(
+          new ApiError(
+            httpStatus.INTERNAL_SERVER_ERROR,
+            "Server configuration error: JWT_SECRET not set",
+          ),
+        );
+        return;
+      }
+      if (error.message.includes("JWT_EXPIRES_IN is not configured")) {
+        next(
+          new ApiError(
+            httpStatus.INTERNAL_SERVER_ERROR,
+            "Server configuration error: JWT_EXPIRES_IN not set",
+          ),
+        );
+        return;
+      }
+    }
+
     next(error);
   }
 };
