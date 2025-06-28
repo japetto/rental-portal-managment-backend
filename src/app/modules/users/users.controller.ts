@@ -137,9 +137,140 @@ const userLogin = catchAsync(async (req: Request, res: Response) => {
 //   });
 // });
 
+// Set Password for Invited Users
+const setPassword = catchAsync(async (req: Request, res: Response) => {
+  const { ...passwordData } = req.body;
+
+  const result = await UserService.setPassword(passwordData);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Password set successfully",
+    data: result,
+  });
+});
+
+// Update User Info (Admin only)
+const updateUserInfo = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { ...updateData } = req.body;
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await UserService.updateUserInfo(userId, updateData, adminId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User information updated successfully",
+    data: result,
+  });
+});
+
+// Delete User (Super Admin only)
+const deleteUser = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await UserService.deleteUser(userId, adminId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User deleted successfully",
+    data: result,
+  });
+});
+
+// Get All Users (Admin only)
+const getAllUsers = catchAsync(async (req: Request, res: Response) => {
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await UserService.getAllUsers(adminId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Users retrieved successfully",
+    data: result,
+  });
+});
+
+// Get All Tenants (Admin only)
+const getAllTenants = catchAsync(async (req: Request, res: Response) => {
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await UserService.getAllTenants(adminId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Tenants retrieved successfully",
+    data: result,
+  });
+});
+
+// Get User by ID (Admin only)
+const getUserById = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await UserService.getUserById(userId, adminId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User retrieved successfully",
+    data: result,
+  });
+});
+
+// Check User Invitation Status
+const checkUserInvitationStatus = catchAsync(
+  async (req: Request, res: Response) => {
+    const { email } = req.params;
+
+    const result = await UserService.checkUserInvitationStatus(email);
+
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User invitation status retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const UserController = {
   userRegister,
   userLogin,
+  setPassword,
+  updateUserInfo,
+  deleteUser,
+  getAllUsers,
+  getAllTenants,
+  getUserById,
+  checkUserInvitationStatus,
   // checkUserForProviderLogin,
   // providerLogin,
   // updatedUser,

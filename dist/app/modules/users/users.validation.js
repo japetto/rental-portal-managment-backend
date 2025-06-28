@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserValidation = exports.createUserValidationSchema = void 0;
+exports.UserValidation = exports.deleteUserValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
 const zod_1 = require("zod");
 const user_constant_1 = require("./user.constant");
 const usersZodSchema = zod_1.z.object({
@@ -120,9 +120,50 @@ exports.createUserValidationSchema = zod_1.z.object({
         path: ["confirmPassword"],
     }),
 });
+exports.setPasswordValidationSchema = zod_1.z.object({
+    body: zod_1.z
+        .object({
+        email: zod_1.z.string().email("Invalid email format"),
+        password: zod_1.z.string().min(6, "Password must be at least 6 characters"),
+        confirmPassword: zod_1.z
+            .string()
+            .min(6, "Confirm password must be at least 6 characters"),
+    })
+        .refine(data => data.password === data.confirmPassword, {
+        message: "Passwords don't match",
+        path: ["confirmPassword"],
+    }),
+});
+exports.updateUserInfoValidationSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        name: zod_1.z.string().optional(),
+        phoneNumber: zod_1.z.string().optional(),
+        preferredLocation: zod_1.z.string().optional(),
+        bio: zod_1.z.string().optional(),
+        profileImage: zod_1.z.string().optional(),
+        emergencyContact: zod_1.z
+            .object({
+            name: zod_1.z.string().min(1, "Emergency contact name is required"),
+            phone: zod_1.z.string().min(1, "Emergency contact phone is required"),
+            relationship: zod_1.z
+                .string()
+                .min(1, "Emergency contact relationship is required"),
+        })
+            .optional(),
+        specialRequests: zod_1.z.array(zod_1.z.string()).optional(),
+    }),
+});
+exports.deleteUserValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        userId: zod_1.z.string().min(1, "User ID is required"),
+    }),
+});
 exports.UserValidation = {
     usersZodSchema,
     loginUserZodSchema,
     userUpdateZodSchema,
     updatePasswordZodSchema,
+    setPasswordValidationSchema: exports.setPasswordValidationSchema,
+    updateUserInfoValidationSchema: exports.updateUserInfoValidationSchema,
+    deleteUserValidationSchema: exports.deleteUserValidationSchema,
 };

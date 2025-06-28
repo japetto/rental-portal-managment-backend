@@ -1,4 +1,5 @@
 import express from "express";
+import { adminAuth } from "../../../middlewares/adminAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import { UserController } from "./users.controller";
 import { UserValidation } from "./users.validation";
@@ -15,6 +16,37 @@ router.post(
   "/login",
   zodValidationRequest(UserValidation.loginUserZodSchema),
   UserController.userLogin,
+);
+
+// Set password for invited users
+router.post(
+  "/set-password",
+  zodValidationRequest(UserValidation.setPasswordValidationSchema),
+  UserController.setPassword,
+);
+
+// Check user invitation status
+router.get("/check-status/:email", UserController.checkUserInvitationStatus);
+
+// Admin routes - require authentication
+router.get("/", adminAuth, UserController.getAllUsers);
+
+router.get("/tenants", adminAuth, UserController.getAllTenants);
+
+router.get("/:userId", adminAuth, UserController.getUserById);
+
+router.patch(
+  "/:userId",
+  adminAuth,
+  zodValidationRequest(UserValidation.updateUserInfoValidationSchema),
+  UserController.updateUserInfo,
+);
+
+router.delete(
+  "/:userId",
+  adminAuth,
+  zodValidationRequest(UserValidation.deleteUserValidationSchema),
+  UserController.deleteUser,
 );
 
 // router.post(

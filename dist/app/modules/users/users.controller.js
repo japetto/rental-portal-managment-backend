@@ -136,9 +136,101 @@ const userLogin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
 //     data: result,
 //   });
 // });
+// Set Password for Invited Users
+const setPassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const passwordData = __rest(req.body, []);
+    const result = yield users_service_1.UserService.setPassword(passwordData);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Password set successfully",
+        data: result,
+    });
+}));
+// Update User Info (Admin only)
+const updateUserInfo = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const updateData = __rest(req.body, []);
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield users_service_1.UserService.updateUserInfo(userId, updateData, adminId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "User information updated successfully",
+        data: result,
+    });
+}));
+// Delete User (Super Admin only)
+const deleteUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield users_service_1.UserService.deleteUser(userId, adminId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "User deleted successfully",
+        data: result,
+    });
+}));
+// Get All Users (Admin only)
+const getAllUsers = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield users_service_1.UserService.getAllUsers(adminId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Users retrieved successfully",
+        data: result,
+    });
+}));
+// Get User by ID (Admin only)
+const getUserById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield users_service_1.UserService.getUserById(userId, adminId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "User retrieved successfully",
+        data: result,
+    });
+}));
+// Check User Invitation Status
+const checkUserInvitationStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email } = req.params;
+    const result = yield users_service_1.UserService.checkUserInvitationStatus(email);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "User invitation status retrieved successfully",
+        data: result,
+    });
+}));
 exports.UserController = {
     userRegister,
     userLogin,
+    setPassword,
+    updateUserInfo,
+    deleteUser,
+    getAllUsers,
+    getUserById,
+    checkUserInvitationStatus,
     // checkUserForProviderLogin,
     // providerLogin,
     // updatedUser,

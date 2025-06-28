@@ -1,5 +1,14 @@
 import { Document, Types } from "mongoose";
 
+// Extend Express Request interface to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: IUser;
+    }
+  }
+}
+
 export type userRoleEnums = "SUPER_ADMIN" | "TENANT";
 
 export interface IUser extends Document {
@@ -69,4 +78,28 @@ export interface IForgetPasswordValidator {
 export interface IUpdatePasswordValidator {
   email: string;
   password: string;
+}
+
+export interface ISetPassword {
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface IUpdateUserInfo {
+  name?: string;
+  phoneNumber?: string;
+  preferredLocation?: string;
+  bio?: string;
+  profileImage?: string;
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  specialRequests?: string[];
+}
+
+export interface IDeleteUser {
+  userId: string;
 }

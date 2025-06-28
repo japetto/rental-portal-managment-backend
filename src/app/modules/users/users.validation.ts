@@ -124,9 +124,53 @@ export const createUserValidationSchema = z.object({
     }),
 });
 
+export const setPasswordValidationSchema = z.object({
+  body: z
+    .object({
+      email: z.string().email("Invalid email format"),
+      password: z.string().min(6, "Password must be at least 6 characters"),
+      confirmPassword: z
+        .string()
+        .min(6, "Confirm password must be at least 6 characters"),
+    })
+    .refine(data => data.password === data.confirmPassword, {
+      message: "Passwords don't match",
+      path: ["confirmPassword"],
+    }),
+});
+
+export const updateUserInfoValidationSchema = z.object({
+  body: z.object({
+    name: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    preferredLocation: z.string().optional(),
+    bio: z.string().optional(),
+    profileImage: z.string().optional(),
+    emergencyContact: z
+      .object({
+        name: z.string().min(1, "Emergency contact name is required"),
+        phone: z.string().min(1, "Emergency contact phone is required"),
+        relationship: z
+          .string()
+          .min(1, "Emergency contact relationship is required"),
+      })
+      .optional(),
+    specialRequests: z.array(z.string()).optional(),
+  }),
+});
+
+export const deleteUserValidationSchema = z.object({
+  params: z.object({
+    userId: z.string().min(1, "User ID is required"),
+  }),
+});
+
 export const UserValidation = {
   usersZodSchema,
   loginUserZodSchema,
   userUpdateZodSchema,
   updatePasswordZodSchema,
+  setPasswordValidationSchema,
+  updateUserInfoValidationSchema,
+  deleteUserValidationSchema,
 };

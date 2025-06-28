@@ -1,7 +1,14 @@
 import bcrypt from "bcrypt";
 import httpStatus from "http-status";
+import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
-import { IAuthUser, ILoginUser, IUser } from "./users.interface";
+import {
+  IAuthUser,
+  ILoginUser,
+  ISetPassword,
+  IUpdateUserInfo,
+  IUser,
+} from "./users.interface";
 import { Users } from "./users.schema";
 import { generateAuthToken } from "./users.utils";
 
@@ -16,7 +23,14 @@ const userRegister = async (payload: IUser): Promise<IAuthUser> => {
     throw new ApiError(httpStatus.CONFLICT, "Email or Contact Already Exists");
   }
 
-  const user = await Users.create(payload);
+  // For regular user registration, set appropriate flags
+  const userData = {
+    ...payload,
+    isInvited: false,
+    isVerified: true, // Regular users are verified by default
+  };
+
+  const user = await Users.create(userData);
 
   return generateAuthToken(user as any);
 };
@@ -31,6 +45,22 @@ const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid Email Or Password");
   }
 
+  // Check if user is invited but hasn't set password yet
+  if (isExists.isInvited && (!isExists.password || isExists.password === "")) {
+    throw new ApiError(
+      httpStatus.UNAUTHORIZED,
+      "Please set your password first. Use the set-password endpoint.",
+    );
+  }
+
+  // Check if user is verified
+  if (!isExists.isVerified) {
+    throw new ApiError(
+      httpStatus.UNAUTHORIZED,
+      "Account not verified. Please contact administrator.",
+    );
+  }
+
   const checkPassword = await bcrypt.compare(password, isExists.password);
 
   if (!checkPassword) {
@@ -40,350 +70,243 @@ const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
   return generateAuthToken(isExists as any);
 };
 
-// //* Check User for Provider Login
-// const checkUserForProviderLogin = async (
-//   payload: ICheckUserExists,
-// ): Promise<IAuthUser | null> => {
-//   const { email } = payload;
+//* Set Password for Invited Users
+const setPassword = async (
+  payload: ISetPassword,
+): Promise<{ message: string }> => {
+  const { email, password } = payload;
 
-//   const isExistsUser = await Users.findOne({ email });
-//   if (!isExistsUser) {
-//     throw new ApiError(httpStatus.NOT_FOUND, "User Dose Not Exists!");
-//   }
+  const user = await Users.findOne({ email }).select("+password");
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
 
-//   if (isExistsUser) {
-//     const updatedUser = await Users.findOneAndUpdate({ email }, isExistsUser, {
-//       new: true,
-//     });
-//     return generateAuthToken(updatedUser as any);
-//   }
+  if (!user.isInvited) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "User is not invited. Cannot set password.",
+    );
+  }
 
-//   return null;
-// };
+  if (user.password && user.password !== "") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Password already set. Use update password instead.",
+    );
+  }
 
-// //* Provider Login
-// const providerLogin = async (payload: IUser): Promise<IAuthUser> => {
-//   const { email } = payload;
+  const hashedPassword = await bcrypt.hash(password, Number(config.salt_round));
 
-//   const isExistsUser = await Users.findOne({ email });
-//   if (isExistsUser) {
-//     if (!isExistsUser.isInvited) {
-//       const updatedUser = await Users.findOneAndUpdate(
-//         { email },
-//         isExistsUser,
-//         {
-//           new: true,
-//         },
-//       );
-//       return generateAuthToken(updatedUser as any);
-//     }
+  await Users.findOneAndUpdate(
+    { email },
+    {
+      password: hashedPassword,
+      isInvited: false,
+      isVerified: true,
+    },
+    { new: true },
+  );
 
-//     if (isExistsUser.isInvited) {
-//       return generateAuthToken(isExistsUser as any);
-//     }
-//   }
+  return {
+    message: "Password set successfully. You can now login.",
+  };
+};
 
-//   const isEmailExists = await Users.findOne({ email: email });
-//   if (isEmailExists) {
-//     throw new ApiError(
-//       httpStatus.CONFLICT,
-//       "Something went wrong! Please try again",
-//     );
-//   }
+//* Update User Info (Admin only)
+const updateUserInfo = async (
+  userId: string,
+  payload: IUpdateUserInfo,
+  adminId: string,
+): Promise<IUser> => {
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
 
-//   const user = await Users.create(payload);
+  // Check if the admin is trying to update themselves
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can update user information",
+    );
+  }
 
-//   return generateAuthToken(user as any);
-// };
+  // Check for phone number uniqueness if being updated
+  if (payload.phoneNumber && payload.phoneNumber !== user.phoneNumber) {
+    const existingUser = await Users.findOne({
+      phoneNumber: payload.phoneNumber,
+    });
+    if (existingUser) {
+      throw new ApiError(httpStatus.CONFLICT, "Phone number already exists");
+    }
+  }
 
-// //* Update User
-// const updateUser = async (
-//   userID: string,
-//   payload: Partial<IUser>,
-//   token: string,
-// ): Promise<IAuthUser | null> => {
-//   jwtHelpers.jwtVerify(token, config.jwt_secret as Secret);
+  const updatedUser = await Users.findByIdAndUpdate(userId, payload, {
+    new: true,
+    runValidators: true,
+  });
 
-//   const isExistsUser = await Users.findById({ _id: userID });
-//   if (!isExistsUser) {
-//     throw new ApiError(httpStatus.NOT_FOUND, "User Not Found");
-//   }
+  if (!updatedUser) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to update user",
+    );
+  }
 
-//   const {
-//     email,
-//     phoneNumber,
-//     ...updatePayload
-//   } = payload;
+  return updatedUser;
+};
 
-//   if (email !== undefined || phoneNumber !== undefined) {
-//     throw new ApiError(
-//       httpStatus.UNAUTHORIZED,
-//       "Permission Denied! Please Try Again.",
-//     );
-//   }
+//* Delete User (Super Admin only, cannot delete self)
+const deleteUser = async (
+  userId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  // Prevent admin from deleting themselves
+  if (userId === adminId) {
+    throw new ApiError(httpStatus.FORBIDDEN, "Cannot delete your own account");
+  }
 
-//   if (payload.email) {
-//     const isExists = await Users.findOne({ email: payload.email });
-//     if (isExists) {
-//       throw new ApiError(
-//         httpStatus.FORBIDDEN,
-//         "Email Already Exists! Try Another One.",
-//       );
-//     }
-//     updatePayload.email = payload.email;
-//   }
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can delete users",
+    );
+  }
 
-//   if (payload.phoneNumber) {
-//     const isExists = await Users.findOne({
-//       phoneNumber: payload.phoneNumber,
-//     });
-//     if (isExists) {
-//       throw new ApiError(
-//         httpStatus.FORBIDDEN,
-//         "Contact Number Already Exists! Try Another One.",
-//       );
-//     }
-//     updatePayload.contactNumber = payload.contactNumber;
-//   }
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
 
-//   if (location && Object.keys(location).length > 0) {
-//     Object.keys(location).map(key => {
-//       const locationsKey = `location.${key}`;
-//       (updatePayload as any)[locationsKey] =
-//         location[key as keyof typeof location];
-//     });
-//   }
+  // Check if user has active leases or other dependencies
+  // You might want to add additional checks here based on your business logic
+  if (user.propertyId || user.spotId) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot delete user with active property or spot assignments. Please remove assignments first.",
+    );
+  }
 
-//   if (socialLinks && Object.keys(socialLinks).length > 0) {
-//     Object.keys(socialLinks).map(key => {
-//       const locationsKey = `socialLinks.${key}`;
-//       (updatePayload as any)[locationsKey] =
-//         socialLinks[key as keyof typeof socialLinks];
-//     });
-//   }
+  await Users.findByIdAndDelete(userId);
 
-//   if (dateOfBirth && Object.keys(dateOfBirth).length > 0) {
-//     Object.keys(dateOfBirth).map(key => {
-//       const locationsKey = `dateOfBirth.${key}`;
-//       (updatePayload as any)[locationsKey] =
-//         dateOfBirth[key as keyof typeof dateOfBirth];
-//     });
-//   }
+  return {
+    message: "User deleted successfully",
+  };
+};
 
-//   const user = await Users.findOneAndUpdate({ _id: userID }, updatePayload, {
-//     new: true,
-//   });
+//* Get All Users (Admin only)
+const getAllUsers = async (adminId: string): Promise<IUser[]> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view all users",
+    );
+  }
 
-//   return generateAuthToken(user as any);
-// };
+  const users = await Users.find({})
+    .select("-password")
+    .populate({
+      path: "propertyId",
+      select:
+        "name description address amenities totalLots availableLots isActive images rules",
+    })
+    .populate({
+      path: "spotId",
+      select:
+        "spotNumber status size amenities hookups price description images isActive",
+    });
 
-// // * For Updating the password
-// const updatePassword = async (
-//   payload: IUpdatePassword,
-//   token: string,
-// ): Promise<IAuthUser | null> => {
-//   jwtHelpers.jwtVerify(token, config.jwt_secret as Secret);
+  return users;
+};
 
-//   const { userId, currentPassword, newPassword, confirmPassword } = payload;
+//* Get All Tenants (Admin only) - with property and spot data
+const getAllTenants = async (adminId: string): Promise<IUser[]> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view tenants",
+    );
+  }
 
-//   const isExistsUser = await Users.findById({ _id: userId });
-//   if (!isExistsUser) {
-//     throw new ApiError(httpStatus.NOT_FOUND, "User Not Found");
-//   }
+  const tenants = await Users.find({ role: "TENANT" })
+    .select("-password")
+    .populate({
+      path: "propertyId",
+      select:
+        "name description address amenities totalLots availableLots isActive images rules",
+    })
+    .populate({
+      path: "spotId",
+      select:
+        "spotNumber status size amenities hookups price description images isActive",
+    });
 
-//   const isPassMatched = await bcrypt.compare(
-//     currentPassword,
-//     isExistsUser.password as string,
-//   );
+  return tenants;
+};
 
-//   if (!isPassMatched) {
-//     throw new ApiError(
-//       httpStatus.UNAUTHORIZED,
-//       "Incorrect current password. Please try again.",
-//     );
-//   }
+//* Get User by ID (Admin only)
+const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view user details",
+    );
+  }
 
-//   const isPreviousPass = await bcrypt.compare(
-//     newPassword,
-//     isExistsUser.password as string,
-//   );
+  const user = await Users.findById(userId)
+    .select("-password")
+    .populate({
+      path: "propertyId",
+      select:
+        "name description address amenities totalLots availableLots isActive images rules",
+    })
+    .populate({
+      path: "spotId",
+      select:
+        "spotNumber status size amenities hookups price description images isActive",
+    });
 
-//   if (isPreviousPass || currentPassword === newPassword) {
-//     throw new ApiError(
-//       httpStatus.FORBIDDEN,
-//       "New Password Cannot be The Previous Password",
-//     );
-//   }
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
 
-//   if (newPassword !== confirmPassword) {
-//     throw new ApiError(
-//       httpStatus.FORBIDDEN,
-//       "New Password and Confirm Password must match.",
-//     );
-//   }
+  return user;
+};
 
-//   const pass = await bcrypt.hash(newPassword, Number(config.salt_round));
-//   isExistsUser.password = pass;
+//* Check User Invitation Status
+const checkUserInvitationStatus = async (
+  email: string,
+): Promise<{
+  isInvited: boolean;
+  isVerified: boolean;
+  hasPassword: boolean;
+}> => {
+  const user = await Users.findOne({ email }).select("+password");
 
-//   const user = await Users.findOneAndUpdate({ _id: userId }, isExistsUser, {
-//     new: true,
-//   });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
 
-//   return generateAuthToken(user as any);
-// };
-
-// //* Forgot Password Part-1 Find user via email
-// const findUserForForgotPassword = async (
-//   email: string,
-// ): Promise<IForgetPasswordValidator> => {
-//   const user = await Users.findOne(
-//     { email: email },
-//     {
-//       _id: 0,
-//       email: 1,
-//     },
-//   ).lean();
-
-//   if (!user) {
-//     throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
-//   }
-
-//   const redis = new Redis({
-//     url: config.redis_host,
-//     token: config.redis_password,
-//   });
-
-//   const otp = crypto.randomInt(100000, 999999).toString();
-//   const dataToEncrypt = JSON.stringify({ otp: otp, verified: false });
-//   const encryptData = encryptForgotPasswordResponse(dataToEncrypt);
-//   await redis.set(email, encryptData, { ex: 180 });
-
-//   const transporter = nodemailer.createTransport({
-//     host: "smtp.gmail.com",
-//     port: 587,
-//     secure: false,
-//     auth: {
-//       user: config.nodemailer_user,
-//       pass: config.nodemailer_pass,
-//     },
-//   });
-
-//   await transporter.sendMail({
-//     to: email,
-//     subject: "OTP For Reset Password",
-//     text: `Your OTP is ${otp}`,
-//   });
-
-//   return user;
-// };
-
-// //* Forgot Password Part-2
-// const verifyOtpForForgotPassword = async (email: string, otp: string) => {
-//   const user = await Users.findOne(
-//     { email: email },
-//     {
-//       _id: 0,
-//       email: 1,
-//     },
-//   ).lean();
-//   if (!user) {
-//     throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
-//   }
-
-//   const redis = new Redis({
-//     url: config.redis_host,
-//     token: config.redis_password,
-//   });
-
-//   const encryptData = await redis.get(email);
-//   if (!encryptData) {
-//     throw new ApiError(httpStatus.BAD_REQUEST, "OTP expired or not found.");
-//   }
-
-//   const decryptedData = decryptForgotPasswordResponse(encryptData as string);
-//   const { otp: storedOtp, verified } = JSON.parse(decryptedData);
-
-//   if (Number(storedOtp) !== Number(otp)) {
-//     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid OTP!");
-//   }
-
-//   if (verified === true) {
-//     throw new ApiError(httpStatus.BAD_REQUEST, "OTP Already Verified!");
-//   }
-
-//   const updatedData = JSON.stringify({ otp: storedOtp, verified: true });
-//   const encryptUpdatedData = encryptForgotPasswordResponse(updatedData);
-//   await redis.set(email, encryptUpdatedData, { ex: 180 });
-
-//   return { message: "OTP verified successfully." };
-// };
-
-// //* Forgot Password Part-3
-// const forgotPassword = async (
-//   payload: IUpdatePasswordValidator,
-// ): Promise<string | null> => {
-//   const { email, password } = payload;
-//   const isExistsUser = await Users.findOne({ email: email });
-//   if (!isExistsUser) {
-//     throw new ApiError(httpStatus.NOT_FOUND, "Invalid User!");
-//   }
-
-//   const redis = new Redis({
-//     url: config.redis_host,
-//     token: config.redis_password,
-//   });
-
-//   const encryptedRedisResponse = await redis.get(email);
-//   if (!encryptedRedisResponse) {
-//     throw new ApiError(
-//       httpStatus.BAD_REQUEST,
-//       "Failed to Update! Please try again.",
-//     );
-//   }
-
-//   const decryptedData = decryptForgotPasswordResponse(
-//     encryptedRedisResponse as string,
-//   );
-//   const { verified } = JSON.parse(decryptedData);
-
-//   if (verified !== true) {
-//     throw new ApiError(
-//       httpStatus.BAD_REQUEST,
-//       "Failed to Update! Please try again.",
-//     );
-//   }
-
-//   const isPreviousPass = await bcrypt.compare(
-//     password,
-//     isExistsUser.password as string,
-//   );
-
-//   if (isPreviousPass) {
-//     throw new ApiError(
-//       httpStatus.FORBIDDEN,
-//       "New Password Cannot be The Previous Password",
-//     );
-//   }
-//   const newPass = await bcrypt.hash(password, Number(config.salt_round));
-//   payload.password = newPass;
-
-//   await Users.findOneAndUpdate({ email: email }, payload, {
-//     new: true,
-//   });
-
-//   await redis.del(email);
-
-//   return null;
-// };
+  return {
+    isInvited: user.isInvited || false,
+    isVerified: user.isVerified || false,
+    hasPassword: !!(user.password && user.password !== ""),
+  };
+};
 
 export const UserService = {
   userRegister,
   userLogin,
-  // checkUserForProviderLogin,
-  // providerLogin,
-  // updateUser,
-  // updatePassword,
-  // findUserForForgotPassword,
-  // verifyOtpForForgotPassword,
-  // forgotPassword,
+  setPassword,
+  updateUserInfo,
+  deleteUser,
+  getAllUsers,
+  getAllTenants,
+  getUserById,
+  checkUserInvitationStatus,
 };
