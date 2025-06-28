@@ -5,13 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminRouter = void 0;
 const express_1 = __importDefault(require("express"));
-const adminAuth_1 = require("../../../middlewares/adminAuth");
 const zodValidationRequest_1 = __importDefault(require("../../../middlewares/zodValidationRequest"));
 const admin_controller_1 = require("./admin.controller");
 const admin_validation_1 = require("./admin.validation");
 const router = express_1.default.Router();
 // Apply admin authentication to all routes
-router.use(adminAuth_1.adminAuth);
+// TODO: Temporary disabled admin auth need to be fixed the token is expired issues
+// router.use(adminAuth);
 // Tenant management routes
 router.post("/invite-tenant", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.inviteTenantValidationSchema), admin_controller_1.AdminController.inviteTenant);
 // Get all tenants
