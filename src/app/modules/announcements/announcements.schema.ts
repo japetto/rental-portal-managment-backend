@@ -3,8 +3,18 @@ import { IAnnouncement } from "./announcements.interface";
 
 export const announcementsSchema = new Schema<IAnnouncement>(
   {
-    title: { type: String, required: true },
-    content: { type: String, required: true },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [200, "Title cannot exceed 200 characters"],
+    },
+    content: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [5000, "Content cannot exceed 5000 characters"],
+    },
     type: {
       type: String,
       enum: ["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"],
@@ -16,13 +26,74 @@ export const announcementsSchema = new Schema<IAnnouncement>(
       required: true,
       default: "MEDIUM",
     },
-    propertyId: { type: Schema.Types.ObjectId, ref: "Properties" }, // Optional - system-wide if null
-    isActive: { type: Boolean, required: true, default: true },
-    publishDate: { type: Date, required: true, default: Date.now },
-    expiryDate: { type: Date },
-    createdBy: { type: String, required: true },
-    attachments: [{ type: String }],
-    readBy: [{ type: Schema.Types.ObjectId, ref: "Users" }],
+    propertyId: {
+      type: Schema.Types.ObjectId,
+      ref: "Properties",
+      required: false, // Optional - system-wide if null
+    },
+    isActive: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
+    publishDate: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    expiryDate: {
+      type: Date,
+      validate: {
+        validator: function (this: IAnnouncement, value: Date) {
+          // Expiry date should be after publish date
+          if (value && this.publishDate && value <= this.publishDate) {
+            return false;
+          }
+          return true;
+        },
+        message: "Expiry date must be after publish date",
+      },
+    },
+    createdBy: {
+      type: String,
+      required: true,
+    },
+    attachments: [
+      {
+        type: String,
+        validate: {
+          validator: function (v: string) {
+            // Basic URL validation
+            return /^https?:\/\/.+/.test(v);
+          },
+          message: "Attachment must be a valid URL",
+        },
+      },
+    ],
+    readBy: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Users",
+      },
+    ],
+    // Add target audience for better filtering
+    targetAudience: {
+      type: String,
+      enum: ["ALL", "TENANTS_ONLY", "ADMINS_ONLY", "PROPERTY_SPECIFIC"],
+      default: "ALL",
+    },
+    // Add notification settings
+    sendNotification: {
+      type: Boolean,
+      default: true,
+    },
+    // Add tags for better categorization
+    tags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
   },
   {
     timestamps: true,
@@ -32,17 +103,33 @@ export const announcementsSchema = new Schema<IAnnouncement>(
   },
 );
 
-// Indexes for efficient queries
-announcementsSchema.index({ propertyId: 1, isActive: 1 });
-announcementsSchema.index({ type: 1, priority: 1 });
-announcementsSchema.index({ publishDate: 1 });
-announcementsSchema.index({ expiryDate: 1 });
-announcementsSchema.index({ readBy: 1 });
-
 // Virtual to check if announcement is expired
 announcementsSchema.virtual("isExpired").get(function (this: IAnnouncement) {
   if (!this.expiryDate) return false;
   return new Date() > this.expiryDate;
+});
+
+// Virtual to check if announcement is currently active (not expired and active)
+announcementsSchema.virtual("isCurrentlyActive").get(function (
+  this: IAnnouncement,
+) {
+  if (!this.isActive) return false;
+  if (this.expiryDate && new Date() > this.expiryDate) return false;
+  return new Date() >= this.publishDate;
+});
+
+// Virtual to get read count
+announcementsSchema.virtual("readCount").get(function (this: IAnnouncement) {
+  return this.readBy ? this.readBy.length : 0;
+});
+
+// Pre-save middleware to set default publish date if not provided
+announcementsSchema.pre("save", function (next) {
+  const doc = this as any;
+  if (!doc.publishDate) {
+    doc.publishDate = new Date();
+  }
+  next();
 });
 
 export const Announcements = model<IAnnouncement>(

@@ -7,6 +7,11 @@ export type AnnouncementType =
   | "EMERGENCY"
   | "RULE_UPDATE";
 export type AnnouncementPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type AnnouncementTargetAudience =
+  | "ALL"
+  | "TENANTS_ONLY"
+  | "ADMINS_ONLY"
+  | "PROPERTY_SPECIFIC";
 
 export interface IAnnouncement extends Document {
   title: string;
@@ -20,8 +25,15 @@ export interface IAnnouncement extends Document {
   createdBy: string; // Admin who created the announcement
   attachments: string[]; // URLs to attached files/images
   readBy: Types.ObjectId[]; // Array of user IDs who have read this announcement
+  targetAudience: AnnouncementTargetAudience;
+  sendNotification: boolean;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
+  // Virtual fields
+  isExpired: boolean;
+  isCurrentlyActive: boolean;
+  readCount: number;
 }
 
 export interface ICreateAnnouncement {
@@ -32,6 +44,9 @@ export interface ICreateAnnouncement {
   propertyId?: string; // Optional - if not provided, it's system-wide
   expiryDate?: Date;
   attachments?: string[];
+  targetAudience?: AnnouncementTargetAudience;
+  sendNotification?: boolean;
+  tags?: string[];
 }
 
 export interface IUpdateAnnouncement {
@@ -43,6 +58,9 @@ export interface IUpdateAnnouncement {
   isActive?: boolean;
   expiryDate?: Date;
   attachments?: string[];
+  targetAudience?: AnnouncementTargetAudience;
+  sendNotification?: boolean;
+  tags?: string[];
 }
 
 export interface IMarkAsRead {

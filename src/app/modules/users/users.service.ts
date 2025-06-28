@@ -53,8 +53,16 @@ const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
     );
   }
 
-  // Check if user is verified
-  if (!isExists.isVerified) {
+  // Check if user has a password (for invited users who haven't set password)
+  if (!isExists.password || isExists.password === "") {
+    throw new ApiError(
+      httpStatus.UNAUTHORIZED,
+      "Please set your password first. Use the set-password endpoint.",
+    );
+  }
+
+  // Check if user is verified (only for non-invited users)
+  if (!isExists.isInvited && !isExists.isVerified) {
     throw new ApiError(
       httpStatus.UNAUTHORIZED,
       "Account not verified. Please contact administrator.",

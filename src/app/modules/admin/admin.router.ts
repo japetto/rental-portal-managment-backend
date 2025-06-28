@@ -55,12 +55,14 @@ router.get("/properties/:propertyId/spots", AdminController.getSpotsByProperty);
 // Get a spot by id
 router.get("/spots/:id", AdminController.getSpotById);
 
+// Update a spot
 router.patch(
   "/spots/:id",
   zodValidationRequest(AdminValidation.updateSpotValidationSchema),
   AdminController.updateSpot,
 );
 
+// Delete a spot
 router.delete("/spots/:id", AdminController.deleteSpot);
 
 export const AdminRouter = router;
