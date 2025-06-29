@@ -23,6 +23,7 @@ const jwtVerify = (token, secret) => {
         throw new Error("JWT_SECRET is not configured");
     }
     try {
+        console.log("🚀 ~ secret:", secret);
         return jsonwebtoken_1.default.verify(token, secret);
     }
     catch (error) {
