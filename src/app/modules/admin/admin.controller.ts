@@ -4,6 +4,7 @@ import config from "../../../config/config";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import {
+  IAdminUpdateUser,
   ICreateProperty,
   ICreateSpot,
   IInviteTenant,
@@ -460,11 +461,80 @@ const getServiceRequestDashboardStats = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Service request dashboard statistics retrieved successfully",
+      message: "Service request dashboard stats retrieved successfully",
       data: result,
     });
   },
 );
+
+// Admin User Management Controllers
+const getAllUsers = catchAsync(async (req: Request, res: Response) => {
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.getAllUsers(adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Users retrieved successfully",
+    data: result,
+  });
+});
+
+const getUserById = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.getUserById(userId, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User retrieved successfully",
+    data: result,
+  });
+});
+
+const updateUser = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const updateData: IAdminUpdateUser = req.body;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.updateUser(userId, updateData, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User updated successfully",
+    data: result,
+  });
+});
+
+const deleteUser = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.deleteUser(userId, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User deleted successfully",
+    data: result,
+  });
+});
 
 export const AdminController = {
   inviteTenant,
@@ -487,4 +557,8 @@ export const AdminController = {
   getServiceRequestsByTenant,
   getUrgentServiceRequests,
   getServiceRequestDashboardStats,
+  getAllUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
 };

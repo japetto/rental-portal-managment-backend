@@ -5,13 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminRouter = void 0;
 const express_1 = __importDefault(require("express"));
+const adminAuth_1 = require("../../../middlewares/adminAuth");
 const zodValidationRequest_1 = __importDefault(require("../../../middlewares/zodValidationRequest"));
 const admin_controller_1 = require("./admin.controller");
 const admin_validation_1 = require("./admin.validation");
 const router = express_1.default.Router();
 // Apply admin authentication to all routes
-// TODO: Temporary disabled admin auth need to be fixed the token is expired issues
-// router.use(adminAuth);
+router.use(adminAuth_1.adminAuth);
 // Tenant management routes
 router.post("/invite-tenant", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.inviteTenantValidationSchema), admin_controller_1.AdminController.inviteTenant);
 // Get all tenants
@@ -45,4 +45,12 @@ router.patch("/service-requests/:id", (0, zodValidationRequest_1.default)(admin_
 router.post("/service-requests/:id/comment", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminAddCommentValidationSchema), admin_controller_1.AdminController.addAdminComment);
 router.get("/properties/:propertyId/service-requests", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestsByPropertyValidationSchema), admin_controller_1.AdminController.getServiceRequestsByProperty);
 router.get("/tenants/:tenantId/service-requests", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestsByTenantValidationSchema), admin_controller_1.AdminController.getServiceRequestsByTenant);
+// Admin User Management Routes
+router.get("/users", admin_controller_1.AdminController.getAllUsers);
+// Get a user by id
+router.get("/users/:userId", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetUserValidationSchema), admin_controller_1.AdminController.getUserById);
+// Update a user
+router.patch("/users/:userId", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminUpdateUserValidationSchema), admin_controller_1.AdminController.updateUser);
+// Delete a user
+router.delete("/users/:userId", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminDeleteUserValidationSchema), admin_controller_1.AdminController.deleteUser);
 exports.AdminRouter = router;

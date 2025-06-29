@@ -87,3 +87,21 @@ export interface IUpdateProperty {
   images?: string[];
   rules?: string[];
 }
+
+// Admin User Management Interfaces
+export interface IAdminUpdateUser {
+  name?: string;
+  phoneNumber?: string;
+  preferredLocation?: string;
+  bio?: string;
+  profileImage?: string;
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  specialRequests?: string[];
+  role?: "SUPER_ADMIN" | "TENANT";
+  isVerified?: boolean;
+  isInvited?: boolean;
+}

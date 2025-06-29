@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdminValidation = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
+exports.AdminValidation = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
 const zod_1 = require("zod");
 // Custom ObjectId validation
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -230,6 +230,40 @@ exports.adminGetUrgentServiceRequestsValidationSchema = zod_1.z.object({
         limit: zod_1.z.string().regex(/^\d+$/, "Limit must be a number").optional(),
     }),
 });
+// Admin User Management Validation Schemas
+exports.adminGetUserValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        userId: zod_1.z.string().regex(objectIdRegex, "Invalid user ID format"),
+    }),
+});
+exports.adminUpdateUserValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        userId: zod_1.z.string().regex(objectIdRegex, "Invalid user ID format"),
+    }),
+    body: zod_1.z.object({
+        name: zod_1.z.string().min(1, "Name is required").optional(),
+        phoneNumber: zod_1.z.string().min(1, "Phone number is required").optional(),
+        preferredLocation: zod_1.z.string().optional(),
+        bio: zod_1.z.string().max(500, "Bio cannot exceed 500 characters").optional(),
+        profileImage: zod_1.z.string().url("Invalid image URL").optional(),
+        emergencyContact: zod_1.z
+            .object({
+            name: zod_1.z.string().min(1, "Emergency contact name is required"),
+            phone: zod_1.z.string().min(1, "Emergency contact phone is required"),
+            relationship: zod_1.z.string().min(1, "Relationship is required"),
+        })
+            .optional(),
+        specialRequests: zod_1.z.array(zod_1.z.string()).optional(),
+        role: zod_1.z.enum(["SUPER_ADMIN", "TENANT"]).optional(),
+        isVerified: zod_1.z.boolean().optional(),
+        isInvited: zod_1.z.boolean().optional(),
+    }),
+});
+exports.adminDeleteUserValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        userId: zod_1.z.string().regex(objectIdRegex, "Invalid user ID format"),
+    }),
+});
 exports.AdminValidation = {
     inviteTenantValidationSchema: exports.inviteTenantValidationSchema,
     createSpotValidationSchema: exports.createSpotValidationSchema,
@@ -243,4 +277,7 @@ exports.AdminValidation = {
     adminGetServiceRequestsByPropertyValidationSchema: exports.adminGetServiceRequestsByPropertyValidationSchema,
     adminGetServiceRequestsByTenantValidationSchema: exports.adminGetServiceRequestsByTenantValidationSchema,
     adminGetUrgentServiceRequestsValidationSchema: exports.adminGetUrgentServiceRequestsValidationSchema,
+    adminGetUserValidationSchema: exports.adminGetUserValidationSchema,
+    adminUpdateUserValidationSchema: exports.adminUpdateUserValidationSchema,
+    adminDeleteUserValidationSchema: exports.adminDeleteUserValidationSchema,
 };

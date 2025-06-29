@@ -1,4 +1,5 @@
 import express from "express";
+import { adminAuth } from "../../../middlewares/adminAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import { AdminController } from "./admin.controller";
 import { AdminValidation } from "./admin.validation";
@@ -6,8 +7,7 @@ import { AdminValidation } from "./admin.validation";
 const router = express.Router();
 
 // Apply admin authentication to all routes
-// TODO: Temporary disabled admin auth need to be fixed the token is expired issues
-// router.use(adminAuth);
+router.use(adminAuth);
 
 // Tenant management routes
 router.post(
@@ -119,6 +119,30 @@ router.get(
     AdminValidation.adminGetServiceRequestsByTenantValidationSchema,
   ),
   AdminController.getServiceRequestsByTenant,
+);
+
+// Admin User Management Routes
+router.get("/users", AdminController.getAllUsers);
+
+// Get a user by id
+router.get(
+  "/users/:userId",
+  zodValidationRequest(AdminValidation.adminGetUserValidationSchema),
+  AdminController.getUserById,
+);
+
+// Update a user
+router.patch(
+  "/users/:userId",
+  zodValidationRequest(AdminValidation.adminUpdateUserValidationSchema),
+  AdminController.updateUser,
+);
+
+// Delete a user
+router.delete(
+  "/users/:userId",
+  zodValidationRequest(AdminValidation.adminDeleteUserValidationSchema),
+  AdminController.deleteUser,
 );
 
 export const AdminRouter = router;

@@ -10,6 +10,7 @@ import { Spots } from "../spots/spots.schema";
 import { IUser } from "../users/users.interface";
 import { Users } from "../users/users.schema";
 import {
+  IAdminUpdateUser,
   ICreateProperty,
   ICreateSpot,
   IInviteTenant,
@@ -787,84 +788,149 @@ const getServiceRequestDashboardStats = async () => {
     status: "COMPLETED",
   });
   const urgentRequests = await ServiceRequests.countDocuments({
-    priority: { $in: ["HIGH", "URGENT"] },
+    priority: "URGENT",
     status: { $ne: "COMPLETED" },
   });
 
-  // Get requests by type
-  const typeStats = await ServiceRequests.aggregate([
-    {
-      $group: {
-        _id: "$type",
-        count: { $sum: 1 },
-        pending: {
-          $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
-        },
-        inProgress: {
-          $sum: { $cond: [{ $eq: ["$status", "IN_PROGRESS"] }, 1, 0] },
-        },
-        completed: {
-          $sum: { $cond: [{ $eq: ["$status", "COMPLETED"] }, 1, 0] },
-        },
-      },
-    },
-  ]);
+  return {
+    total: totalRequests,
+    pending: pendingRequests,
+    inProgress: inProgressRequests,
+    completed: completedRequests,
+    urgent: urgentRequests,
+  };
+};
 
-  // Get requests by property
-  const propertyStats = await ServiceRequests.aggregate([
-    {
-      $lookup: {
-        from: "properties",
-        localField: "propertyId",
-        foreignField: "_id",
-        as: "property",
-      },
-    },
-    {
-      $unwind: "$property",
-    },
-    {
-      $group: {
-        _id: "$propertyId",
-        propertyName: { $first: "$property.name" },
-        count: { $sum: 1 },
-        pending: {
-          $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
-        },
-        urgent: {
-          $sum: { $cond: [{ $in: ["$priority", ["HIGH", "URGENT"]] }, 1, 0] },
-        },
-      },
-    },
-    {
-      $sort: { count: -1 },
-    },
-  ]);
+// Admin User Management Services
+const getAllUsers = async (adminId: string): Promise<IUser[]> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view all users",
+    );
+  }
 
-  // Get recent activity (last 7 days)
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const users = await Users.find({})
+    .select("-password")
+    .sort({ createdAt: -1 });
+  return users;
+};
 
-  const recentActivity = await ServiceRequests.find({
-    createdAt: { $gte: sevenDaysAgo },
-  })
-    .populate("tenantId", "name email")
-    .populate("propertyId", "name")
-    .populate("spotId", "spotNumber")
-    .sort({ createdAt: -1 })
-    .limit(10);
+const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid user ID format");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view user details",
+    );
+  }
+
+  const user = await Users.findById(userId).select("-password");
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  return user;
+};
+
+const updateUser = async (
+  userId: string,
+  updateData: IAdminUpdateUser,
+  adminId: string,
+): Promise<IUser> => {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid user ID format");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can update user information",
+    );
+  }
+
+  // Prevent admin from updating themselves through this endpoint
+  if (userId === adminId) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Cannot update your own account through this endpoint",
+    );
+  }
+
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Check for phone number uniqueness if being updated
+  if (updateData.phoneNumber && updateData.phoneNumber !== user.phoneNumber) {
+    const existingUser = await Users.findOne({
+      phoneNumber: updateData.phoneNumber,
+    });
+    if (existingUser) {
+      throw new ApiError(httpStatus.CONFLICT, "Phone number already exists");
+    }
+  }
+
+  const updatedUser = await Users.findByIdAndUpdate(userId, updateData, {
+    new: true,
+    runValidators: true,
+  }).select("-password");
+
+  if (!updatedUser) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to update user",
+    );
+  }
+
+  return updatedUser;
+};
+
+const deleteUser = async (
+  userId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid user ID format");
+  }
+
+  // Prevent admin from deleting themselves
+  if (userId === adminId) {
+    throw new ApiError(httpStatus.FORBIDDEN, "Cannot delete your own account");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can delete users",
+    );
+  }
+
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Check if user has active property or spot assignments
+  if (user.propertyId || user.spotId) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot delete user with active property or spot assignments. Please remove assignments first.",
+    );
+  }
+
+  await Users.findByIdAndDelete(userId);
 
   return {
-    overview: {
-      total: totalRequests,
-      pending: pendingRequests,
-      inProgress: inProgressRequests,
-      completed: completedRequests,
-      urgent: urgentRequests,
-    },
-    byType: typeStats,
-    byProperty: propertyStats,
-    recentActivity,
+    message: "User deleted successfully",
   };
 };
 
@@ -889,4 +955,8 @@ export const AdminService = {
   getServiceRequestsByTenant,
   getUrgentServiceRequests,
   getServiceRequestDashboardStats,
+  getAllUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
 };

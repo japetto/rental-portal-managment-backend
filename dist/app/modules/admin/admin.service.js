@@ -515,79 +515,99 @@ const getServiceRequestDashboardStats = () => __awaiter(void 0, void 0, void 0, 
         status: "COMPLETED",
     });
     const urgentRequests = yield service_requests_schema_1.ServiceRequests.countDocuments({
-        priority: { $in: ["HIGH", "URGENT"] },
+        priority: "URGENT",
         status: { $ne: "COMPLETED" },
     });
-    // Get requests by type
-    const typeStats = yield service_requests_schema_1.ServiceRequests.aggregate([
-        {
-            $group: {
-                _id: "$type",
-                count: { $sum: 1 },
-                pending: {
-                    $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
-                },
-                inProgress: {
-                    $sum: { $cond: [{ $eq: ["$status", "IN_PROGRESS"] }, 1, 0] },
-                },
-                completed: {
-                    $sum: { $cond: [{ $eq: ["$status", "COMPLETED"] }, 1, 0] },
-                },
-            },
-        },
-    ]);
-    // Get requests by property
-    const propertyStats = yield service_requests_schema_1.ServiceRequests.aggregate([
-        {
-            $lookup: {
-                from: "properties",
-                localField: "propertyId",
-                foreignField: "_id",
-                as: "property",
-            },
-        },
-        {
-            $unwind: "$property",
-        },
-        {
-            $group: {
-                _id: "$propertyId",
-                propertyName: { $first: "$property.name" },
-                count: { $sum: 1 },
-                pending: {
-                    $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
-                },
-                urgent: {
-                    $sum: { $cond: [{ $in: ["$priority", ["HIGH", "URGENT"]] }, 1, 0] },
-                },
-            },
-        },
-        {
-            $sort: { count: -1 },
-        },
-    ]);
-    // Get recent activity (last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentActivity = yield service_requests_schema_1.ServiceRequests.find({
-        createdAt: { $gte: sevenDaysAgo },
-    })
-        .populate("tenantId", "name email")
-        .populate("propertyId", "name")
-        .populate("spotId", "spotNumber")
-        .sort({ createdAt: -1 })
-        .limit(10);
     return {
-        overview: {
-            total: totalRequests,
-            pending: pendingRequests,
-            inProgress: inProgressRequests,
-            completed: completedRequests,
-            urgent: urgentRequests,
-        },
-        byType: typeStats,
-        byProperty: propertyStats,
-        recentActivity,
+        total: totalRequests,
+        pending: pendingRequests,
+        inProgress: inProgressRequests,
+        completed: completedRequests,
+        urgent: urgentRequests,
+    };
+});
+// Admin User Management Services
+const getAllUsers = (adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    const admin = yield users_schema_1.Users.findById(adminId);
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view all users");
+    }
+    const users = yield users_schema_1.Users.find({})
+        .select("-password")
+        .sort({ createdAt: -1 });
+    return users;
+});
+const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid user ID format");
+    }
+    const admin = yield users_schema_1.Users.findById(adminId);
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view user details");
+    }
+    const user = yield users_schema_1.Users.findById(userId).select("-password");
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    return user;
+});
+const updateUser = (userId, updateData, adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid user ID format");
+    }
+    const admin = yield users_schema_1.Users.findById(adminId);
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can update user information");
+    }
+    // Prevent admin from updating themselves through this endpoint
+    if (userId === adminId) {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Cannot update your own account through this endpoint");
+    }
+    const user = yield users_schema_1.Users.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    // Check for phone number uniqueness if being updated
+    if (updateData.phoneNumber && updateData.phoneNumber !== user.phoneNumber) {
+        const existingUser = yield users_schema_1.Users.findOne({
+            phoneNumber: updateData.phoneNumber,
+        });
+        if (existingUser) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, "Phone number already exists");
+        }
+    }
+    const updatedUser = yield users_schema_1.Users.findByIdAndUpdate(userId, updateData, {
+        new: true,
+        runValidators: true,
+    }).select("-password");
+    if (!updatedUser) {
+        throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to update user");
+    }
+    return updatedUser;
+});
+const deleteUser = (userId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid user ID format");
+    }
+    // Prevent admin from deleting themselves
+    if (userId === adminId) {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Cannot delete your own account");
+    }
+    const admin = yield users_schema_1.Users.findById(adminId);
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can delete users");
+    }
+    const user = yield users_schema_1.Users.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    // Check if user has active property or spot assignments
+    if (user.propertyId || user.spotId) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot delete user with active property or spot assignments. Please remove assignments first.");
+    }
+    yield users_schema_1.Users.findByIdAndDelete(userId);
+    return {
+        message: "User deleted successfully",
     };
 });
 exports.AdminService = {
@@ -611,4 +631,8 @@ exports.AdminService = {
     getServiceRequestsByTenant,
     getUrgentServiceRequests,
     getServiceRequestDashboardStats,
+    getAllUsers,
+    getUserById,
+    updateUser,
+    deleteUser,
 };

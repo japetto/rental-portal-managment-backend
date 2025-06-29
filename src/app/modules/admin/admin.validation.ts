@@ -241,6 +241,43 @@ export const adminGetUrgentServiceRequestsValidationSchema = z.object({
   }),
 });
 
+// Admin User Management Validation Schemas
+export const adminGetUserValidationSchema = z.object({
+  params: z.object({
+    userId: z.string().regex(objectIdRegex, "Invalid user ID format"),
+  }),
+});
+
+export const adminUpdateUserValidationSchema = z.object({
+  params: z.object({
+    userId: z.string().regex(objectIdRegex, "Invalid user ID format"),
+  }),
+  body: z.object({
+    name: z.string().min(1, "Name is required").optional(),
+    phoneNumber: z.string().min(1, "Phone number is required").optional(),
+    preferredLocation: z.string().optional(),
+    bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
+    profileImage: z.string().url("Invalid image URL").optional(),
+    emergencyContact: z
+      .object({
+        name: z.string().min(1, "Emergency contact name is required"),
+        phone: z.string().min(1, "Emergency contact phone is required"),
+        relationship: z.string().min(1, "Relationship is required"),
+      })
+      .optional(),
+    specialRequests: z.array(z.string()).optional(),
+    role: z.enum(["SUPER_ADMIN", "TENANT"]).optional(),
+    isVerified: z.boolean().optional(),
+    isInvited: z.boolean().optional(),
+  }),
+});
+
+export const adminDeleteUserValidationSchema = z.object({
+  params: z.object({
+    userId: z.string().regex(objectIdRegex, "Invalid user ID format"),
+  }),
+});
+
 export const AdminValidation = {
   inviteTenantValidationSchema,
   createSpotValidationSchema,
@@ -254,4 +291,7 @@ export const AdminValidation = {
   adminGetServiceRequestsByPropertyValidationSchema,
   adminGetServiceRequestsByTenantValidationSchema,
   adminGetUrgentServiceRequestsValidationSchema,
+  adminGetUserValidationSchema,
+  adminUpdateUserValidationSchema,
+  adminDeleteUserValidationSchema,
 };

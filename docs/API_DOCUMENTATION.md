@@ -135,11 +135,11 @@ Authorization: Bearer <your-jwt-token>
 
 ## 👥 User Management APIs (Admin Only)
 
-### 5. Get All Users
+### 5. Get All Users (Admin)
 
-**GET** `/users`
+**GET** `/admin/users`
 
-- **Description**: Get all users with property and spot data
+- **Description**: Get all users in the system
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**:
 
@@ -213,7 +213,74 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 6. Get All Tenants
+### 6. Get User by ID (Admin)
+
+**GET** `/admin/users/:userId`
+
+- **Description**: Get specific user details
+- **Authentication**: Required (SUPER_ADMIN)
+- **Response**: Same structure as individual user object from "Get All Users"
+
+### 7. Update User (Admin)
+
+**PATCH** `/admin/users/:userId`
+
+- **Description**: Update user information (admin only)
+- **Authentication**: Required (SUPER_ADMIN)
+- **Request Body**:
+
+```json
+{
+  "name": "Updated Name",
+  "phoneNumber": "1234567890",
+  "preferredLocation": "New Location",
+  "bio": "Updated bio",
+  "profileImage": "https://example.com/image.jpg",
+  "emergencyContact": {
+    "name": "Emergency Contact",
+    "phone": "0987654321",
+    "relationship": "Spouse"
+  },
+  "specialRequests": ["ADA accessible", "Quiet area"],
+  "role": "TENANT",
+  "isVerified": true,
+  "isInvited": false
+}
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "User updated successfully",
+  "data": {
+    // Updated user object
+  }
+}
+```
+
+### 8. Delete User (Admin)
+
+**DELETE** `/admin/users/:userId`
+
+- **Description**: Delete a user (cannot delete self)
+- **Authentication**: Required (SUPER_ADMIN)
+- **Response**:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "User deleted successfully",
+  "data": {
+    "message": "User deleted successfully"
+  }
+}
+```
+
+### 9. Get All Tenants
 
 **GET** `/users/tenants`
 
@@ -221,7 +288,7 @@ Authorization: Bearer <your-jwt-token>
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Same structure as "Get All Users" but only includes users with role "TENANT"
 
-### 7. Get User by ID
+### 10. Get User by ID
 
 **GET** `/users/:userId`
 
@@ -229,7 +296,7 @@ Authorization: Bearer <your-jwt-token>
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Same structure as individual user object from "Get All Users"
 
-### 8. Update User Information
+### 11. Update User Information
 
 **PATCH** `/users/:userId`
 
@@ -266,7 +333,7 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 9. Delete User
+### 12. Delete User
 
 **DELETE** `/users/:userId`
 
@@ -289,7 +356,7 @@ Authorization: Bearer <your-jwt-token>
 
 ## 🏠 Property Management APIs (Admin Only)
 
-### 10. Get All Properties
+### 13. Get All Properties
 
 **GET** `/admin/properties`
 
@@ -328,14 +395,14 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 11. Get Property by ID
+### 14. Get Property by ID
 
 **GET** `/admin/properties/:propertyId`
 
 - **Description**: Get specific property
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 12. Create Property
+### 15. Create Property
 
 **POST** `/admin/properties`
 
@@ -362,14 +429,14 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 13. Update Property
+### 16. Update Property
 
 **PATCH** `/admin/properties/:propertyId`
 
 - **Description**: Update property information
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 14. Delete Property
+### 17. Delete Property
 
 **DELETE** `/admin/properties/:propertyId`
 
@@ -380,7 +447,7 @@ Authorization: Bearer <your-jwt-token>
 
 ## 🚗 Spot Management APIs (Admin Only)
 
-### 15. Get All Spots
+### 18. Get All Spots
 
 **GET** `/admin/spots`
 
@@ -429,14 +496,14 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 16. Get Spots by Property
+### 19. Get Spots by Property
 
 **GET** `/admin/spots/property/:propertyId`
 
 - **Description**: Get all spots for a specific property
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 17. Create Spot
+### 20. Create Spot
 
 **POST** `/admin/spots`
 
@@ -470,14 +537,14 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 18. Update Spot
+### 21. Update Spot
 
 **PATCH** `/admin/spots/:spotId`
 
 - **Description**: Update spot information
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 19. Delete Spot
+### 22. Delete Spot
 
 **DELETE** `/admin/spots/:spotId`
 
@@ -488,7 +555,7 @@ Authorization: Bearer <your-jwt-token>
 
 ## 👥 Tenant Management APIs (Admin Only)
 
-### 20. Invite Tenant
+### 23. Invite Tenant
 
 **POST** `/admin/tenants/invite`
 
@@ -533,21 +600,21 @@ Authorization: Bearer <your-jwt-token>
 
 ## 📊 Payment Management APIs (Admin Only)
 
-### 21. Get All Payments
+### 24. Get All Payments
 
 **GET** `/admin/payments`
 
 - **Description**: Get all payments with user and spot data
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 22. Get Payments by User
+### 25. Get Payments by User
 
 **GET** `/admin/payments/user/:userId`
 
 - **Description**: Get payments for a specific user
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 23. Create Payment
+### 26. Create Payment
 
 **POST** `/admin/payments`
 
@@ -558,7 +625,7 @@ Authorization: Bearer <your-jwt-token>
 
 ## 📢 Announcement Management APIs
 
-### 24. Get All Announcements (Admin)
+### 27. Get All Announcements (Admin)
 
 **GET** `/announcements`
 
@@ -615,7 +682,7 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 25. Get Active Announcements (Public)
+### 28. Get Active Announcements (Public)
 
 **GET** `/announcements/active`
 
@@ -625,7 +692,7 @@ Authorization: Bearer <your-jwt-token>
   - `propertyId` (optional): Filter by specific property
 - **Response**: Same structure as above but only active, non-expired announcements
 
-### 26. Create Announcement (Admin)
+### 29. Create Announcement (Admin)
 
 **POST** `/announcements`
 
@@ -650,7 +717,7 @@ Authorization: Bearer <your-jwt-token>
 
 - **Response**: Created announcement object
 
-### 27. Get Announcement by ID
+### 30. Get Announcement by ID
 
 **GET** `/announcements/:announcementId`
 
@@ -658,7 +725,7 @@ Authorization: Bearer <your-jwt-token>
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Single announcement object
 
-### 28. Update Announcement (Admin)
+### 31. Update Announcement (Admin)
 
 **PATCH** `/announcements/:announcementId`
 
@@ -667,7 +734,7 @@ Authorization: Bearer <your-jwt-token>
 - **Request Body**: Same as create but all fields optional
 - **Response**: Updated announcement object
 
-### 29. Delete Announcement (Admin)
+### 32. Delete Announcement (Admin)
 
 **DELETE** `/announcements/:announcementId`
 
@@ -686,7 +753,7 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 30. Mark Announcement as Read
+### 33. Mark Announcement as Read
 
 **POST** `/announcements/mark-read`
 
@@ -714,7 +781,7 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 31. Get Announcements by Property (Admin)
+### 34. Get Announcements by Property (Admin)
 
 **GET** `/announcements/property/:propertyId`
 
@@ -722,7 +789,7 @@ Authorization: Bearer <your-jwt-token>
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Array of announcements for the property
 
-### 32. Get Announcements by Type (Admin)
+### 35. Get Announcements by Type (Admin)
 
 **GET** `/announcements/type/:type`
 
@@ -730,7 +797,9 @@ Authorization: Bearer <your-jwt-token>
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Array of announcements of the specified type
 
-### 33. Get Announcements by Priority (Admin)
+### 36. Get Announcements by Priority (Admin)
+
+### 37. Get Announcements by Priority (Admin)
 
 **GET** `/announcements/priority/:priority`
 
@@ -738,7 +807,7 @@ Authorization: Bearer <your-jwt-token>
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Array of announcements with the specified priority
 
-### 34. Get Unread Announcements for User
+### 38. Get Unread Announcements for User
 
 **GET** `/announcements/unread/:userId`
 
@@ -752,14 +821,14 @@ Authorization: Bearer <your-jwt-token>
 
 ## 🔧 Service Request Management APIs (Admin Only)
 
-### 26. Get All Service Requests
+### 39. Get All Service Requests
 
 **GET** `/admin/service-requests`
 
 - **Description**: Get all service requests with user data
 - **Authentication**: Required (SUPER_ADMIN)
 
-### 27. Create Service Request
+### 40. Create Service Request
 
 **POST** `/admin/service-requests`
 

@@ -380,7 +380,68 @@ const getServiceRequestDashboardStats = (0, catchAsync_1.default)((req, res) => 
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
-        message: "Service request dashboard statistics retrieved successfully",
+        message: "Service request dashboard stats retrieved successfully",
+        data: result,
+    });
+}));
+// Admin User Management Controllers
+const getAllUsers = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield admin_service_1.AdminService.getAllUsers(adminId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Users retrieved successfully",
+        data: result,
+    });
+}));
+const getUserById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield admin_service_1.AdminService.getUserById(userId, adminId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "User retrieved successfully",
+        data: result,
+    });
+}));
+const updateUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const updateData = req.body;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield admin_service_1.AdminService.updateUser(userId, updateData, adminId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "User updated successfully",
+        data: result,
+    });
+}));
+const deleteUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield admin_service_1.AdminService.deleteUser(userId, adminId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "User deleted successfully",
         data: result,
     });
 }));
@@ -405,4 +466,8 @@ exports.AdminController = {
     getServiceRequestsByTenant,
     getUrgentServiceRequests,
     getServiceRequestDashboardStats,
+    getAllUsers,
+    getUserById,
+    updateUser,
+    deleteUser,
 };
