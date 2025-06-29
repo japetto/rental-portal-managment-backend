@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import ApiError from "../../../errors/ApiError";
 import { IProperty } from "../properties/properties.interface";
 import { Properties } from "../properties/properties.schema";
+import { IServiceRequest } from "../service-requests/service-requests.interface";
+import { ServiceRequests } from "../service-requests/service-requests.schema";
 import { ISpot } from "../spots/spots.interface";
 import { Spots } from "../spots/spots.schema";
 import { IUser } from "../users/users.interface";
@@ -409,6 +411,463 @@ const getAllTenants = async (): Promise<IUser[]> => {
   return tenantsWithLotNumber;
 };
 
+// Get all service requests with full details (Admin only)
+const getAllServiceRequests = async (
+  filters: Record<string, unknown>,
+  options: any,
+) => {
+  const page = options.page || 1;
+  const limit = options.limit || 10;
+  const skip = (page - 1) * limit;
+  const sortBy = options.sortBy || "requestedDate";
+  const sortOrder = options.sortOrder === "asc" ? 1 : -1;
+
+  // Build filter conditions
+  const filterConditions: Record<string, unknown> = {};
+
+  // Add filters
+  if (filters.status) {
+    filterConditions.status = filters.status;
+  }
+  if (filters.priority) {
+    filterConditions.priority = filters.priority;
+  }
+  if (filters.type) {
+    filterConditions.type = filters.type;
+  }
+  if (filters.propertyId) {
+    filterConditions.propertyId = filters.propertyId;
+  }
+  if (filters.tenantId) {
+    filterConditions.tenantId = filters.tenantId;
+  }
+
+  // Build sort conditions
+  const sortConditions: Record<string, 1 | -1> = {};
+  sortConditions[sortBy] = sortOrder;
+
+  const serviceRequests = await ServiceRequests.find(filterConditions)
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    )
+    .sort(sortConditions)
+    .skip(skip)
+    .limit(limit);
+
+  const total = await ServiceRequests.countDocuments(filterConditions);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: serviceRequests,
+  };
+};
+
+// Get service request by ID with full details (Admin only)
+const getServiceRequestById = async (
+  requestId: string,
+): Promise<IServiceRequest> => {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid service request ID format",
+    );
+  }
+
+  const serviceRequest = await ServiceRequests.findById(requestId)
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    );
+
+  if (!serviceRequest) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
+  }
+
+  return serviceRequest;
+};
+
+// Update service request status and details (Admin only)
+const updateServiceRequest = async (
+  requestId: string,
+  updateData: {
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    estimatedCost?: number;
+    actualCost?: number;
+    completedDate?: Date;
+    adminNotes?: string;
+    images?: string[];
+  },
+): Promise<IServiceRequest> => {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid service request ID format",
+    );
+  }
+
+  const serviceRequest = await ServiceRequests.findById(requestId);
+  if (!serviceRequest) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
+  }
+
+  // If status is being updated to COMPLETED, set completedDate if not provided
+  if (updateData.status === "COMPLETED" && !updateData.completedDate) {
+    updateData.completedDate = new Date();
+  }
+
+  const updatedRequest = await ServiceRequests.findByIdAndUpdate(
+    requestId,
+    updateData,
+    { new: true, runValidators: true },
+  )
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    );
+
+  return updatedRequest!;
+};
+
+// Add admin comment to service request
+const addAdminComment = async (
+  requestId: string,
+  comment: string,
+): Promise<IServiceRequest> => {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid service request ID format",
+    );
+  }
+
+  const serviceRequest = await ServiceRequests.findById(requestId);
+  if (!serviceRequest) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
+  }
+
+  // Append new comment to existing admin notes
+  const timestamp = new Date().toISOString();
+  const newComment = `[${timestamp}] ${comment}\n`;
+  const updatedAdminNotes = serviceRequest.adminNotes
+    ? serviceRequest.adminNotes + "\n" + newComment
+    : newComment;
+
+  const updatedRequest = await ServiceRequests.findByIdAndUpdate(
+    requestId,
+    { adminNotes: updatedAdminNotes },
+    { new: true, runValidators: true },
+  )
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    );
+
+  return updatedRequest!;
+};
+
+// Get service requests by property (Admin only)
+const getServiceRequestsByProperty = async (
+  propertyId: string,
+  filters: Record<string, unknown>,
+  options: any,
+) => {
+  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+  }
+
+  const page = options.page || 1;
+  const limit = options.limit || 10;
+  const skip = (page - 1) * limit;
+  const sortBy = options.sortBy || "requestedDate";
+  const sortOrder = options.sortOrder === "asc" ? 1 : -1;
+
+  // Build filter conditions
+  const filterConditions: Record<string, unknown> = { propertyId };
+
+  // Add additional filters
+  if (filters.status) {
+    filterConditions.status = filters.status;
+  }
+  if (filters.priority) {
+    filterConditions.priority = filters.priority;
+  }
+  if (filters.type) {
+    filterConditions.type = filters.type;
+  }
+
+  // Build sort conditions
+  const sortConditions: Record<string, 1 | -1> = {};
+  sortConditions[sortBy] = sortOrder;
+
+  const serviceRequests = await ServiceRequests.find(filterConditions)
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    )
+    .sort(sortConditions)
+    .skip(skip)
+    .limit(limit);
+
+  const total = await ServiceRequests.countDocuments(filterConditions);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: serviceRequests,
+  };
+};
+
+// Get service requests by tenant (Admin only)
+const getServiceRequestsByTenant = async (
+  tenantId: string,
+  filters: Record<string, unknown>,
+  options: any,
+) => {
+  if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid tenant ID format");
+  }
+
+  const page = options.page || 1;
+  const limit = options.limit || 10;
+  const skip = (page - 1) * limit;
+  const sortBy = options.sortBy || "requestedDate";
+  const sortOrder = options.sortOrder === "asc" ? 1 : -1;
+
+  // Build filter conditions
+  const filterConditions: Record<string, unknown> = { tenantId };
+
+  // Add additional filters
+  if (filters.status) {
+    filterConditions.status = filters.status;
+  }
+  if (filters.priority) {
+    filterConditions.priority = filters.priority;
+  }
+  if (filters.type) {
+    filterConditions.type = filters.type;
+  }
+
+  // Build sort conditions
+  const sortConditions: Record<string, 1 | -1> = {};
+  sortConditions[sortBy] = sortOrder;
+
+  const serviceRequests = await ServiceRequests.find(filterConditions)
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    )
+    .sort(sortConditions)
+    .skip(skip)
+    .limit(limit);
+
+  const total = await ServiceRequests.countDocuments(filterConditions);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: serviceRequests,
+  };
+};
+
+// Get urgent service requests (Admin only)
+const getUrgentServiceRequests = async (options: any) => {
+  const page = options.page || 1;
+  const limit = options.limit || 10;
+  const skip = (page - 1) * limit;
+
+  const filterConditions = {
+    priority: { $in: ["HIGH", "URGENT"] },
+    status: { $ne: "COMPLETED" },
+  };
+
+  const serviceRequests = await ServiceRequests.find(filterConditions)
+    .populate(
+      "tenantId",
+      "name email phoneNumber profileImage bio preferredLocation emergencyContact",
+    )
+    .populate(
+      "propertyId",
+      "name description address amenities totalLots availableLots isActive images rules",
+    )
+    .populate(
+      "spotId",
+      "spotNumber status size amenities hookups price description images isActive",
+    )
+    .sort({ priority: -1, requestedDate: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const total = await ServiceRequests.countDocuments(filterConditions);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: serviceRequests,
+  };
+};
+
+// Get service request dashboard statistics (Admin only)
+const getServiceRequestDashboardStats = async () => {
+  const totalRequests = await ServiceRequests.countDocuments();
+  const pendingRequests = await ServiceRequests.countDocuments({
+    status: "PENDING",
+  });
+  const inProgressRequests = await ServiceRequests.countDocuments({
+    status: "IN_PROGRESS",
+  });
+  const completedRequests = await ServiceRequests.countDocuments({
+    status: "COMPLETED",
+  });
+  const urgentRequests = await ServiceRequests.countDocuments({
+    priority: { $in: ["HIGH", "URGENT"] },
+    status: { $ne: "COMPLETED" },
+  });
+
+  // Get requests by type
+  const typeStats = await ServiceRequests.aggregate([
+    {
+      $group: {
+        _id: "$type",
+        count: { $sum: 1 },
+        pending: {
+          $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
+        },
+        inProgress: {
+          $sum: { $cond: [{ $eq: ["$status", "IN_PROGRESS"] }, 1, 0] },
+        },
+        completed: {
+          $sum: { $cond: [{ $eq: ["$status", "COMPLETED"] }, 1, 0] },
+        },
+      },
+    },
+  ]);
+
+  // Get requests by property
+  const propertyStats = await ServiceRequests.aggregate([
+    {
+      $lookup: {
+        from: "properties",
+        localField: "propertyId",
+        foreignField: "_id",
+        as: "property",
+      },
+    },
+    {
+      $unwind: "$property",
+    },
+    {
+      $group: {
+        _id: "$propertyId",
+        propertyName: { $first: "$property.name" },
+        count: { $sum: 1 },
+        pending: {
+          $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
+        },
+        urgent: {
+          $sum: { $cond: [{ $in: ["$priority", ["HIGH", "URGENT"]] }, 1, 0] },
+        },
+      },
+    },
+    {
+      $sort: { count: -1 },
+    },
+  ]);
+
+  // Get recent activity (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const recentActivity = await ServiceRequests.find({
+    createdAt: { $gte: sevenDaysAgo },
+  })
+    .populate("tenantId", "name email")
+    .populate("propertyId", "name")
+    .populate("spotId", "spotNumber")
+    .sort({ createdAt: -1 })
+    .limit(10);
+
+  return {
+    overview: {
+      total: totalRequests,
+      pending: pendingRequests,
+      inProgress: inProgressRequests,
+      completed: completedRequests,
+      urgent: urgentRequests,
+    },
+    byType: typeStats,
+    byProperty: propertyStats,
+    recentActivity,
+  };
+};
+
 export const AdminService = {
   inviteTenant,
   createProperty,
@@ -422,4 +881,12 @@ export const AdminService = {
   updateSpot,
   deleteSpot,
   getAllTenants,
+  getAllServiceRequests,
+  getServiceRequestById,
+  updateServiceRequest,
+  addAdminComment,
+  getServiceRequestsByProperty,
+  getServiceRequestsByTenant,
+  getUrgentServiceRequests,
+  getServiceRequestDashboardStats,
 };

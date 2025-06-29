@@ -65,4 +65,60 @@ router.patch(
 // Delete a spot
 router.delete("/spots/:id", AdminController.deleteSpot);
 
+// Service Request Management Routes (Admin only)
+router.get(
+  "/service-requests",
+  zodValidationRequest(AdminValidation.adminGetServiceRequestsValidationSchema),
+  AdminController.getAllServiceRequests,
+);
+
+router.get(
+  "/service-requests/urgent",
+  zodValidationRequest(
+    AdminValidation.adminGetUrgentServiceRequestsValidationSchema,
+  ),
+  AdminController.getUrgentServiceRequests,
+);
+
+router.get(
+  "/service-requests/dashboard-stats",
+  AdminController.getServiceRequestDashboardStats,
+);
+
+router.get(
+  "/service-requests/:id",
+  zodValidationRequest(AdminValidation.adminGetServiceRequestValidationSchema),
+  AdminController.getServiceRequestById,
+);
+
+router.patch(
+  "/service-requests/:id",
+  zodValidationRequest(
+    AdminValidation.adminUpdateServiceRequestValidationSchema,
+  ),
+  AdminController.updateServiceRequest,
+);
+
+router.post(
+  "/service-requests/:id/comment",
+  zodValidationRequest(AdminValidation.adminAddCommentValidationSchema),
+  AdminController.addAdminComment,
+);
+
+router.get(
+  "/properties/:propertyId/service-requests",
+  zodValidationRequest(
+    AdminValidation.adminGetServiceRequestsByPropertyValidationSchema,
+  ),
+  AdminController.getServiceRequestsByProperty,
+);
+
+router.get(
+  "/tenants/:tenantId/service-requests",
+  zodValidationRequest(
+    AdminValidation.adminGetServiceRequestsByTenantValidationSchema,
+  ),
+  AdminController.getServiceRequestsByTenant,
+);
+
 export const AdminRouter = router;

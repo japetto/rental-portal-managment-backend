@@ -237,6 +237,235 @@ const deleteSpot = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Get all service requests with full details (Admin only)
+const getAllServiceRequests = catchAsync(
+  async (req: Request, res: Response) => {
+    const filters = req.query;
+    const options = {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || "requestedDate",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+    };
+
+    const result = await AdminService.getAllServiceRequests(filters, options);
+
+    const responseData = {
+      serviceRequests: result.data,
+      pagination: result.meta,
+    };
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service requests retrieved successfully",
+      data: responseData,
+    });
+  },
+);
+
+// Get service request by ID with full details (Admin only)
+const getServiceRequestById = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    if (!id) {
+      return sendResponse(res, {
+        statusCode: httpStatus.BAD_REQUEST,
+        success: false,
+        message: "Service request ID is required",
+        data: null,
+      });
+    }
+
+    const result = await AdminService.getServiceRequestById(id);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service request retrieved successfully",
+      data: result,
+    });
+  },
+);
+
+// Update service request status and details (Admin only)
+const updateServiceRequest = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  if (!id) {
+    return sendResponse(res, {
+      statusCode: httpStatus.BAD_REQUEST,
+      success: false,
+      message: "Service request ID is required",
+      data: null,
+    });
+  }
+
+  const result = await AdminService.updateServiceRequest(id, updateData);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Service request updated successfully",
+    data: result,
+  });
+});
+
+// Add admin comment to service request
+const addAdminComment = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { comment } = req.body;
+
+  if (!id) {
+    return sendResponse(res, {
+      statusCode: httpStatus.BAD_REQUEST,
+      success: false,
+      message: "Service request ID is required",
+      data: null,
+    });
+  }
+
+  if (!comment) {
+    return sendResponse(res, {
+      statusCode: httpStatus.BAD_REQUEST,
+      success: false,
+      message: "Comment is required",
+      data: null,
+    });
+  }
+
+  const result = await AdminService.addAdminComment(id, comment);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Comment added successfully",
+    data: result,
+  });
+});
+
+// Get service requests by property (Admin only)
+const getServiceRequestsByProperty = catchAsync(
+  async (req: Request, res: Response) => {
+    const { propertyId } = req.params;
+    const filters = req.query;
+    const options = {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || "requestedDate",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+    };
+
+    if (!propertyId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.BAD_REQUEST,
+        success: false,
+        message: "Property ID is required",
+        data: null,
+      });
+    }
+
+    const result = await AdminService.getServiceRequestsByProperty(
+      propertyId,
+      filters,
+      options,
+    );
+
+    const responseData = {
+      serviceRequests: result.data,
+      pagination: result.meta,
+    };
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service requests by property retrieved successfully",
+      data: responseData,
+    });
+  },
+);
+
+// Get service requests by tenant (Admin only)
+const getServiceRequestsByTenant = catchAsync(
+  async (req: Request, res: Response) => {
+    const { tenantId } = req.params;
+    const filters = req.query;
+    const options = {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || "requestedDate",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+    };
+
+    if (!tenantId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.BAD_REQUEST,
+        success: false,
+        message: "Tenant ID is required",
+        data: null,
+      });
+    }
+
+    const result = await AdminService.getServiceRequestsByTenant(
+      tenantId,
+      filters,
+      options,
+    );
+
+    const responseData = {
+      serviceRequests: result.data,
+      pagination: result.meta,
+    };
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service requests by tenant retrieved successfully",
+      data: responseData,
+    });
+  },
+);
+
+// Get urgent service requests (Admin only)
+const getUrgentServiceRequests = catchAsync(
+  async (req: Request, res: Response) => {
+    const options = {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+    };
+
+    const result = await AdminService.getUrgentServiceRequests(options);
+
+    const responseData = {
+      serviceRequests: result.data,
+      pagination: result.meta,
+    };
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Urgent service requests retrieved successfully",
+      data: responseData,
+    });
+  },
+);
+
+// Get service request dashboard statistics (Admin only)
+const getServiceRequestDashboardStats = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await AdminService.getServiceRequestDashboardStats();
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service request dashboard statistics retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const AdminController = {
   inviteTenant,
   getAllTenants,
@@ -250,4 +479,12 @@ export const AdminController = {
   getSpotById,
   updateSpot,
   deleteSpot,
+  getAllServiceRequests,
+  getServiceRequestById,
+  updateServiceRequest,
+  addAdminComment,
+  getServiceRequestsByProperty,
+  getServiceRequestsByTenant,
+  getUrgentServiceRequests,
+  getServiceRequestDashboardStats,
 };

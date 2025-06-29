@@ -127,10 +127,131 @@ export const updatePropertyValidationSchema = z.object({
   }),
 });
 
+// Admin service request validation schemas
+export const adminGetServiceRequestsValidationSchema = z.object({
+  query: z.object({
+    status: z
+      .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+      .optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+    type: z
+      .enum(["MAINTENANCE", "UTILITY", "SECURITY", "CLEANING", "OTHER"])
+      .optional(),
+    propertyId: z.string().optional(),
+    tenantId: z.string().optional(),
+    page: z.string().regex(/^\d+$/, "Page must be a number").optional(),
+    limit: z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+    sortBy: z.enum(["requestedDate", "priority", "status", "type"]).optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  }),
+});
+
+export const adminGetServiceRequestValidationSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, "Service request ID is required"),
+  }),
+});
+
+export const adminUpdateServiceRequestValidationSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, "Service request ID is required"),
+  }),
+  body: z.object({
+    status: z
+      .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+      .optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+    assignedTo: z
+      .string()
+      .max(100, "Assigned to name cannot exceed 100 characters")
+      .optional(),
+    estimatedCost: z
+      .number()
+      .min(0, "Estimated cost cannot be negative")
+      .max(100000, "Estimated cost cannot exceed $100,000")
+      .optional(),
+    actualCost: z
+      .number()
+      .min(0, "Actual cost cannot be negative")
+      .max(100000, "Actual cost cannot exceed $100,000")
+      .optional(),
+    completedDate: z.string().datetime("Invalid date format").optional(),
+    adminNotes: z
+      .string()
+      .max(2000, "Admin notes cannot exceed 2000 characters")
+      .optional(),
+    images: z.array(z.string().url("Invalid image URL")).optional(),
+  }),
+});
+
+export const adminAddCommentValidationSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, "Service request ID is required"),
+  }),
+  body: z.object({
+    comment: z
+      .string()
+      .min(1, "Comment is required")
+      .max(1000, "Comment cannot exceed 1000 characters"),
+  }),
+});
+
+export const adminGetServiceRequestsByPropertyValidationSchema = z.object({
+  params: z.object({
+    propertyId: z.string().min(1, "Property ID is required"),
+  }),
+  query: z.object({
+    status: z
+      .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+      .optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+    type: z
+      .enum(["MAINTENANCE", "UTILITY", "SECURITY", "CLEANING", "OTHER"])
+      .optional(),
+    page: z.string().regex(/^\d+$/, "Page must be a number").optional(),
+    limit: z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+    sortBy: z.enum(["requestedDate", "priority", "status", "type"]).optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  }),
+});
+
+export const adminGetServiceRequestsByTenantValidationSchema = z.object({
+  params: z.object({
+    tenantId: z.string().min(1, "Tenant ID is required"),
+  }),
+  query: z.object({
+    status: z
+      .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+      .optional(),
+    priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+    type: z
+      .enum(["MAINTENANCE", "UTILITY", "SECURITY", "CLEANING", "OTHER"])
+      .optional(),
+    page: z.string().regex(/^\d+$/, "Page must be a number").optional(),
+    limit: z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+    sortBy: z.enum(["requestedDate", "priority", "status", "type"]).optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  }),
+});
+
+export const adminGetUrgentServiceRequestsValidationSchema = z.object({
+  query: z.object({
+    page: z.string().regex(/^\d+$/, "Page must be a number").optional(),
+    limit: z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+  }),
+});
+
 export const AdminValidation = {
   inviteTenantValidationSchema,
   createSpotValidationSchema,
   updateSpotValidationSchema,
   createPropertyValidationSchema,
   updatePropertyValidationSchema,
+  adminGetServiceRequestsValidationSchema,
+  adminGetServiceRequestValidationSchema,
+  adminUpdateServiceRequestValidationSchema,
+  adminAddCommentValidationSchema,
+  adminGetServiceRequestsByPropertyValidationSchema,
+  adminGetServiceRequestsByTenantValidationSchema,
+  adminGetUrgentServiceRequestsValidationSchema,
 };
