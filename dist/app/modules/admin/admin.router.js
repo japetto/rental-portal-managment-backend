@@ -32,6 +32,17 @@ router.post("/spots", (0, zodValidationRequest_1.default)(admin_validation_1.Adm
 router.get("/properties/:propertyId/spots", admin_controller_1.AdminController.getSpotsByProperty);
 // Get a spot by id
 router.get("/spots/:id", admin_controller_1.AdminController.getSpotById);
+// Update a spot
 router.patch("/spots/:id", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.updateSpotValidationSchema), admin_controller_1.AdminController.updateSpot);
+// Delete a spot
 router.delete("/spots/:id", admin_controller_1.AdminController.deleteSpot);
+// Service Request Management Routes (Admin only)
+router.get("/service-requests", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestsValidationSchema), admin_controller_1.AdminController.getAllServiceRequests);
+router.get("/service-requests/urgent", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetUrgentServiceRequestsValidationSchema), admin_controller_1.AdminController.getUrgentServiceRequests);
+router.get("/service-requests/dashboard-stats", admin_controller_1.AdminController.getServiceRequestDashboardStats);
+router.get("/service-requests/:id", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestValidationSchema), admin_controller_1.AdminController.getServiceRequestById);
+router.patch("/service-requests/:id", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminUpdateServiceRequestValidationSchema), admin_controller_1.AdminController.updateServiceRequest);
+router.post("/service-requests/:id/comment", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminAddCommentValidationSchema), admin_controller_1.AdminController.addAdminComment);
+router.get("/properties/:propertyId/service-requests", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestsByPropertyValidationSchema), admin_controller_1.AdminController.getServiceRequestsByProperty);
+router.get("/tenants/:tenantId/service-requests", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestsByTenantValidationSchema), admin_controller_1.AdminController.getServiceRequestsByTenant);
 exports.AdminRouter = router;

@@ -13,9 +13,12 @@ const createToken = (
     throw new Error("JWT_EXPIRES_IN is not configured");
   }
 
-  return jwt.sign(payload, secret, {
+  const token = jwt.sign(payload, secret, {
     expiresIn: expireTime,
   } as SignOptions);
+  console.log("🚀 ~ token:", token);
+
+  return token;
 };
 
 const jwtVerify = (token: string, secret: Secret): JwtPayload => {
@@ -26,6 +29,7 @@ const jwtVerify = (token: string, secret: Secret): JwtPayload => {
   try {
     return jwt.verify(token, secret) as JwtPayload;
   } catch (error) {
+    console.log("🚀 ~ error:", error);
     throw error;
   }
 };

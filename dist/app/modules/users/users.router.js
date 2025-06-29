@@ -18,6 +18,7 @@ router.post("/set-password", (0, zodValidationRequest_1.default)(users_validatio
 router.get("/check-status/:email", users_controller_1.UserController.checkUserInvitationStatus);
 // Admin routes - require authentication
 router.get("/", adminAuth_1.adminAuth, users_controller_1.UserController.getAllUsers);
+router.get("/tenants", adminAuth_1.adminAuth, users_controller_1.UserController.getAllTenants);
 router.get("/:userId", adminAuth_1.adminAuth, users_controller_1.UserController.getUserById);
 router.patch("/:userId", adminAuth_1.adminAuth, (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.updateUserInfoValidationSchema), users_controller_1.UserController.updateUserInfo);
 router.delete("/:userId", adminAuth_1.adminAuth, (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.deleteUserValidationSchema), users_controller_1.UserController.deleteUser);

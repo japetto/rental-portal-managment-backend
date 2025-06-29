@@ -1,16 +1,16 @@
 import { NextFunction, Request, Response } from "express";
+import httpStatus from "http-status";
+import { Users } from "../app/modules/users/users.schema";
+import config from "../config/config";
+import ApiError from "../errors/ApiError";
+import { jwtHelpers } from "../helpers/jwtHelpers";
+import { verifyAuthToken } from "../util/verifyAuthToken";
 
 export const adminAuth = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
-  // TEMPORARILY DISABLED ALL AUTHENTICATION CHECKS
-  // Just allow all requests to pass through
-  next();
-
-  // ORIGINAL CODE COMMENTED OUT BELOW
-  /*
   try {
     // Get token from request
     const token = verifyAuthToken(req);
@@ -29,9 +29,13 @@ export const adminAuth = async (
         "Server configuration error: JWT_EXPIRES_IN not set",
       );
     }
+    console.log("🚀 ~ config.jwt_secret:", config.jwt_secret);
+
+    console.log("🚀 ~ token:", token);
 
     // Verify token
     const verifiedToken = jwtHelpers.jwtVerify(token, config.jwt_secret);
+    console.log("🚀 ~ verifiedToken:", verifiedToken);
 
     // Check if user exists
     const user = await Users.findById(verifiedToken.id).select("+password");
@@ -97,5 +101,4 @@ export const adminAuth = async (
 
     next(error);
   }
-  */
 };

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdminValidation = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
+exports.AdminValidation = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
 const zod_1 = require("zod");
 // Custom ObjectId validation
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -123,10 +123,124 @@ exports.updatePropertyValidationSchema = zod_1.z.object({
         rules: zod_1.z.array(zod_1.z.string()).optional(),
     }),
 });
+// Admin service request validation schemas
+exports.adminGetServiceRequestsValidationSchema = zod_1.z.object({
+    query: zod_1.z.object({
+        status: zod_1.z
+            .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+            .optional(),
+        priority: zod_1.z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+        type: zod_1.z
+            .enum(["MAINTENANCE", "UTILITY", "SECURITY", "CLEANING", "OTHER"])
+            .optional(),
+        propertyId: zod_1.z.string().optional(),
+        tenantId: zod_1.z.string().optional(),
+        page: zod_1.z.string().regex(/^\d+$/, "Page must be a number").optional(),
+        limit: zod_1.z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+        sortBy: zod_1.z.enum(["requestedDate", "priority", "status", "type"]).optional(),
+        sortOrder: zod_1.z.enum(["asc", "desc"]).optional(),
+    }),
+});
+exports.adminGetServiceRequestValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z.string().min(1, "Service request ID is required"),
+    }),
+});
+exports.adminUpdateServiceRequestValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z.string().min(1, "Service request ID is required"),
+    }),
+    body: zod_1.z.object({
+        status: zod_1.z
+            .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+            .optional(),
+        priority: zod_1.z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+        assignedTo: zod_1.z
+            .string()
+            .max(100, "Assigned to name cannot exceed 100 characters")
+            .optional(),
+        estimatedCost: zod_1.z
+            .number()
+            .min(0, "Estimated cost cannot be negative")
+            .max(100000, "Estimated cost cannot exceed $100,000")
+            .optional(),
+        actualCost: zod_1.z
+            .number()
+            .min(0, "Actual cost cannot be negative")
+            .max(100000, "Actual cost cannot exceed $100,000")
+            .optional(),
+        completedDate: zod_1.z.string().datetime("Invalid date format").optional(),
+        adminNotes: zod_1.z
+            .string()
+            .max(2000, "Admin notes cannot exceed 2000 characters")
+            .optional(),
+        images: zod_1.z.array(zod_1.z.string().url("Invalid image URL")).optional(),
+    }),
+});
+exports.adminAddCommentValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z.string().min(1, "Service request ID is required"),
+    }),
+    body: zod_1.z.object({
+        comment: zod_1.z
+            .string()
+            .min(1, "Comment is required")
+            .max(1000, "Comment cannot exceed 1000 characters"),
+    }),
+});
+exports.adminGetServiceRequestsByPropertyValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        propertyId: zod_1.z.string().min(1, "Property ID is required"),
+    }),
+    query: zod_1.z.object({
+        status: zod_1.z
+            .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+            .optional(),
+        priority: zod_1.z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+        type: zod_1.z
+            .enum(["MAINTENANCE", "UTILITY", "SECURITY", "CLEANING", "OTHER"])
+            .optional(),
+        page: zod_1.z.string().regex(/^\d+$/, "Page must be a number").optional(),
+        limit: zod_1.z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+        sortBy: zod_1.z.enum(["requestedDate", "priority", "status", "type"]).optional(),
+        sortOrder: zod_1.z.enum(["asc", "desc"]).optional(),
+    }),
+});
+exports.adminGetServiceRequestsByTenantValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        tenantId: zod_1.z.string().min(1, "Tenant ID is required"),
+    }),
+    query: zod_1.z.object({
+        status: zod_1.z
+            .enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+            .optional(),
+        priority: zod_1.z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+        type: zod_1.z
+            .enum(["MAINTENANCE", "UTILITY", "SECURITY", "CLEANING", "OTHER"])
+            .optional(),
+        page: zod_1.z.string().regex(/^\d+$/, "Page must be a number").optional(),
+        limit: zod_1.z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+        sortBy: zod_1.z.enum(["requestedDate", "priority", "status", "type"]).optional(),
+        sortOrder: zod_1.z.enum(["asc", "desc"]).optional(),
+    }),
+});
+exports.adminGetUrgentServiceRequestsValidationSchema = zod_1.z.object({
+    query: zod_1.z.object({
+        page: zod_1.z.string().regex(/^\d+$/, "Page must be a number").optional(),
+        limit: zod_1.z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+    }),
+});
 exports.AdminValidation = {
     inviteTenantValidationSchema: exports.inviteTenantValidationSchema,
     createSpotValidationSchema: exports.createSpotValidationSchema,
     updateSpotValidationSchema: exports.updateSpotValidationSchema,
     createPropertyValidationSchema: exports.createPropertyValidationSchema,
     updatePropertyValidationSchema: exports.updatePropertyValidationSchema,
+    adminGetServiceRequestsValidationSchema: exports.adminGetServiceRequestsValidationSchema,
+    adminGetServiceRequestValidationSchema: exports.adminGetServiceRequestValidationSchema,
+    adminUpdateServiceRequestValidationSchema: exports.adminUpdateServiceRequestValidationSchema,
+    adminAddCommentValidationSchema: exports.adminAddCommentValidationSchema,
+    adminGetServiceRequestsByPropertyValidationSchema: exports.adminGetServiceRequestsByPropertyValidationSchema,
+    adminGetServiceRequestsByTenantValidationSchema: exports.adminGetServiceRequestsByTenantValidationSchema,
+    adminGetUrgentServiceRequestsValidationSchema: exports.adminGetUrgentServiceRequestsValidationSchema,
 };

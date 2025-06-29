@@ -30,8 +30,11 @@ const adminAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function
         if (!config_1.default.jwt_expires_in) {
             throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Server configuration error: JWT_EXPIRES_IN not set");
         }
+        console.log("🚀 ~ config.jwt_secret:", config_1.default.jwt_secret);
+        console.log("🚀 ~ token:", token);
         // Verify token
         const verifiedToken = jwtHelpers_1.jwtHelpers.jwtVerify(token, config_1.default.jwt_secret);
+        console.log("🚀 ~ verifiedToken:", verifiedToken);
         // Check if user exists
         const user = yield users_schema_1.Users.findById(verifiedToken.id).select("+password");
         if (!user) {

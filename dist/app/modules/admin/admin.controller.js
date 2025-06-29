@@ -208,6 +208,182 @@ const deleteSpot = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
         data: null,
     });
 }));
+// Get all service requests with full details (Admin only)
+const getAllServiceRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const filters = req.query;
+    const options = {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        sortBy: req.query.sortBy || "requestedDate",
+        sortOrder: req.query.sortOrder || "desc",
+    };
+    const result = yield admin_service_1.AdminService.getAllServiceRequests(filters, options);
+    const responseData = {
+        serviceRequests: result.data,
+        pagination: result.meta,
+    };
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service requests retrieved successfully",
+        data: responseData,
+    });
+}));
+// Get service request by ID with full details (Admin only)
+const getServiceRequestById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    if (!id) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Service request ID is required",
+            data: null,
+        });
+    }
+    const result = yield admin_service_1.AdminService.getServiceRequestById(id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service request retrieved successfully",
+        data: result,
+    });
+}));
+// Update service request status and details (Admin only)
+const updateServiceRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const updateData = req.body;
+    if (!id) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Service request ID is required",
+            data: null,
+        });
+    }
+    const result = yield admin_service_1.AdminService.updateServiceRequest(id, updateData);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service request updated successfully",
+        data: result,
+    });
+}));
+// Add admin comment to service request
+const addAdminComment = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { comment } = req.body;
+    if (!id) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Service request ID is required",
+            data: null,
+        });
+    }
+    if (!comment) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Comment is required",
+            data: null,
+        });
+    }
+    const result = yield admin_service_1.AdminService.addAdminComment(id, comment);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Comment added successfully",
+        data: result,
+    });
+}));
+// Get service requests by property (Admin only)
+const getServiceRequestsByProperty = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { propertyId } = req.params;
+    const filters = req.query;
+    const options = {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        sortBy: req.query.sortBy || "requestedDate",
+        sortOrder: req.query.sortOrder || "desc",
+    };
+    if (!propertyId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Property ID is required",
+            data: null,
+        });
+    }
+    const result = yield admin_service_1.AdminService.getServiceRequestsByProperty(propertyId, filters, options);
+    const responseData = {
+        serviceRequests: result.data,
+        pagination: result.meta,
+    };
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service requests by property retrieved successfully",
+        data: responseData,
+    });
+}));
+// Get service requests by tenant (Admin only)
+const getServiceRequestsByTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { tenantId } = req.params;
+    const filters = req.query;
+    const options = {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        sortBy: req.query.sortBy || "requestedDate",
+        sortOrder: req.query.sortOrder || "desc",
+    };
+    if (!tenantId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.BAD_REQUEST,
+            success: false,
+            message: "Tenant ID is required",
+            data: null,
+        });
+    }
+    const result = yield admin_service_1.AdminService.getServiceRequestsByTenant(tenantId, filters, options);
+    const responseData = {
+        serviceRequests: result.data,
+        pagination: result.meta,
+    };
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service requests by tenant retrieved successfully",
+        data: responseData,
+    });
+}));
+// Get urgent service requests (Admin only)
+const getUrgentServiceRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const options = {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+    };
+    const result = yield admin_service_1.AdminService.getUrgentServiceRequests(options);
+    const responseData = {
+        serviceRequests: result.data,
+        pagination: result.meta,
+    };
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Urgent service requests retrieved successfully",
+        data: responseData,
+    });
+}));
+// Get service request dashboard statistics (Admin only)
+const getServiceRequestDashboardStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield admin_service_1.AdminService.getServiceRequestDashboardStats();
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service request dashboard statistics retrieved successfully",
+        data: result,
+    });
+}));
 exports.AdminController = {
     inviteTenant,
     getAllTenants,
@@ -221,4 +397,12 @@ exports.AdminController = {
     getSpotById,
     updateSpot,
     deleteSpot,
+    getAllServiceRequests,
+    getServiceRequestById,
+    updateServiceRequest,
+    addAdminComment,
+    getServiceRequestsByProperty,
+    getServiceRequestsByTenant,
+    getUrgentServiceRequests,
+    getServiceRequestDashboardStats,
 };

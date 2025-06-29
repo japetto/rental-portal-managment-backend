@@ -195,6 +195,21 @@ const getAllUsers = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         data: result,
     });
 }));
+// Get All Tenants (Admin only)
+const getAllTenants = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield users_service_1.UserService.getAllTenants(adminId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Tenants retrieved successfully",
+        data: result,
+    });
+}));
 // Get User by ID (Admin only)
 const getUserById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -229,6 +244,7 @@ exports.UserController = {
     updateUserInfo,
     deleteUser,
     getAllUsers,
+    getAllTenants,
     getUserById,
     checkUserInvitationStatus,
     // checkUserForProviderLogin,

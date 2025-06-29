@@ -44,8 +44,12 @@ const userLogin = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     if (isExists.isInvited && (!isExists.password || isExists.password === "")) {
         throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Please set your password first. Use the set-password endpoint.");
     }
-    // Check if user is verified
-    if (!isExists.isVerified) {
+    // Check if user has a password (for invited users who haven't set password)
+    if (!isExists.password || isExists.password === "") {
+        throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Please set your password first. Use the set-password endpoint.");
+    }
+    // Check if user is verified (only for non-invited users)
+    if (!isExists.isInvited && !isExists.isVerified) {
         throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Account not verified. Please contact administrator.");
     }
     const checkPassword = yield bcrypt_1.default.compare(password, isExists.password);
@@ -136,8 +140,35 @@ const getAllUsers = (adminId) => __awaiter(void 0, void 0, void 0, function* () 
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view all users");
     }
-    const users = yield users_schema_1.Users.find({}).select("-password");
+    const users = yield users_schema_1.Users.find({})
+        .select("-password")
+        .populate({
+        path: "propertyId",
+        select: "name description address amenities totalLots availableLots isActive images rules",
+    })
+        .populate({
+        path: "spotId",
+        select: "spotNumber status size amenities hookups price description images isActive",
+    });
     return users;
+});
+//* Get All Tenants (Admin only) - with property and spot data
+const getAllTenants = (adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    const admin = yield users_schema_1.Users.findById(adminId);
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view tenants");
+    }
+    const tenants = yield users_schema_1.Users.find({ role: "TENANT" })
+        .select("-password")
+        .populate({
+        path: "propertyId",
+        select: "name description address amenities totalLots availableLots isActive images rules",
+    })
+        .populate({
+        path: "spotId",
+        select: "spotNumber status size amenities hookups price description images isActive",
+    });
+    return tenants;
 });
 //* Get User by ID (Admin only)
 const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -145,7 +176,16 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view user details");
     }
-    const user = yield users_schema_1.Users.findById(userId).select("-password");
+    const user = yield users_schema_1.Users.findById(userId)
+        .select("-password")
+        .populate({
+        path: "propertyId",
+        select: "name description address amenities totalLots availableLots isActive images rules",
+    })
+        .populate({
+        path: "spotId",
+        select: "spotNumber status size amenities hookups price description images isActive",
+    });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
@@ -170,6 +210,7 @@ exports.UserService = {
     updateUserInfo,
     deleteUser,
     getAllUsers,
+    getAllTenants,
     getUserById,
     checkUserInvitationStatus,
 };
