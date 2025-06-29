@@ -16,7 +16,6 @@ const createToken = (
   const token = jwt.sign(payload, secret, {
     expiresIn: expireTime,
   } as SignOptions);
-  console.log("🚀 ~ token:", token);
 
   return token;
 };
