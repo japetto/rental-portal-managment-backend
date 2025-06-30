@@ -64,7 +64,7 @@ const getActiveAnnouncements = async (
 ): Promise<IAnnouncement[]> => {
   const query: any = {
     isActive: true,
-    publishDate: { $lte: new Date() },
+    createdAt: { $lte: new Date() },
     $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
   };
 
@@ -313,7 +313,7 @@ const getUnreadAnnouncements = async (
 
   const query: any = {
     isActive: true,
-    publishDate: { $lte: new Date() },
+    createdAt: { $lte: new Date() },
     $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
     readBy: { $ne: userId },
   };

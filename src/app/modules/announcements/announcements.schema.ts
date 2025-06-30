@@ -36,22 +36,17 @@ export const announcementsSchema = new Schema<IAnnouncement>(
       required: true,
       default: true,
     },
-    publishDate: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
     expiryDate: {
       type: Date,
       validate: {
         validator: function (this: IAnnouncement, value: Date) {
-          // Expiry date should be after publish date
-          if (value && this.publishDate && value <= this.publishDate) {
+          // Expiry date should be after creation date
+          if (value && this.createdAt && value <= this.createdAt) {
             return false;
           }
           return true;
         },
-        message: "Expiry date must be after publish date",
+        message: "Expiry date must be after creation date",
       },
     },
     createdBy: {
@@ -115,21 +110,12 @@ announcementsSchema.virtual("isCurrentlyActive").get(function (
 ) {
   if (!this.isActive) return false;
   if (this.expiryDate && new Date() > this.expiryDate) return false;
-  return new Date() >= this.publishDate;
+  return new Date() >= this.createdAt;
 });
 
 // Virtual to get read count
 announcementsSchema.virtual("readCount").get(function (this: IAnnouncement) {
   return this.readBy ? this.readBy.length : 0;
-});
-
-// Pre-save middleware to set default publish date if not provided
-announcementsSchema.pre("save", function (next) {
-  const doc = this as any;
-  if (!doc.publishDate) {
-    doc.publishDate = new Date();
-  }
-  next();
 });
 
 export const Announcements = model<IAnnouncement>(

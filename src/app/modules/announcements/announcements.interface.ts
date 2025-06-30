@@ -20,7 +20,6 @@ export interface IAnnouncement extends Document {
   priority: AnnouncementPriority;
   propertyId?: Types.ObjectId; // If null, it's a system-wide announcement
   isActive: boolean;
-  publishDate: Date;
   expiryDate?: Date; // Optional expiry date
   createdBy: string; // Admin who created the announcement
   attachments: string[]; // URLs to attached files/images

@@ -49,7 +49,7 @@ const getAllAnnouncements = (adminId) => __awaiter(void 0, void 0, void 0, funct
 const getActiveAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0, void 0, function* () {
     const query = {
         isActive: true,
-        publishDate: { $lte: new Date() },
+        createdAt: { $lte: new Date() },
         $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
     };
     // Filter by property if specified
@@ -218,7 +218,7 @@ const getUnreadAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0,
     }
     const query = {
         isActive: true,
-        publishDate: { $lte: new Date() },
+        createdAt: { $lte: new Date() },
         $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
         readBy: { $ne: userId },
     };

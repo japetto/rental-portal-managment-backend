@@ -15,7 +15,6 @@ const createToken = (payload, secret, expireTime) => {
     const token = jsonwebtoken_1.default.sign(payload, secret, {
         expiresIn: expireTime,
     });
-    console.log("🚀 ~ token:", token);
     return token;
 };
 const jwtVerify = (token, secret) => {

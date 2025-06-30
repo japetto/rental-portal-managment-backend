@@ -36,22 +36,17 @@ exports.announcementsSchema = new mongoose_1.Schema({
         required: true,
         default: true,
     },
-    publishDate: {
-        type: Date,
-        required: true,
-        default: Date.now,
-    },
     expiryDate: {
         type: Date,
         validate: {
             validator: function (value) {
-                // Expiry date should be after publish date
-                if (value && this.publishDate && value <= this.publishDate) {
+                // Expiry date should be after creation date
+                if (value && this.createdAt && value <= this.createdAt) {
                     return false;
                 }
                 return true;
             },
-            message: "Expiry date must be after publish date",
+            message: "Expiry date must be after creation date",
         },
     },
     createdBy: {
@@ -112,18 +107,10 @@ exports.announcementsSchema.virtual("isCurrentlyActive").get(function () {
         return false;
     if (this.expiryDate && new Date() > this.expiryDate)
         return false;
-    return new Date() >= this.publishDate;
+    return new Date() >= this.createdAt;
 });
 // Virtual to get read count
 exports.announcementsSchema.virtual("readCount").get(function () {
     return this.readBy ? this.readBy.length : 0;
-});
-// Pre-save middleware to set default publish date if not provided
-exports.announcementsSchema.pre("save", function (next) {
-    const doc = this;
-    if (!doc.publishDate) {
-        doc.publishDate = new Date();
-    }
-    next();
 });
 exports.Announcements = (0, mongoose_1.model)("Announcements", exports.announcementsSchema);
