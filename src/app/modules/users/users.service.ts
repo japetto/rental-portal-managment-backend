@@ -2,6 +2,8 @@ import bcrypt from "bcrypt";
 import httpStatus from "http-status";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
+import { Properties } from "../properties/properties.schema";
+import { Spots } from "../spots/spots.schema";
 import {
   IAuthUser,
   ILoginUser,
@@ -172,36 +174,57 @@ const deleteUser = async (
 ): Promise<{ message: string }> => {
   // Prevent admin from deleting themselves
   if (userId === adminId) {
-    throw new ApiError(httpStatus.FORBIDDEN, "Cannot delete your own account");
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "You cannot delete your own account. Please contact another administrator.",
+    );
   }
 
   const admin = await Users.findById(adminId);
   if (!admin || admin.role !== "SUPER_ADMIN") {
     throw new ApiError(
       httpStatus.FORBIDDEN,
-      "Only super admins can delete users",
+      "Access denied. Only super administrators can delete users.",
     );
   }
 
   const user = await Users.findById(userId);
   if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
-  }
-
-  // Check if user has active leases or other dependencies
-  // You might want to add additional checks here based on your business logic
-  if (user.propertyId || user.spotId) {
     throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Cannot delete user with active property or spot assignments. Please remove assignments first.",
+      httpStatus.NOT_FOUND,
+      "User not found. The user may have already been deleted.",
     );
   }
 
-  await Users.findByIdAndDelete(userId);
+  // Cascade delete: Remove user assignments and update related data
+  try {
+    // If user has a spot assignment, free up the spot
+    if (user.spotId) {
+      await Spots.findByIdAndUpdate(user.spotId, {
+        status: "AVAILABLE",
+      });
+    }
 
-  return {
-    message: "User deleted successfully",
-  };
+    // If user has a property assignment, update property available lots
+    if (user.propertyId) {
+      await Properties.findByIdAndUpdate(user.propertyId, {
+        $inc: { availableLots: 1 },
+      });
+    }
+
+    // Delete the user
+    await Users.findByIdAndDelete(userId);
+
+    return {
+      message:
+        "User and all associated assignments have been successfully removed.",
+    };
+  } catch (error) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to delete user. Please try again or contact support if the problem persists.",
+    );
+  }
 };
 
 //* Get All Users (Admin only)

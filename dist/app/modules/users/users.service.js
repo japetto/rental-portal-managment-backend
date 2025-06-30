@@ -17,6 +17,8 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const http_status_1 = __importDefault(require("http-status"));
 const config_1 = __importDefault(require("../../../config/config"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
+const properties_schema_1 = require("../properties/properties.schema");
+const spots_schema_1 = require("../spots/spots.schema");
 const users_schema_1 = require("./users.schema");
 const users_utils_1 = require("./users.utils");
 //* User Register Custom
@@ -114,25 +116,39 @@ const updateUserInfo = (userId, payload, adminId) => __awaiter(void 0, void 0, v
 const deleteUser = (userId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
     // Prevent admin from deleting themselves
     if (userId === adminId) {
-        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Cannot delete your own account");
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "You cannot delete your own account. Please contact another administrator.");
     }
     const admin = yield users_schema_1.Users.findById(adminId);
     if (!admin || admin.role !== "SUPER_ADMIN") {
-        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can delete users");
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Access denied. Only super administrators can delete users.");
     }
     const user = yield users_schema_1.Users.findById(userId);
     if (!user) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found. The user may have already been deleted.");
     }
-    // Check if user has active leases or other dependencies
-    // You might want to add additional checks here based on your business logic
-    if (user.propertyId || user.spotId) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot delete user with active property or spot assignments. Please remove assignments first.");
+    // Cascade delete: Remove user assignments and update related data
+    try {
+        // If user has a spot assignment, free up the spot
+        if (user.spotId) {
+            yield spots_schema_1.Spots.findByIdAndUpdate(user.spotId, {
+                status: "AVAILABLE",
+            });
+        }
+        // If user has a property assignment, update property available lots
+        if (user.propertyId) {
+            yield properties_schema_1.Properties.findByIdAndUpdate(user.propertyId, {
+                $inc: { availableLots: 1 },
+            });
+        }
+        // Delete the user
+        yield users_schema_1.Users.findByIdAndDelete(userId);
+        return {
+            message: "User and all associated assignments have been successfully removed.",
+        };
     }
-    yield users_schema_1.Users.findByIdAndDelete(userId);
-    return {
-        message: "User deleted successfully",
-    };
+    catch (error) {
+        throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to delete user. Please try again or contact support if the problem persists.");
+    }
 });
 //* Get All Users (Admin only)
 const getAllUsers = (adminId) => __awaiter(void 0, void 0, void 0, function* () {
