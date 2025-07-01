@@ -80,7 +80,7 @@ const inviteTenant = async (
   if (existingSpotUser) {
     throw new ApiError(
       httpStatus.CONFLICT,
-      "Spot is already assigned to another tenant",
+      `Spot is already assigned to tenant: ${existingSpotUser.name}`,
     );
   }
 

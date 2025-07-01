@@ -121,17 +121,10 @@ exports.createUserValidationSchema = zod_1.z.object({
     }),
 });
 exports.setPasswordValidationSchema = zod_1.z.object({
-    body: zod_1.z
-        .object({
+    body: zod_1.z.object({
         email: zod_1.z.string().email("Invalid email format"),
         password: zod_1.z.string().min(6, "Password must be at least 6 characters"),
-        confirmPassword: zod_1.z
-            .string()
-            .min(6, "Confirm password must be at least 6 characters"),
-    })
-        .refine(data => data.password === data.confirmPassword, {
-        message: "Passwords don't match",
-        path: ["confirmPassword"],
+        confirmPassword: zod_1.z.string().optional(),
     }),
 });
 exports.updateUserInfoValidationSchema = zod_1.z.object({

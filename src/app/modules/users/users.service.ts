@@ -84,7 +84,15 @@ const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
 const setPassword = async (
   payload: ISetPassword,
 ): Promise<{ message: string }> => {
-  const { email, password } = payload;
+  const { email, password, confirmPassword } = payload;
+
+  // Validate password confirmation
+  if (password !== confirmPassword) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Password and confirm password do not match",
+    );
+  }
 
   const user = await Users.findOne({ email }).select("+password");
   if (!user) {

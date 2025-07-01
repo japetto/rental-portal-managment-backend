@@ -61,7 +61,7 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
     // Check if spot is already assigned to another user
     const existingSpotUser = yield users_schema_1.Users.findOne({ spotId: inviteData.spotId });
     if (existingSpotUser) {
-        throw new ApiError_1.default(http_status_1.default.CONFLICT, "Spot is already assigned to another tenant");
+        throw new ApiError_1.default(http_status_1.default.CONFLICT, `Spot is already assigned to tenant: ${existingSpotUser.name}`);
     }
     // Generate a temporary password (tenant will change it on first login)
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);

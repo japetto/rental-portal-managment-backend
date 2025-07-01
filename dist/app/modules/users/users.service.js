@@ -62,7 +62,11 @@ const userLogin = (payload) => __awaiter(void 0, void 0, void 0, function* () {
 });
 //* Set Password for Invited Users
 const setPassword = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email, password } = payload;
+    const { email, password, confirmPassword } = payload;
+    // Validate password confirmation
+    if (password !== confirmPassword) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Password and confirm password do not match");
+    }
     const user = yield users_schema_1.Users.findOne({ email }).select("+password");
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
