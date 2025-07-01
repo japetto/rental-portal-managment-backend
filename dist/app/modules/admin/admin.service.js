@@ -86,7 +86,11 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
     yield properties_schema_1.Properties.findByIdAndUpdate(inviteData.propertyId, {
         $inc: { availableLots: -1 },
     });
-    return user;
+    return {
+        user,
+        property,
+        spot,
+    };
 });
 const createProperty = (propertyData) => __awaiter(void 0, void 0, void 0, function* () {
     // Check if property with same name already exists

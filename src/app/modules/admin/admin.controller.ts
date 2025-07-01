@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import config from "../../../config/config";
 import catchAsync from "../../../shared/catchAsync";
+import { sendTenantInvitationEmail } from "../../../shared/emailService";
 import sendResponse from "../../../shared/sendResponse";
 import {
   IAdminUpdateUser,
@@ -20,13 +21,13 @@ const inviteTenant = catchAsync(async (req: Request, res: Response) => {
   // Generate URL with tenant data for auto-filling client UI
   const baseUrl = config.client_url || "http://localhost:3000";
   const tenantData = {
-    id: result._id,
-    name: result.name,
-    email: result.email,
-    phone: result.phoneNumber,
-    preferredLocation: result.preferredLocation,
-    propertyId: result.propertyId,
-    spotId: result.spotId,
+    id: result.user._id,
+    name: result.user.name,
+    email: result.user.email,
+    phone: result.user.phoneNumber,
+    preferredLocation: result.user.preferredLocation,
+    propertyId: result.user.propertyId,
+    spotId: result.user.spotId,
   };
 
   // Encode the data as base64 to make it URL-safe
@@ -34,6 +35,20 @@ const inviteTenant = catchAsync(async (req: Request, res: Response) => {
     "base64",
   );
   const autoFillUrl = `${baseUrl}/tenant-setup?data=${encodedData}`;
+
+  // Send invitation email to the tenant
+  try {
+    await sendTenantInvitationEmail(
+      result.user.email,
+      result.user.name,
+      autoFillUrl,
+      result.property.name,
+      result.spot.spotNumber,
+    );
+  } catch (error) {
+    console.error("Failed to send invitation email:", error);
+    // Continue with the response even if email fails
+  }
 
   // Example of how to decode this URL on the client side:
   //
@@ -80,19 +95,12 @@ const inviteTenant = catchAsync(async (req: Request, res: Response) => {
     message: "Tenant invited successfully",
     data: {
       user: {
-        _id: result._id,
-        name: result.name,
-        email: result.email,
-        phoneNumber: result.phoneNumber,
-        role: result.role,
-        isInvited: result.isInvited,
-        propertyId: result.propertyId,
-        spotId: result.spotId,
-        preferredLocation: result.preferredLocation,
+        name: result.user.name,
+        email: result.user.email,
       },
       autoFillUrl: autoFillUrl,
       message:
-        "Invitation sent successfully. Tenant will receive login credentials.",
+        "Invitation sent successfully. Tenant will receive login credentials via email.",
     },
   });
 });

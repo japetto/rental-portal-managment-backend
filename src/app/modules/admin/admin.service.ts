@@ -18,7 +18,13 @@ import {
   IUpdateSpot,
 } from "./admin.interface";
 
-const inviteTenant = async (inviteData: IInviteTenant): Promise<IUser> => {
+const inviteTenant = async (
+  inviteData: IInviteTenant,
+): Promise<{
+  user: IUser;
+  property: IProperty;
+  spot: ISpot;
+}> => {
   // Validate ObjectId format for propertyId
   if (!mongoose.Types.ObjectId.isValid(inviteData.propertyId)) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
@@ -107,7 +113,11 @@ const inviteTenant = async (inviteData: IInviteTenant): Promise<IUser> => {
     $inc: { availableLots: -1 },
   });
 
-  return user;
+  return {
+    user,
+    property,
+    spot,
+  };
 };
 
 const createProperty = async (

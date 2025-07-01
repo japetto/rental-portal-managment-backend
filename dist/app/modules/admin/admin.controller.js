@@ -16,6 +16,7 @@ exports.AdminController = void 0;
 const http_status_1 = __importDefault(require("http-status"));
 const config_1 = __importDefault(require("../../../config/config"));
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
+const emailService_1 = require("../../../shared/emailService");
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const admin_service_1 = require("./admin.service");
 const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -24,17 +25,25 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
     // Generate URL with tenant data for auto-filling client UI
     const baseUrl = config_1.default.client_url || "http://localhost:3000";
     const tenantData = {
-        id: result._id,
-        name: result.name,
-        email: result.email,
-        phone: result.phoneNumber,
-        preferredLocation: result.preferredLocation,
-        propertyId: result.propertyId,
-        spotId: result.spotId,
+        id: result.user._id,
+        name: result.user.name,
+        email: result.user.email,
+        phone: result.user.phoneNumber,
+        preferredLocation: result.user.preferredLocation,
+        propertyId: result.user.propertyId,
+        spotId: result.user.spotId,
     };
     // Encode the data as base64 to make it URL-safe
     const encodedData = Buffer.from(JSON.stringify(tenantData)).toString("base64");
     const autoFillUrl = `${baseUrl}/tenant-setup?data=${encodedData}`;
+    // Send invitation email to the tenant
+    try {
+        yield (0, emailService_1.sendTenantInvitationEmail)(result.user.email, result.user.name, autoFillUrl, result.property.name, result.spot.spotNumber);
+    }
+    catch (error) {
+        console.error("Failed to send invitation email:", error);
+        // Continue with the response even if email fails
+    }
     // Example of how to decode this URL on the client side:
     //
     // // In your React component or JavaScript file:
@@ -79,18 +88,11 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         message: "Tenant invited successfully",
         data: {
             user: {
-                _id: result._id,
-                name: result.name,
-                email: result.email,
-                phoneNumber: result.phoneNumber,
-                role: result.role,
-                isInvited: result.isInvited,
-                propertyId: result.propertyId,
-                spotId: result.spotId,
-                preferredLocation: result.preferredLocation,
+                name: result.user.name,
+                email: result.user.email,
             },
             autoFillUrl: autoFillUrl,
-            message: "Invitation sent successfully. Tenant will receive login credentials.",
+            message: "Invitation sent successfully. Tenant will receive login credentials via email.",
         },
     });
 }));
