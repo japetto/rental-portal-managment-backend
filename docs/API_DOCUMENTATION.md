@@ -671,7 +671,6 @@ Authorization: Bearer <your-jwt-token>
       ],
       "targetAudience": "TENANTS_ONLY",
       "sendNotification": true,
-      "isSendNotification": true,
       "tags": ["pool", "maintenance", "facility"],
       "isExpired": false,
       "isCurrentlyActive": true,
@@ -712,7 +711,6 @@ Authorization: Bearer <your-jwt-token>
   "attachments": ["https://example.com/document.pdf"],
   "targetAudience": "TENANTS_ONLY",
   "sendNotification": true,
-  "isSendNotification": true,
   "tags": ["important", "general"]
 }
 ```

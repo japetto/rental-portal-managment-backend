@@ -32,8 +32,7 @@ exports.createAnnouncementValidationSchema = zod_1.z.object({
         targetAudience: zod_1.z
             .enum(["ALL", "TENANTS_ONLY", "ADMINS_ONLY", "PROPERTY_SPECIFIC"])
             .default("ALL"),
-        sendNotification: zod_1.z.boolean().default(true),
-        isSendNotification: zod_1.z.boolean().optional(),
+        sendNotification: zod_1.z.boolean().optional(),
         tags: zod_1.z.array(zod_1.z.string().trim()).optional(),
     }),
 });
@@ -71,7 +70,6 @@ exports.updateAnnouncementValidationSchema = zod_1.z.object({
             .enum(["ALL", "TENANTS_ONLY", "ADMINS_ONLY", "PROPERTY_SPECIFIC"])
             .optional(),
         sendNotification: zod_1.z.boolean().optional(),
-        isSendNotification: zod_1.z.boolean().optional(),
         tags: zod_1.z.array(zod_1.z.string().trim()).optional(),
     }),
 });
