@@ -17,7 +17,16 @@ export const announcementsSchema = new Schema<IAnnouncement>(
     },
     type: {
       type: String,
-      enum: ["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"],
+      enum: [
+        "GENERAL",
+        "MAINTENANCE",
+        "EVENT",
+        "EMERGENCY",
+        "RULE_UPDATE",
+        "BILLING",
+        "SECURITY",
+        "OTHER",
+      ],
       required: true,
     },
     priority: {

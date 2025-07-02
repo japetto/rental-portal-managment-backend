@@ -793,7 +793,7 @@ Authorization: Bearer <your-jwt-token>
 
 **GET** `/announcements/type/:type`
 
-- **Description**: Get announcements by type (GENERAL, MAINTENANCE, EVENT, EMERGENCY, RULE_UPDATE)
+- **Description**: Get announcements by type (GENERAL, MAINTENANCE, EVENT, EMERGENCY, RULE_UPDATE, BILLING, SECURITY, OTHER)
 - **Authentication**: Required (SUPER_ADMIN)
 - **Response**: Array of announcements of the specified type
 

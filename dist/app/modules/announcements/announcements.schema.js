@@ -17,7 +17,16 @@ exports.announcementsSchema = new mongoose_1.Schema({
     },
     type: {
         type: String,
-        enum: ["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"],
+        enum: [
+            "GENERAL",
+            "MAINTENANCE",
+            "EVENT",
+            "EMERGENCY",
+            "RULE_UPDATE",
+            "BILLING",
+            "SECURITY",
+            "OTHER",
+        ],
         required: true,
     },
     priority: {

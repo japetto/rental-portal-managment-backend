@@ -8,8 +8,7 @@ export type AnnouncementType =
   | "RULE_UPDATE"
   | "BILLING"
   | "SECURITY"
-  | "OTHER"
-  | "RULE_UPDATE";
+  | "OTHER";
 
 export type AnnouncementPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 

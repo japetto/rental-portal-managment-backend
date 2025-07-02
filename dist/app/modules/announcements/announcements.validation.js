@@ -13,7 +13,16 @@ exports.createAnnouncementValidationSchema = zod_1.z.object({
             .string()
             .min(1, "Content is required")
             .max(5000, "Content cannot exceed 5000 characters"),
-        type: zod_1.z.enum(["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"], {
+        type: zod_1.z.enum([
+            "GENERAL",
+            "MAINTENANCE",
+            "EVENT",
+            "EMERGENCY",
+            "RULE_UPDATE",
+            "BILLING",
+            "SECURITY",
+            "OTHER",
+        ], {
             required_error: "Type is required",
         }),
         priority: zod_1.z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
@@ -41,7 +50,16 @@ exports.updateAnnouncementValidationSchema = zod_1.z.object({
             .max(5000, "Content cannot exceed 5000 characters")
             .optional(),
         type: zod_1.z
-            .enum(["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"])
+            .enum([
+            "GENERAL",
+            "MAINTENANCE",
+            "EVENT",
+            "EMERGENCY",
+            "RULE_UPDATE",
+            "BILLING",
+            "SECURITY",
+            "OTHER",
+        ])
             .optional(),
         priority: zod_1.z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
         propertyId: zod_1.z.string().optional(),
@@ -83,7 +101,16 @@ exports.getAnnouncementsByPropertyValidationSchema = zod_1.z.object({
 // Get announcements by type validation schema
 exports.getAnnouncementsByTypeValidationSchema = zod_1.z.object({
     params: zod_1.z.object({
-        type: zod_1.z.enum(["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"], {
+        type: zod_1.z.enum([
+            "GENERAL",
+            "MAINTENANCE",
+            "EVENT",
+            "EMERGENCY",
+            "RULE_UPDATE",
+            "BILLING",
+            "SECURITY",
+            "OTHER",
+        ], {
             required_error: "Type is required",
         }),
     }),

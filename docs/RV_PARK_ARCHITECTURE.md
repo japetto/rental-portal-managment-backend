@@ -111,7 +111,7 @@ This backend system is designed to manage multiple RV park properties and their 
 **Schema Fields**:
 
 - `title`, `content` - Announcement details
-- `type` - Announcement type (GENERAL, MAINTENANCE, EVENT, EMERGENCY, RULE_UPDATE)
+- `type` - Announcement type (GENERAL, MAINTENANCE, EVENT, EMERGENCY, RULE_UPDATE, BILLING, SECURITY, OTHER)
 - `priority` - Priority level (LOW, MEDIUM, HIGH, URGENT)
 - `propertyId` - Optional property reference (null for system-wide)
 - `isActive`, `publishDate`, `expiryDate` - Publication control

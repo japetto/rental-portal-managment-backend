@@ -12,7 +12,16 @@ export const createAnnouncementValidationSchema = z.object({
       .min(1, "Content is required")
       .max(5000, "Content cannot exceed 5000 characters"),
     type: z.enum(
-      ["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"],
+      [
+        "GENERAL",
+        "MAINTENANCE",
+        "EVENT",
+        "EMERGENCY",
+        "RULE_UPDATE",
+        "BILLING",
+        "SECURITY",
+        "OTHER",
+      ],
       {
         required_error: "Type is required",
       },
@@ -43,7 +52,16 @@ export const updateAnnouncementValidationSchema = z.object({
       .max(5000, "Content cannot exceed 5000 characters")
       .optional(),
     type: z
-      .enum(["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"])
+      .enum([
+        "GENERAL",
+        "MAINTENANCE",
+        "EVENT",
+        "EMERGENCY",
+        "RULE_UPDATE",
+        "BILLING",
+        "SECURITY",
+        "OTHER",
+      ])
       .optional(),
     priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
     propertyId: z.string().optional(),
@@ -91,7 +109,16 @@ export const getAnnouncementsByPropertyValidationSchema = z.object({
 export const getAnnouncementsByTypeValidationSchema = z.object({
   params: z.object({
     type: z.enum(
-      ["GENERAL", "MAINTENANCE", "EVENT", "EMERGENCY", "RULE_UPDATE"],
+      [
+        "GENERAL",
+        "MAINTENANCE",
+        "EVENT",
+        "EMERGENCY",
+        "RULE_UPDATE",
+        "BILLING",
+        "SECURITY",
+        "OTHER",
+      ],
       {
         required_error: "Type is required",
       },
