@@ -29,6 +29,7 @@ export const addLotDataToProperty = async (property: IProperty) => {
 
   return {
     ...propertyObject,
+    id: propertyObject._id,
     ...lotData,
   };
 };

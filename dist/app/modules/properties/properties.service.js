@@ -34,7 +34,7 @@ const addLotDataToProperty = (property) => __awaiter(void 0, void 0, void 0, fun
     const propertyId = property._id.toString();
     const lotData = yield (0, exports.calculatePropertyLotData)(propertyId);
     const propertyObject = property.toObject();
-    return Object.assign(Object.assign({}, propertyObject), lotData);
+    return Object.assign(Object.assign(Object.assign({}, propertyObject), { id: propertyObject._id }), lotData);
 });
 exports.addLotDataToProperty = addLotDataToProperty;
 // Helper function to add lot data to multiple properties
