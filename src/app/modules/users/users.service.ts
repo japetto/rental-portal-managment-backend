@@ -2,7 +2,6 @@ import bcrypt from "bcrypt";
 import httpStatus from "http-status";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
-import { Properties } from "../properties/properties.schema";
 import { Spots } from "../spots/spots.schema";
 import {
   IAuthUser,
@@ -213,12 +212,7 @@ const deleteUser = async (
       });
     }
 
-    // If user has a property assignment, update property available lots
-    if (user.propertyId) {
-      await Properties.findByIdAndUpdate(user.propertyId, {
-        $inc: { availableLots: 1 },
-      });
-    }
+    // Property lots are now calculated from spots, no need to update manually
 
     // Delete the user
     await Users.findByIdAndDelete(userId);
@@ -249,8 +243,7 @@ const getAllUsers = async (adminId: string): Promise<IUser[]> => {
     .select("-password")
     .populate({
       path: "propertyId",
-      select:
-        "name description address amenities totalLots availableLots isActive images rules",
+      select: "name description address amenities images rules",
     })
     .populate({
       path: "spotId",

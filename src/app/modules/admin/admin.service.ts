@@ -17,6 +17,10 @@ import {
   IUpdateProperty,
   IUpdateSpot,
 } from "./admin.interface";
+import {
+  addLotDataToProperties,
+  addLotDataToProperty,
+} from "../properties/properties.service";
 
 const inviteTenant = async (
   inviteData: IInviteTenant,
@@ -134,18 +138,16 @@ const createProperty = async (
     );
   }
 
-  // Create the property with available lots equal to total lots
-  const property = await Properties.create({
-    ...propertyData,
-    availableLots: propertyData.totalLots,
-  });
+  // Create the property
+  const property = await Properties.create(propertyData);
 
   return property;
 };
 
 const getAllProperties = async (): Promise<IProperty[]> => {
   const properties = await Properties.find({}).sort({ createdAt: -1 });
-  return properties;
+  const propertiesWithLotData = await addLotDataToProperties(properties);
+  return propertiesWithLotData;
 };
 
 const getPropertyById = async (propertyId: string): Promise<IProperty> => {
@@ -158,7 +160,8 @@ const getPropertyById = async (propertyId: string): Promise<IProperty> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
 
-  return property;
+  const propertyWithLotData = await addLotDataToProperty(property);
+  return propertyWithLotData;
 };
 
 const updateProperty = async (
@@ -174,17 +177,7 @@ const updateProperty = async (
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
 
-  // If updating totalLots, recalculate availableLots
-  if (updateData.totalLots !== undefined) {
-    const occupiedLots = property.totalLots - property.availableLots;
-    if (updateData.totalLots < occupiedLots) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "Cannot reduce total lots below occupied lots",
-      );
-    }
-    updateData.availableLots = updateData.totalLots - occupiedLots;
-  }
+  // No need to handle totalLots/availableLots updates - they are calculated from spots
 
   const updatedProperty = await Properties.findByIdAndUpdate(
     propertyId,
@@ -238,13 +231,7 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
 
-  // Check if property is active
-  if (!property.isActive) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Cannot create spots for inactive property",
-    );
-  }
+  // Property is always active now (no isActive field)
 
   // Check if spot number already exists in this property
   const existingSpot = await Spots.findOne({
@@ -258,27 +245,13 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
     );
   }
 
-  // Check if adding this spot would exceed property's total lots
-  const currentSpotsCount = await Spots.countDocuments({
-    propertyId: spotData.propertyId,
-  });
-  if (currentSpotsCount >= property.totalLots) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Cannot create more spots than the property's total lots capacity",
-    );
-  }
+  // No limit on spots - they are managed independently
 
   // Create the spot
   const spot = await Spots.create({
     ...spotData,
     status: "AVAILABLE",
     isActive: true,
-  });
-
-  // Update property's available lots count
-  await Properties.findByIdAndUpdate(spotData.propertyId, {
-    $inc: { availableLots: 1 },
   });
 
   return spot;

@@ -11,9 +11,6 @@ export interface IProperty extends Document {
     country: string;
   };
   amenities: string[];
-  totalLots: number; // Total number of lots/spots available
-  availableLots: number; // Available lots for new tenants
-  isActive: boolean;
   images: string[];
   rules: string[];
   createdAt: Date;
@@ -31,7 +28,6 @@ export interface ICreateProperty {
     country: string;
   };
   amenities: string[];
-  totalLots: number;
   images?: string[];
   rules?: string[];
 }
@@ -47,8 +43,6 @@ export interface IUpdateProperty {
     country?: string;
   };
   amenities?: string[];
-  totalLots?: number;
-  isActive?: boolean;
   images?: string[];
   rules?: string[];
 }

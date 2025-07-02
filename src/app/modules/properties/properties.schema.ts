@@ -13,9 +13,6 @@ export const propertiesSchema = new Schema<IProperty>(
       country: { type: String, required: true, default: "USA" },
     },
     amenities: [{ type: String, required: true }],
-    totalLots: { type: Number, required: true, min: 1 },
-    availableLots: { type: Number, required: true, default: 0 },
-    isActive: { type: Boolean, required: true, default: true },
     images: [{ type: String }],
     rules: [{ type: String }],
   },
@@ -26,10 +23,5 @@ export const propertiesSchema = new Schema<IProperty>(
     },
   },
 );
-
-// Virtual for calculating occupied lots
-propertiesSchema.virtual("occupiedLots").get(function (this: IProperty) {
-  return this.totalLots - this.availableLots;
-});
 
 export const Properties = model<IProperty>("Properties", propertiesSchema);

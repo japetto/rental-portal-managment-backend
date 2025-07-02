@@ -17,7 +17,6 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const http_status_1 = __importDefault(require("http-status"));
 const config_1 = __importDefault(require("../../../config/config"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
-const properties_schema_1 = require("../properties/properties.schema");
 const spots_schema_1 = require("../spots/spots.schema");
 const users_schema_1 = require("./users.schema");
 const users_utils_1 = require("./users.utils");
@@ -138,12 +137,7 @@ const deleteUser = (userId, adminId) => __awaiter(void 0, void 0, void 0, functi
                 status: "AVAILABLE",
             });
         }
-        // If user has a property assignment, update property available lots
-        if (user.propertyId) {
-            yield properties_schema_1.Properties.findByIdAndUpdate(user.propertyId, {
-                $inc: { availableLots: 1 },
-            });
-        }
+        // Property lots are now calculated from spots, no need to update manually
         // Delete the user
         yield users_schema_1.Users.findByIdAndDelete(userId);
         return {
@@ -164,7 +158,7 @@ const getAllUsers = (adminId) => __awaiter(void 0, void 0, void 0, function* () 
         .select("-password")
         .populate({
         path: "propertyId",
-        select: "name description address amenities totalLots availableLots isActive images rules",
+        select: "name description address amenities images rules",
     })
         .populate({
         path: "spotId",

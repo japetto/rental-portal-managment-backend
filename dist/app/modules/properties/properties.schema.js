@@ -13,9 +13,6 @@ exports.propertiesSchema = new mongoose_1.Schema({
         country: { type: String, required: true, default: "USA" },
     },
     amenities: [{ type: String, required: true }],
-    totalLots: { type: Number, required: true, min: 1 },
-    availableLots: { type: Number, required: true, default: 0 },
-    isActive: { type: Boolean, required: true, default: true },
     images: [{ type: String }],
     rules: [{ type: String }],
 }, {
@@ -23,9 +20,5 @@ exports.propertiesSchema = new mongoose_1.Schema({
     toJSON: {
         virtuals: true,
     },
-});
-// Virtual for calculating occupied lots
-exports.propertiesSchema.virtual("occupiedLots").get(function () {
-    return this.totalLots - this.availableLots;
 });
 exports.Properties = (0, mongoose_1.model)("Properties", exports.propertiesSchema);

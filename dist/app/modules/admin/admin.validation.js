@@ -73,7 +73,6 @@ exports.createPropertyValidationSchema = zod_1.z.object({
             country: zod_1.z.string().min(1, "Country is required"),
         }),
         amenities: zod_1.z.array(zod_1.z.string()).min(1, "At least one amenity is required"),
-        totalLots: zod_1.z.number().min(1, "Total lots must be at least 1"),
         images: zod_1.z.array(zod_1.z.string()).optional(),
         rules: zod_1.z.array(zod_1.z.string()).optional(),
     }),
@@ -98,8 +97,6 @@ exports.updatePropertyValidationSchema = zod_1.z.object({
             .array(zod_1.z.string())
             .min(1, "At least one amenity is required")
             .optional(),
-        totalLots: zod_1.z.number().min(1, "Total lots must be at least 1").optional(),
-        isActive: zod_1.z.boolean().optional(),
         images: zod_1.z.array(zod_1.z.string()).optional(),
         rules: zod_1.z.array(zod_1.z.string()).optional(),
     }),

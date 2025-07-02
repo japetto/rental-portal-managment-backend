@@ -65,7 +65,6 @@ export interface ICreateProperty {
     country: string;
   };
   amenities: string[];
-  totalLots: number;
   images?: string[];
   rules?: string[];
 }
@@ -81,9 +80,6 @@ export interface IUpdateProperty {
     country?: string;
   };
   amenities?: string[];
-  totalLots?: number;
-  availableLots?: number;
-  isActive?: boolean;
   images?: string[];
   rules?: string[];
 }

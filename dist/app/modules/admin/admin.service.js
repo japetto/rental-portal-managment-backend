@@ -20,6 +20,7 @@ const properties_schema_1 = require("../properties/properties.schema");
 const service_requests_schema_1 = require("../service-requests/service-requests.schema");
 const spots_schema_1 = require("../spots/spots.schema");
 const users_schema_1 = require("../users/users.schema");
+const properties_service_1 = require("../properties/properties.service");
 const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function* () {
     // Validate ObjectId format for propertyId
     if (!mongoose_1.default.Types.ObjectId.isValid(inviteData.propertyId)) {
@@ -100,13 +101,14 @@ const createProperty = (propertyData) => __awaiter(void 0, void 0, void 0, funct
     if (existingProperty) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, "Property with this name already exists");
     }
-    // Create the property with available lots equal to total lots
-    const property = yield properties_schema_1.Properties.create(Object.assign(Object.assign({}, propertyData), { availableLots: propertyData.totalLots }));
+    // Create the property
+    const property = yield properties_schema_1.Properties.create(propertyData);
     return property;
 });
 const getAllProperties = () => __awaiter(void 0, void 0, void 0, function* () {
     const properties = yield properties_schema_1.Properties.find({}).sort({ createdAt: -1 });
-    return properties;
+    const propertiesWithLotData = yield (0, properties_service_1.addLotDataToProperties)(properties);
+    return propertiesWithLotData;
 });
 const getPropertyById = (propertyId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
@@ -116,7 +118,8 @@ const getPropertyById = (propertyId) => __awaiter(void 0, void 0, void 0, functi
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
-    return property;
+    const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(property);
+    return propertyWithLotData;
 });
 const updateProperty = (propertyId, updateData) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
@@ -126,14 +129,7 @@ const updateProperty = (propertyId, updateData) => __awaiter(void 0, void 0, voi
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
-    // If updating totalLots, recalculate availableLots
-    if (updateData.totalLots !== undefined) {
-        const occupiedLots = property.totalLots - property.availableLots;
-        if (updateData.totalLots < occupiedLots) {
-            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot reduce total lots below occupied lots");
-        }
-        updateData.availableLots = updateData.totalLots - occupiedLots;
-    }
+    // No need to handle totalLots/availableLots updates - they are calculated from spots
     const updatedProperty = yield properties_schema_1.Properties.findByIdAndUpdate(propertyId, updateData, { new: true, runValidators: true });
     return updatedProperty;
 });
@@ -167,10 +163,7 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
-    // Check if property is active
-    if (!property.isActive) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot create spots for inactive property");
-    }
+    // Property is always active now (no isActive field)
     // Check if spot number already exists in this property
     const existingSpot = yield spots_schema_1.Spots.findOne({
         propertyId: spotData.propertyId,
@@ -179,19 +172,9 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
     if (existingSpot) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, "Spot number already exists in this property");
     }
-    // Check if adding this spot would exceed property's total lots
-    const currentSpotsCount = yield spots_schema_1.Spots.countDocuments({
-        propertyId: spotData.propertyId,
-    });
-    if (currentSpotsCount >= property.totalLots) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot create more spots than the property's total lots capacity");
-    }
+    // No limit on spots - they are managed independently
     // Create the spot
     const spot = yield spots_schema_1.Spots.create(Object.assign(Object.assign({}, spotData), { status: "AVAILABLE", isActive: true }));
-    // Update property's available lots count
-    yield properties_schema_1.Properties.findByIdAndUpdate(spotData.propertyId, {
-        $inc: { availableLots: 1 },
-    });
     return spot;
 });
 const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, void 0, function* () {

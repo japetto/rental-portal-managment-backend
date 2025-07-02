@@ -75,7 +75,6 @@ export const createPropertyValidationSchema = z.object({
       country: z.string().min(1, "Country is required"),
     }),
     amenities: z.array(z.string()).min(1, "At least one amenity is required"),
-    totalLots: z.number().min(1, "Total lots must be at least 1"),
     images: z.array(z.string()).optional(),
     rules: z.array(z.string()).optional(),
   }),
@@ -101,8 +100,6 @@ export const updatePropertyValidationSchema = z.object({
       .array(z.string())
       .min(1, "At least one amenity is required")
       .optional(),
-    totalLots: z.number().min(1, "Total lots must be at least 1").optional(),
-    isActive: z.boolean().optional(),
     images: z.array(z.string()).optional(),
     rules: z.array(z.string()).optional(),
   }),
