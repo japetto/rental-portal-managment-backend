@@ -22,13 +22,6 @@ exports.createSpotValidationSchema = zod_1.z.object({
             length: zod_1.z.number().min(1, "Length must be at least 1 foot"),
             width: zod_1.z.number().min(1, "Width must be at least 1 foot"),
         }),
-        amenities: zod_1.z.array(zod_1.z.string()).min(1, "At least one amenity is required"),
-        hookups: zod_1.z.object({
-            water: zod_1.z.boolean(),
-            electricity: zod_1.z.boolean(),
-            sewer: zod_1.z.boolean(),
-            wifi: zod_1.z.boolean(),
-        }),
         price: zod_1.z.object({
             daily: zod_1.z.number().min(0, "Daily price must be non-negative"),
             weekly: zod_1.z.number().min(0, "Weekly price must be non-negative"),
@@ -48,18 +41,6 @@ exports.updateSpotValidationSchema = zod_1.z.object({
             .object({
             length: zod_1.z.number().min(1, "Length must be at least 1 foot").optional(),
             width: zod_1.z.number().min(1, "Width must be at least 1 foot").optional(),
-        })
-            .optional(),
-        amenities: zod_1.z
-            .array(zod_1.z.string())
-            .min(1, "At least one amenity is required")
-            .optional(),
-        hookups: zod_1.z
-            .object({
-            water: zod_1.z.boolean().optional(),
-            electricity: zod_1.z.boolean().optional(),
-            sewer: zod_1.z.boolean().optional(),
-            wifi: zod_1.z.boolean().optional(),
         })
             .optional(),
         price: zod_1.z

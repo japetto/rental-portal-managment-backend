@@ -22,13 +22,6 @@ export const createSpotValidationSchema = z.object({
       length: z.number().min(1, "Length must be at least 1 foot"),
       width: z.number().min(1, "Width must be at least 1 foot"),
     }),
-    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
-    hookups: z.object({
-      water: z.boolean(),
-      electricity: z.boolean(),
-      sewer: z.boolean(),
-      wifi: z.boolean(),
-    }),
     price: z.object({
       daily: z.number().min(0, "Daily price must be non-negative"),
       weekly: z.number().min(0, "Weekly price must be non-negative"),
@@ -49,18 +42,6 @@ export const updateSpotValidationSchema = z.object({
       .object({
         length: z.number().min(1, "Length must be at least 1 foot").optional(),
         width: z.number().min(1, "Width must be at least 1 foot").optional(),
-      })
-      .optional(),
-    amenities: z
-      .array(z.string())
-      .min(1, "At least one amenity is required")
-      .optional(),
-    hookups: z
-      .object({
-        water: z.boolean().optional(),
-        electricity: z.boolean().optional(),
-        sewer: z.boolean().optional(),
-        wifi: z.boolean().optional(),
       })
       .optional(),
     price: z

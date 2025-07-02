@@ -254,8 +254,7 @@ const getAllUsers = async (adminId: string): Promise<IUser[]> => {
     })
     .populate({
       path: "spotId",
-      select:
-        "spotNumber status size amenities hookups price description images isActive",
+      select: "spotNumber status size price description images isActive",
     });
 
   return users;
@@ -280,8 +279,7 @@ const getAllTenants = async (adminId: string): Promise<IUser[]> => {
     })
     .populate({
       path: "spotId",
-      select:
-        "spotNumber status size amenities hookups price description images isActive",
+      select: "spotNumber status size price description images isActive",
     });
 
   return tenants;
@@ -306,8 +304,7 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     })
     .populate({
       path: "spotId",
-      select:
-        "spotNumber status size amenities hookups price description images isActive",
+      select: "spotNumber status size price description images isActive",
     });
 
   if (!user) {

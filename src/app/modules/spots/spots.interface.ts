@@ -10,13 +10,6 @@ export interface ISpot extends Document {
     length: number; // in feet
     width: number; // in feet
   };
-  amenities: string[];
-  hookups: {
-    water: boolean;
-    electricity: boolean;
-    sewer: boolean;
-    wifi: boolean;
-  };
   price: {
     daily: number;
     weekly: number;
@@ -36,13 +29,6 @@ export interface ICreateSpot {
     length: number;
     width: number;
   };
-  amenities: string[];
-  hookups: {
-    water: boolean;
-    electricity: boolean;
-    sewer: boolean;
-    wifi: boolean;
-  };
   price: {
     daily: number;
     weekly: number;
@@ -58,13 +44,6 @@ export interface IUpdateSpot {
   size?: {
     length?: number;
     width?: number;
-  };
-  amenities?: string[];
-  hookups?: {
-    water?: boolean;
-    electricity?: boolean;
-    sewer?: boolean;
-    wifi?: boolean;
   };
   price?: {
     daily?: number;

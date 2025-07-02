@@ -168,7 +168,7 @@ const getAllUsers = (adminId) => __awaiter(void 0, void 0, void 0, function* () 
     })
         .populate({
         path: "spotId",
-        select: "spotNumber status size amenities hookups price description images isActive",
+        select: "spotNumber status size price description images isActive",
     });
     return users;
 });
@@ -186,7 +186,7 @@ const getAllTenants = (adminId) => __awaiter(void 0, void 0, void 0, function* (
     })
         .populate({
         path: "spotId",
-        select: "spotNumber status size amenities hookups price description images isActive",
+        select: "spotNumber status size price description images isActive",
     });
     return tenants;
 });
@@ -204,7 +204,7 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     })
         .populate({
         path: "spotId",
-        select: "spotNumber status size amenities hookups price description images isActive",
+        select: "spotNumber status size price description images isActive",
     });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");

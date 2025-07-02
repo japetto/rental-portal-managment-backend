@@ -19,13 +19,6 @@ export const spotsSchema = new Schema<ISpot>(
       length: { type: Number, required: true, min: 1 },
       width: { type: Number, required: true, min: 1 },
     },
-    amenities: [{ type: String }],
-    hookups: {
-      water: { type: Boolean, required: true, default: false },
-      electricity: { type: Boolean, required: true, default: false },
-      sewer: { type: Boolean, required: true, default: false },
-      wifi: { type: Boolean, required: true, default: false },
-    },
     price: {
       daily: { type: Number, required: true, min: 0 },
       weekly: { type: Number, required: true, min: 0 },

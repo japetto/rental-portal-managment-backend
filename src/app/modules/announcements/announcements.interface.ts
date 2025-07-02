@@ -6,7 +6,9 @@ export type AnnouncementType =
   | "EVENT"
   | "EMERGENCY"
   | "RULE_UPDATE";
+
 export type AnnouncementPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
 export type AnnouncementTargetAudience =
   | "ALL"
   | "TENANTS_ONLY"
