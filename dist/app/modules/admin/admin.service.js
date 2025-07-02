@@ -17,10 +17,10 @@ const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const properties_schema_1 = require("../properties/properties.schema");
+const properties_service_1 = require("../properties/properties.service");
 const service_requests_schema_1 = require("../service-requests/service-requests.schema");
 const spots_schema_1 = require("../spots/spots.schema");
 const users_schema_1 = require("../users/users.schema");
-const properties_service_1 = require("../properties/properties.service");
 const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function* () {
     // Validate ObjectId format for propertyId
     if (!mongoose_1.default.Types.ObjectId.isValid(inviteData.propertyId)) {
@@ -83,13 +83,11 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
     const user = yield users_schema_1.Users.create(userData);
     // Update spot status to RESERVED
     yield spots_schema_1.Spots.findByIdAndUpdate(inviteData.spotId, { status: "RESERVED" });
-    // Update property available lots count
-    yield properties_schema_1.Properties.findByIdAndUpdate(inviteData.propertyId, {
-        $inc: { availableLots: -1 },
-    });
+    // Property lots are now calculated from spots, no need to update manually
+    const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(property);
     return {
         user,
-        property,
+        property: propertyWithLotData,
         spot,
     };
 });
@@ -131,7 +129,8 @@ const updateProperty = (propertyId, updateData) => __awaiter(void 0, void 0, voi
     }
     // No need to handle totalLots/availableLots updates - they are calculated from spots
     const updatedProperty = yield properties_schema_1.Properties.findByIdAndUpdate(propertyId, updateData, { new: true, runValidators: true });
-    return updatedProperty;
+    const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(updatedProperty);
+    return propertyWithLotData;
 });
 const deleteProperty = (propertyId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {

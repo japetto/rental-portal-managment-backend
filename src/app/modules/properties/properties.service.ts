@@ -22,10 +22,13 @@ export const calculatePropertyLotData = async (propertyId: string) => {
 
 // Helper function to add lot data to property object
 export const addLotDataToProperty = async (property: IProperty) => {
-  const lotData = await calculatePropertyLotData(property._id as string);
+  const propertyId = (property._id as any).toString();
+  const lotData = await calculatePropertyLotData(propertyId);
+
+  const propertyObject = property.toObject();
 
   return {
-    ...property.toObject(),
+    ...propertyObject,
     ...lotData,
   };
 };

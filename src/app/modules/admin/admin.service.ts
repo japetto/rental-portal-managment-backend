@@ -3,6 +3,10 @@ import mongoose from "mongoose";
 import ApiError from "../../../errors/ApiError";
 import { IProperty } from "../properties/properties.interface";
 import { Properties } from "../properties/properties.schema";
+import {
+  addLotDataToProperties,
+  addLotDataToProperty,
+} from "../properties/properties.service";
 import { IServiceRequest } from "../service-requests/service-requests.interface";
 import { ServiceRequests } from "../service-requests/service-requests.schema";
 import { ISpot } from "../spots/spots.interface";
@@ -17,10 +21,6 @@ import {
   IUpdateProperty,
   IUpdateSpot,
 } from "./admin.interface";
-import {
-  addLotDataToProperties,
-  addLotDataToProperty,
-} from "../properties/properties.service";
 
 const inviteTenant = async (
   inviteData: IInviteTenant,
@@ -112,14 +112,13 @@ const inviteTenant = async (
   // Update spot status to RESERVED
   await Spots.findByIdAndUpdate(inviteData.spotId, { status: "RESERVED" });
 
-  // Update property available lots count
-  await Properties.findByIdAndUpdate(inviteData.propertyId, {
-    $inc: { availableLots: -1 },
-  });
+  // Property lots are now calculated from spots, no need to update manually
+
+  const propertyWithLotData = await addLotDataToProperty(property);
 
   return {
     user,
-    property,
+    property: propertyWithLotData,
     spot,
   };
 };
@@ -185,7 +184,8 @@ const updateProperty = async (
     { new: true, runValidators: true },
   );
 
-  return updatedProperty!;
+  const propertyWithLotData = await addLotDataToProperty(updatedProperty!);
+  return propertyWithLotData;
 };
 
 const deleteProperty = async (propertyId: string): Promise<void> => {
