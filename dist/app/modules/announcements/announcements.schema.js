@@ -91,6 +91,11 @@ exports.announcementsSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
+    // Add optional notification control field
+    isSendNotification: {
+        type: Boolean,
+        required: false, // Optional field
+    },
     // Add tags for better categorization
     tags: [
         {

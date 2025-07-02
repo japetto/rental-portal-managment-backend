@@ -69,22 +69,23 @@ http://localhost:5000/api/v1/announcements
 
 ### Field Descriptions
 
-| Field              | Type     | Required | Description                                                                         |
-| ------------------ | -------- | -------- | ----------------------------------------------------------------------------------- |
-| `title`            | String   | Yes      | Announcement title (max 200 chars)                                                  |
-| `content`          | String   | Yes      | Announcement content (max 5000 chars)                                               |
-| `type`             | Enum     | Yes      | Type: GENERAL, MAINTENANCE, EVENT, EMERGENCY, RULE_UPDATE, BILLING, SECURITY, OTHER |
-| `priority`         | Enum     | No       | Priority: LOW, MEDIUM, HIGH, URGENT (default: MEDIUM)                               |
-| `propertyId`       | ObjectId | No       | Property ID (null for system-wide)                                                  |
-| `isActive`         | Boolean  | No       | Active status (default: true)                                                       |
-| `publishDate`      | Date     | No       | Publish date (default: current date)                                                |
-| `expiryDate`       | Date     | No       | Expiry date (optional)                                                              |
-| `createdBy`        | String   | Yes      | Admin who created the announcement                                                  |
-| `attachments`      | Array    | No       | Array of attachment URLs                                                            |
-| `readBy`           | Array    | No       | Array of user IDs who read it                                                       |
-| `targetAudience`   | Enum     | No       | ALL, TENANTS_ONLY, ADMINS_ONLY, PROPERTY_SPECIFIC                                   |
-| `sendNotification` | Boolean  | No       | Send notification flag (default: true)                                              |
-| `tags`             | Array    | No       | Array of tags for categorization                                                    |
+| Field                | Type     | Required | Description                                                                         |
+| -------------------- | -------- | -------- | ----------------------------------------------------------------------------------- |
+| `title`              | String   | Yes      | Announcement title (max 200 chars)                                                  |
+| `content`            | String   | Yes      | Announcement content (max 5000 chars)                                               |
+| `type`               | Enum     | Yes      | Type: GENERAL, MAINTENANCE, EVENT, EMERGENCY, RULE_UPDATE, BILLING, SECURITY, OTHER |
+| `priority`           | Enum     | No       | Priority: LOW, MEDIUM, HIGH, URGENT (default: MEDIUM)                               |
+| `propertyId`         | ObjectId | No       | Property ID (null for system-wide)                                                  |
+| `isActive`           | Boolean  | No       | Active status (default: true)                                                       |
+| `publishDate`        | Date     | No       | Publish date (default: current date)                                                |
+| `expiryDate`         | Date     | No       | Expiry date (optional)                                                              |
+| `createdBy`          | String   | Yes      | Admin who created the announcement                                                  |
+| `attachments`        | Array    | No       | Array of attachment URLs                                                            |
+| `readBy`             | Array    | No       | Array of user IDs who read it                                                       |
+| `targetAudience`     | Enum     | No       | ALL, TENANTS_ONLY, ADMINS_ONLY, PROPERTY_SPECIFIC                                   |
+| `sendNotification`   | Boolean  | No       | Send notification flag (default: true)                                              |
+| `isSendNotification` | Boolean  | No       | Optional notification control flag                                                  |
+| `tags`               | Array    | No       | Array of tags for categorization                                                    |
 
 ### Virtual Fields
 
@@ -262,6 +263,7 @@ Content-Type: application/json
   "attachments": ["https://example.com/emergency-notice.pdf"],
   "targetAudience": "TENANTS_ONLY",
   "sendNotification": true,
+  "isSendNotification": true,
   "tags": ["emergency", "water", "maintenance"]
 }
 ```
@@ -291,6 +293,7 @@ Content-Type: application/json
     "readBy": [],
     "targetAudience": "TENANTS_ONLY",
     "sendNotification": true,
+    "isSendNotification": true,
     "tags": ["emergency", "water", "maintenance"],
     "isExpired": false,
     "isCurrentlyActive": true,
@@ -353,6 +356,7 @@ Authorization: Bearer <admin-jwt-token>
       ],
       "targetAudience": "TENANTS_ONLY",
       "sendNotification": true,
+      "isSendNotification": true,
       "tags": ["pool", "maintenance"],
       "isExpired": false,
       "isCurrentlyActive": true,

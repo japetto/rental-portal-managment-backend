@@ -34,6 +34,7 @@ export const createAnnouncementValidationSchema = z.object({
       .enum(["ALL", "TENANTS_ONLY", "ADMINS_ONLY", "PROPERTY_SPECIFIC"])
       .default("ALL"),
     sendNotification: z.boolean().default(true),
+    isSendNotification: z.boolean().optional(),
     tags: z.array(z.string().trim()).optional(),
   }),
 });
@@ -72,6 +73,7 @@ export const updateAnnouncementValidationSchema = z.object({
       .enum(["ALL", "TENANTS_ONLY", "ADMINS_ONLY", "PROPERTY_SPECIFIC"])
       .optional(),
     sendNotification: z.boolean().optional(),
+    isSendNotification: z.boolean().optional(),
     tags: z.array(z.string().trim()).optional(),
   }),
 });

@@ -91,6 +91,11 @@ export const announcementsSchema = new Schema<IAnnouncement>(
       type: Boolean,
       default: true,
     },
+    // Add optional notification control field
+    isSendNotification: {
+      type: Boolean,
+      required: false, // Optional field
+    },
     // Add tags for better categorization
     tags: [
       {

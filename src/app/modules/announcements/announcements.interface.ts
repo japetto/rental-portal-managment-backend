@@ -31,6 +31,7 @@ export interface IAnnouncement extends Document {
   readBy: Types.ObjectId[]; // Array of user IDs who have read this announcement
   targetAudience: AnnouncementTargetAudience;
   sendNotification: boolean;
+  isSendNotification?: boolean; // Optional field to control notification sending
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +51,7 @@ export interface ICreateAnnouncement {
   attachments?: string[];
   targetAudience?: AnnouncementTargetAudience;
   sendNotification?: boolean;
+  isSendNotification?: boolean; // Optional field to control notification sending
   tags?: string[];
 }
 
@@ -64,6 +66,7 @@ export interface IUpdateAnnouncement {
   attachments?: string[];
   targetAudience?: AnnouncementTargetAudience;
   sendNotification?: boolean;
+  isSendNotification?: boolean; // Optional field to control notification sending
   tags?: string[];
 }
 
