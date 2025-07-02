@@ -5,6 +5,10 @@ export type AnnouncementType =
   | "MAINTENANCE"
   | "EVENT"
   | "EMERGENCY"
+  | "RULE_UPDATE"
+  | "BILLING"
+  | "SECURITY"
+  | "OTHER"
   | "RULE_UPDATE";
 
 export type AnnouncementPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
