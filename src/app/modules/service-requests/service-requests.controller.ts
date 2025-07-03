@@ -11,7 +11,7 @@ import { ServiceRequestService } from "./service-requests.service";
 // Create service request
 const createServiceRequest = catchAsync(async (req: Request, res: Response) => {
   const payload: ICreateServiceRequest = req.body;
-  const userId = req.user?.id;
+  const userId = req.user?._id?.toString();
 
   if (!userId) {
     return sendResponse(res, {
@@ -39,7 +39,7 @@ const createServiceRequest = catchAsync(async (req: Request, res: Response) => {
 const getServiceRequestById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?._id?.toString();
     const userRole = req.user?.role;
 
     if (!userId || !id) {
@@ -75,7 +75,7 @@ const getServiceRequests = catchAsync(async (req: Request, res: Response) => {
     sortBy: (req.query.sortBy as string) || "requestedDate",
     sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
   };
-  const userId = req.user?.id;
+  const userId = req.user?._id?.toString();
   const userRole = req.user?.role;
 
   if (!userId) {
@@ -112,7 +112,7 @@ const getServiceRequests = catchAsync(async (req: Request, res: Response) => {
 const updateServiceRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const payload: IUpdateServiceRequest = req.body;
-  const userId = req.user?.id;
+  const userId = req.user?._id?.toString();
   const userRole = req.user?.role;
 
   if (!userId || !id) {
@@ -142,7 +142,7 @@ const updateServiceRequest = catchAsync(async (req: Request, res: Response) => {
 // Delete service request
 const deleteServiceRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const userId = req.user?.id;
+  const userId = req.user?._id?.toString();
   const userRole = req.user?.role;
 
   if (!userId || !id) {

@@ -19,9 +19,9 @@ const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const service_requests_service_1 = require("./service-requests.service");
 // Create service request
 const createServiceRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     const payload = req.body;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
     if (!userId) {
         return (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.UNAUTHORIZED,
@@ -40,10 +40,10 @@ const createServiceRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
 }));
 // Get service request by ID
 const getServiceRequestById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c;
     const { id } = req.params;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-    const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    const userRole = (_c = req.user) === null || _c === void 0 ? void 0 : _c.role;
     if (!userId || !id) {
         return (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.UNAUTHORIZED,
@@ -62,7 +62,7 @@ const getServiceRequestById = (0, catchAsync_1.default)((req, res) => __awaiter(
 }));
 // Get service requests with filters and pagination
 const getServiceRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c;
     const filters = req.query;
     const options = {
         page: Number(req.query.page) || 1,
@@ -70,8 +70,8 @@ const getServiceRequests = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         sortBy: req.query.sortBy || "requestedDate",
         sortOrder: req.query.sortOrder || "desc",
     };
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-    const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    const userRole = (_c = req.user) === null || _c === void 0 ? void 0 : _c.role;
     if (!userId) {
         return (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.UNAUTHORIZED,
@@ -95,11 +95,11 @@ const getServiceRequests = (0, catchAsync_1.default)((req, res) => __awaiter(voi
 }));
 // Update service request
 const updateServiceRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c;
     const { id } = req.params;
     const payload = req.body;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-    const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    const userRole = (_c = req.user) === null || _c === void 0 ? void 0 : _c.role;
     if (!userId || !id) {
         return (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.UNAUTHORIZED,
@@ -118,10 +118,10 @@ const updateServiceRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
 }));
 // Delete service request
 const deleteServiceRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c;
     const { id } = req.params;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-    const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    const userRole = (_c = req.user) === null || _c === void 0 ? void 0 : _c.role;
     if (!userId || !id) {
         return (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.UNAUTHORIZED,

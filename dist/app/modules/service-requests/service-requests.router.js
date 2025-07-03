@@ -5,13 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ServiceRequestRoutes = void 0;
 const express_1 = require("express");
+const userAuth_1 = require("../../../middlewares/userAuth");
 const zodValidationRequest_1 = __importDefault(require("../../../middlewares/zodValidationRequest"));
-const verifyAuthToken_1 = require("../../../util/verifyAuthToken");
 const service_requests_controller_1 = require("./service-requests.controller");
 const service_requests_validation_1 = require("./service-requests.validation");
 const router = (0, express_1.Router)();
 // Apply authentication middleware to all routes
-router.use(verifyAuthToken_1.verifyAuthToken);
+router.use(userAuth_1.userAuth);
 // Create service request (Tenants only)
 router.post("/", (0, zodValidationRequest_1.default)(service_requests_validation_1.ServiceRequestValidation.createServiceRequestValidationSchema), service_requests_controller_1.ServiceRequestController.createServiceRequest);
 // Get service request by ID

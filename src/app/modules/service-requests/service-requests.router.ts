@@ -1,13 +1,13 @@
 import { Router } from "express";
+import { userAuth } from "../../../middlewares/userAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
-import { verifyAuthToken } from "../../../util/verifyAuthToken";
 import { ServiceRequestController } from "./service-requests.controller";
 import { ServiceRequestValidation } from "./service-requests.validation";
 
 const router = Router();
 
 // Apply authentication middleware to all routes
-router.use(verifyAuthToken);
+router.use(userAuth);
 
 // Create service request (Tenants only)
 router.post(
