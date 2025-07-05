@@ -249,8 +249,7 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
 
   // Create the spot
   const spot = await Spots.create({
-    ...spotData,
-    status: "AVAILABLE",
+    spotData,
     isActive: true,
   });
 
