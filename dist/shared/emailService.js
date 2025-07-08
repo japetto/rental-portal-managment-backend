@@ -12,42 +12,87 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendTenantInvitationEmail = exports.sendEmail = void 0;
+exports.sendTenantInvitationEmail = exports.sendEmail = exports.verifyEmailConnection = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const config_1 = __importDefault(require("../config/config"));
 // Create transporter with SMTP configuration for Gmail
-const transporter = nodemailer_1.default.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: config_1.default.nodemailer_user,
-        pass: config_1.default.nodemailer_pass,
-    },
-    // Optional: Add these settings for better reliability
-    tls: {
-        rejectUnauthorized: false,
-    },
-    // Optional: Add timeout settings
-    connectionTimeout: 60000,
-    greetingTimeout: 30000,
-    socketTimeout: 60000,
+const createTransporter = () => {
+    // Check if we're in production and use different settings
+    const isProduction = config_1.default.node_env === "production";
+    const transporterConfig = {
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+            user: config_1.default.nodemailer_user,
+            pass: config_1.default.nodemailer_pass,
+        },
+        // Optional: Add these settings for better reliability
+        tls: {
+            rejectUnauthorized: false,
+        },
+        // Optional: Add timeout settings
+        connectionTimeout: 60000,
+        greetingTimeout: 30000,
+        socketTimeout: 60000,
+    };
+    // Alternative configuration for production with more robust settings
+    if (isProduction) {
+        transporterConfig.port = 465;
+        transporterConfig.secure = true;
+        transporterConfig.tls = {
+            rejectUnauthorized: false,
+        };
+    }
+    return nodemailer_1.default.createTransport(transporterConfig);
+};
+const transporter = createTransporter();
+// Verify transporter connection
+const verifyEmailConnection = () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield transporter.verify();
+        console.log("Email transporter verified successfully");
+        return true;
+    }
+    catch (error) {
+        console.error("Email transporter verification failed:", error);
+        return false;
+    }
 });
-// Send email function
+exports.verifyEmailConnection = verifyEmailConnection;
+// Send email function with enhanced error handling
 const sendEmail = (emailOptions) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        // Verify connection before sending
+        const isConnected = yield (0, exports.verifyEmailConnection)();
+        if (!isConnected) {
+            throw new Error("Email service is not properly configured");
+        }
         const mailOptions = {
             from: config_1.default.nodemailer_user,
             to: emailOptions.to,
             subject: emailOptions.subject,
             html: emailOptions.html,
         };
-        yield transporter.sendMail(mailOptions);
-        console.log("Email sent successfully");
+        console.log("Attempting to send email to:", emailOptions.to);
+        const result = yield transporter.sendMail(mailOptions);
+        console.log("Email sent successfully. Message ID:", result.messageId);
     }
     catch (error) {
         console.error("Error sending email:", error);
-        throw new Error("Failed to send email");
+        // Provide more specific error messages
+        if (error instanceof Error) {
+            if (error.message.includes("Invalid login")) {
+                throw new Error("Email authentication failed. Please check your Gmail credentials and ensure you're using an App Password.");
+            }
+            else if (error.message.includes("Connection timeout")) {
+                throw new Error("Email connection timeout. Please check your network connection and try again.");
+            }
+            else if (error.message.includes("Authentication failed")) {
+                throw new Error("Gmail authentication failed. Please enable 2FA and use an App Password.");
+            }
+        }
+        throw new Error(`Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
 });
 exports.sendEmail = sendEmail;

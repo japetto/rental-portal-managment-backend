@@ -53,4 +53,6 @@ router.get("/users/:userId", (0, zodValidationRequest_1.default)(admin_validatio
 router.patch("/users/:userId", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminUpdateUserValidationSchema), admin_controller_1.AdminController.updateUser);
 // Delete a user
 router.delete("/users/:userId", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminDeleteUserValidationSchema), admin_controller_1.AdminController.deleteUser);
+// Test email endpoint for debugging
+router.get("/test-email", admin_controller_1.AdminController.testEmail);
 exports.AdminRouter = router;

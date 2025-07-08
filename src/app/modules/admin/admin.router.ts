@@ -145,4 +145,7 @@ router.delete(
   AdminController.deleteUser,
 );
 
+// Test email endpoint for debugging
+router.get("/test-email", AdminController.testEmail);
+
 export const AdminRouter = router;

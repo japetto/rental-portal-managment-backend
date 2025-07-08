@@ -2,26 +2,57 @@ import nodemailer from "nodemailer";
 import config from "../config/config";
 
 // Create transporter with SMTP configuration for Gmail
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: config.nodemailer_user,
-    pass: config.nodemailer_pass,
-  },
-  // Optional: Add these settings for better reliability
-  tls: {
-    rejectUnauthorized: false,
-  },
-  // Optional: Add timeout settings
-  connectionTimeout: 60000,
-  greetingTimeout: 30000,
-  socketTimeout: 60000,
-});
+const createTransporter = () => {
+  // Check if we're in production and use different settings
+  const isProduction = config.node_env === "production";
+
+  const transporterConfig = {
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: config.nodemailer_user,
+      pass: config.nodemailer_pass,
+    },
+    // Optional: Add these settings for better reliability
+    tls: {
+      rejectUnauthorized: false,
+    },
+    // Optional: Add timeout settings
+    connectionTimeout: 60000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
+  };
+
+  // Alternative configuration for production with more robust settings
+  if (isProduction) {
+    transporterConfig.port = 465;
+    transporterConfig.secure = true;
+    transporterConfig.tls = {
+      rejectUnauthorized: false,
+    };
+  }
+
+  return nodemailer.createTransport(transporterConfig);
+};
+
+const transporter = createTransporter();
+
+// Verify transporter connection
+export const verifyEmailConnection = async (): Promise<boolean> => {
+  try {
+    await transporter.verify();
+    console.log("Email transporter verified successfully");
+    return true;
+  } catch (error) {
+    console.error("Email transporter verification failed:", error);
+    return false;
+  }
+};
 
 // Alternative configuration using service (simpler but less control)
-// const transporter = nodemailer.createTransporter({
+
+// const transporter = nodemailer.createTransport({
 //   service: "gmail", // You can change this to: 'outlook', 'yahoo', 'hotmail', etc.
 //   auth: {
 //     user: config.nodemailer_user,
@@ -36,9 +67,15 @@ interface IEmailOptions {
   html: string;
 }
 
-// Send email function
+// Send email function with enhanced error handling
 export const sendEmail = async (emailOptions: IEmailOptions): Promise<void> => {
   try {
+    // Verify connection before sending
+    const isConnected = await verifyEmailConnection();
+    if (!isConnected) {
+      throw new Error("Email service is not properly configured");
+    }
+
     const mailOptions = {
       from: config.nodemailer_user,
       to: emailOptions.to,
@@ -46,11 +83,32 @@ export const sendEmail = async (emailOptions: IEmailOptions): Promise<void> => {
       html: emailOptions.html,
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully");
+    console.log("Attempting to send email to:", emailOptions.to);
+    const result = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully. Message ID:", result.messageId);
   } catch (error) {
     console.error("Error sending email:", error);
-    throw new Error("Failed to send email");
+
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes("Invalid login")) {
+        throw new Error(
+          "Email authentication failed. Please check your Gmail credentials and ensure you're using an App Password.",
+        );
+      } else if (error.message.includes("Connection timeout")) {
+        throw new Error(
+          "Email connection timeout. Please check your network connection and try again.",
+        );
+      } else if (error.message.includes("Authentication failed")) {
+        throw new Error(
+          "Gmail authentication failed. Please enable 2FA and use an App Password.",
+        );
+      }
+    }
+
+    throw new Error(
+      `Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
 };
 

@@ -2,7 +2,10 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import config from "../../../config/config";
 import catchAsync from "../../../shared/catchAsync";
-import { sendTenantInvitationEmail } from "../../../shared/emailService";
+import {
+  sendTenantInvitationEmail,
+  verifyEmailConnection,
+} from "../../../shared/emailService";
 import sendResponse from "../../../shared/sendResponse";
 import {
   IAdminUpdateUser,
@@ -544,6 +547,47 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Test email endpoint for debugging
+const testEmail = catchAsync(async (req: Request, res: Response) => {
+  try {
+    // Test email connection
+    const isConnected = await verifyEmailConnection();
+
+    if (!isConnected) {
+      return sendResponse(res, {
+        statusCode: 500,
+        success: false,
+        message: "Email service is not properly configured",
+        data: null,
+      });
+    }
+
+    return sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Email service is working correctly",
+      data: {
+        connected: true,
+        nodemailer_user: process.env.NODEMAILER_USER
+          ? "Configured"
+          : "Not configured",
+        nodemailer_pass: process.env.NODEMAILER_PASS
+          ? "Configured"
+          : "Not configured",
+      },
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      statusCode: 500,
+      success: false,
+      message: "Email test failed",
+      data: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
+  }
+});
+
 export const AdminController = {
   inviteTenant,
   getAllTenants,
@@ -569,4 +613,5 @@ export const AdminController = {
   getUserById,
   updateUser,
   deleteUser,
+  testEmail,
 };

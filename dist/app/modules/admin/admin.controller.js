@@ -447,6 +447,45 @@ const deleteUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
         data: result,
     });
 }));
+// Test email endpoint for debugging
+const testEmail = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Test email connection
+        const isConnected = yield (0, emailService_1.verifyEmailConnection)();
+        if (!isConnected) {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: 500,
+                success: false,
+                message: "Email service is not properly configured",
+                data: null,
+            });
+        }
+        return (0, sendResponse_1.default)(res, {
+            statusCode: 200,
+            success: true,
+            message: "Email service is working correctly",
+            data: {
+                connected: true,
+                nodemailer_user: process.env.NODEMAILER_USER
+                    ? "Configured"
+                    : "Not configured",
+                nodemailer_pass: process.env.NODEMAILER_PASS
+                    ? "Configured"
+                    : "Not configured",
+            },
+        });
+    }
+    catch (error) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: 500,
+            success: false,
+            message: "Email test failed",
+            data: {
+                error: error instanceof Error ? error.message : "Unknown error",
+            },
+        });
+    }
+}));
 exports.AdminController = {
     inviteTenant,
     getAllTenants,
@@ -472,4 +511,5 @@ exports.AdminController = {
     getUserById,
     updateUser,
     deleteUser,
+    testEmail,
 };
