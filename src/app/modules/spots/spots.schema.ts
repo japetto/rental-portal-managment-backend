@@ -11,7 +11,7 @@ export const spotsSchema = new Schema<ISpot>(
     },
     status: {
       type: String,
-      enum: ["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"],
+      enum: ["AVAILABLE", "MAINTENANCE"],
       required: true,
       default: "AVAILABLE",
     },

@@ -18,14 +18,14 @@ const calculatePropertyLotData = (propertyId) => __awaiter(void 0, void 0, void 
         propertyId,
         status: "AVAILABLE",
     });
-    const occupiedLots = yield spots_schema_1.Spots.countDocuments({
+    const maintenanceLots = yield spots_schema_1.Spots.countDocuments({
         propertyId,
-        status: "OCCUPIED",
+        status: "MAINTENANCE",
     });
     return {
         totalLots,
         availableLots,
-        occupiedLots,
+        maintenanceLots,
     };
 });
 exports.calculatePropertyLotData = calculatePropertyLotData;

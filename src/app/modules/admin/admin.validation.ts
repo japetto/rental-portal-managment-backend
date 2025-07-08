@@ -35,9 +35,7 @@ export const createSpotValidationSchema = z.object({
 export const updateSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required").optional(),
-    status: z
-      .enum(["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"])
-      .optional(),
+    status: z.enum(["AVAILABLE", "MAINTENANCE"]).optional(),
     size: z
       .object({
         length: z.number().min(1, "Length must be at least 1 foot").optional(),

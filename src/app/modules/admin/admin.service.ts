@@ -109,8 +109,8 @@ const inviteTenant = async (
 
   const user = await Users.create(userData);
 
-  // Update spot status to RESERVED
-  await Spots.findByIdAndUpdate(inviteData.spotId, { status: "RESERVED" });
+  // Update spot status to MAINTENANCE (temporarily unavailable)
+  await Spots.findByIdAndUpdate(inviteData.spotId, { status: "MAINTENANCE" });
 
   // Property lots are now calculated from spots, no need to update manually
 
@@ -245,11 +245,23 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
     );
   }
 
+  // Validate status - only AVAILABLE and MAINTENANCE are allowed
+  if (
+    spotData.status &&
+    !["AVAILABLE", "MAINTENANCE"].includes(spotData.status)
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid status. Only AVAILABLE and MAINTENANCE are allowed for spot creation",
+    );
+  }
+
   // No limit on spots - they are managed independently
 
-  // Create the spot
+  // Create the spot with validated data
   const spot = await Spots.create({
-    spotData,
+    ...spotData,
+    status: spotData.status || "AVAILABLE", // Default to AVAILABLE if not specified
     isActive: true,
   });
 
@@ -275,11 +287,11 @@ const getSpotsByProperty = async (
 
   // Add status filter if provided
   if (status) {
-    const validStatuses = ["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"];
+    const validStatuses = ["AVAILABLE", "MAINTENANCE"];
     if (!validStatuses.includes(status.toUpperCase())) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        "Invalid status. Must be one of: AVAILABLE, OCCUPIED, MAINTENANCE, RESERVED",
+        "Invalid status. Must be one of: AVAILABLE, MAINTENANCE",
       );
     }
     query.status = status.toUpperCase();
@@ -348,17 +360,12 @@ const deleteSpot = async (spotId: string): Promise<void> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
 
-  // Check if spot is occupied
-  if (spot.status === "OCCUPIED") {
+  // Check if spot is in maintenance
+  if (spot.status === "MAINTENANCE") {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Cannot delete an occupied spot",
+      "Cannot delete a spot that is under maintenance",
     );
-  }
-
-  // Check if spot is reserved
-  if (spot.status === "RESERVED") {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Cannot delete a reserved spot");
   }
 
   await Spots.findByIdAndDelete(spotId);

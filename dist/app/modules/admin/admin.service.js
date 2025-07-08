@@ -81,8 +81,8 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
         spotId: inviteData.spotId,
     };
     const user = yield users_schema_1.Users.create(userData);
-    // Update spot status to RESERVED
-    yield spots_schema_1.Spots.findByIdAndUpdate(inviteData.spotId, { status: "RESERVED" });
+    // Update spot status to MAINTENANCE (temporarily unavailable)
+    yield spots_schema_1.Spots.findByIdAndUpdate(inviteData.spotId, { status: "MAINTENANCE" });
     // Property lots are now calculated from spots, no need to update manually
     const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(property);
     return {
@@ -171,12 +171,14 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
     if (existingSpot) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, "Spot number already exists in this property");
     }
+    // Validate status - only AVAILABLE and MAINTENANCE are allowed
+    if (spotData.status &&
+        !["AVAILABLE", "MAINTENANCE"].includes(spotData.status)) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Only AVAILABLE and MAINTENANCE are allowed for spot creation");
+    }
     // No limit on spots - they are managed independently
-    // Create the spot
-    const spot = yield spots_schema_1.Spots.create({
-        spotData,
-        isActive: true,
-    });
+    // Create the spot with validated data
+    const spot = yield spots_schema_1.Spots.create(Object.assign(Object.assign({}, spotData), { status: spotData.status || "AVAILABLE", isActive: true }));
     return spot;
 });
 const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, void 0, function* () {
@@ -192,9 +194,9 @@ const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, voi
     const query = { propertyId };
     // Add status filter if provided
     if (status) {
-        const validStatuses = ["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"];
+        const validStatuses = ["AVAILABLE", "MAINTENANCE"];
         if (!validStatuses.includes(status.toUpperCase())) {
-            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Must be one of: AVAILABLE, OCCUPIED, MAINTENANCE, RESERVED");
+            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Must be one of: AVAILABLE, MAINTENANCE");
         }
         query.status = status.toUpperCase();
     }
@@ -244,13 +246,9 @@ const deleteSpot = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!spot) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found");
     }
-    // Check if spot is occupied
-    if (spot.status === "OCCUPIED") {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot delete an occupied spot");
-    }
-    // Check if spot is reserved
-    if (spot.status === "RESERVED") {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot delete a reserved spot");
+    // Check if spot is in maintenance
+    if (spot.status === "MAINTENANCE") {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Cannot delete a spot that is under maintenance");
     }
     yield spots_schema_1.Spots.findByIdAndDelete(spotId);
     // Update property's available lots count

@@ -10,6 +10,7 @@ export interface IInviteTenant {
 export interface ICreateSpot {
   spotNumber: string;
   propertyId: string;
+  status?: "AVAILABLE" | "MAINTENANCE";
   size: {
     length: number;
     width: number;
@@ -32,7 +33,7 @@ export interface ICreateSpot {
 
 export interface IUpdateSpot {
   spotNumber?: string;
-  status?: "AVAILABLE" | "OCCUPIED" | "MAINTENANCE" | "RESERVED";
+  status?: "AVAILABLE" | "MAINTENANCE";
   size?: {
     length?: number;
     width?: number;

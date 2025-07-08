@@ -34,9 +34,7 @@ exports.createSpotValidationSchema = zod_1.z.object({
 exports.updateSpotValidationSchema = zod_1.z.object({
     body: zod_1.z.object({
         spotNumber: zod_1.z.string().min(1, "Spot number is required").optional(),
-        status: zod_1.z
-            .enum(["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"])
-            .optional(),
+        status: zod_1.z.enum(["AVAILABLE", "MAINTENANCE"]).optional(),
         size: zod_1.z
             .object({
             length: zod_1.z.number().min(1, "Length must be at least 1 foot").optional(),

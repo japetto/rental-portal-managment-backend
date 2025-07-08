@@ -1,6 +1,6 @@
 import { Document, Types } from "mongoose";
 
-export type SpotStatus = "AVAILABLE" | "OCCUPIED" | "MAINTENANCE" | "RESERVED";
+export type SpotStatus = "AVAILABLE" | "MAINTENANCE";
 
 export interface ISpot extends Document {
   spotNumber: string;

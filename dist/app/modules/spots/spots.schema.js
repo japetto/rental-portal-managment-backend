@@ -11,7 +11,7 @@ exports.spotsSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ["AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"],
+        enum: ["AVAILABLE", "MAINTENANCE"],
         required: true,
         default: "AVAILABLE",
     },

@@ -8,15 +8,15 @@ export const calculatePropertyLotData = async (propertyId: string) => {
     propertyId,
     status: "AVAILABLE",
   });
-  const occupiedLots = await Spots.countDocuments({
+  const maintenanceLots = await Spots.countDocuments({
     propertyId,
-    status: "OCCUPIED",
+    status: "MAINTENANCE",
   });
 
   return {
     totalLots,
     availableLots,
-    occupiedLots,
+    maintenanceLots,
   };
 };
 
