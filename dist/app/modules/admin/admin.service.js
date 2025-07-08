@@ -173,7 +173,10 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
     }
     // No limit on spots - they are managed independently
     // Create the spot
-    const spot = yield spots_schema_1.Spots.create(Object.assign(Object.assign({}, spotData), { status: "AVAILABLE", isActive: true }));
+    const spot = yield spots_schema_1.Spots.create({
+        spotData,
+        isActive: true,
+    });
     return spot;
 });
 const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, void 0, function* () {
