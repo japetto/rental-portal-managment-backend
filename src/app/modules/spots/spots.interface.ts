@@ -6,14 +6,14 @@ export interface ISpot extends Document {
   spotNumber: string;
   propertyId: Types.ObjectId;
   status: SpotStatus;
-  size: {
-    length: number; // in feet
-    width: number; // in feet
+  size?: {
+    length?: number; // in feet
+    width?: number; // in feet
   };
   price: {
-    daily: number;
-    weekly: number;
-    monthly: number;
+    daily?: number;
+    weekly?: number;
+    monthly?: number;
   };
   description: string;
   images: string[];
@@ -25,14 +25,14 @@ export interface ISpot extends Document {
 export interface ICreateSpot {
   spotNumber: string;
   propertyId: string;
-  size: {
-    length: number;
-    width: number;
+  size?: {
+    length?: number;
+    width?: number;
   };
   price: {
-    daily: number;
-    weekly: number;
-    monthly: number;
+    daily?: number;
+    weekly?: number;
+    monthly?: number;
   };
   description: string;
   images?: string[];

@@ -176,6 +176,12 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
         !["AVAILABLE", "MAINTENANCE"].includes(spotData.status)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Only AVAILABLE and MAINTENANCE are allowed for spot creation");
     }
+    // Validate that at least one price is provided
+    if (!spotData.price.daily &&
+        !spotData.price.weekly &&
+        !spotData.price.monthly) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "At least one price (daily, weekly, or monthly) must be provided");
+    }
     // No limit on spots - they are managed independently
     // Create the spot with validated data
     const spot = yield spots_schema_1.Spots.create(Object.assign(Object.assign({}, spotData), { status: spotData.status || "AVAILABLE", isActive: true }));

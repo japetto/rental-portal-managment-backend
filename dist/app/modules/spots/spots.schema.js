@@ -16,13 +16,13 @@ exports.spotsSchema = new mongoose_1.Schema({
         default: "AVAILABLE",
     },
     size: {
-        length: { type: Number, required: true, min: 1 },
-        width: { type: Number, required: true, min: 1 },
+        length: { type: Number },
+        width: { type: Number },
     },
     price: {
-        daily: { type: Number, required: true, min: 0 },
-        weekly: { type: Number, required: true, min: 0 },
-        monthly: { type: Number, required: true, min: 0 },
+        daily: { type: Number, min: 0 },
+        weekly: { type: Number, min: 0 },
+        monthly: { type: Number, min: 0 },
     },
     description: { type: String, required: true },
     images: [{ type: String }],
@@ -35,4 +35,12 @@ exports.spotsSchema = new mongoose_1.Schema({
 });
 // Compound index to ensure unique spot numbers within a property
 exports.spotsSchema.index({ propertyId: 1, spotNumber: 1 }, { unique: true });
+// Custom validation to ensure at least one price is provided
+exports.spotsSchema.pre("save", function (next) {
+    const price = this.price;
+    if (!price.daily && !price.weekly && !price.monthly) {
+        return next(new Error("At least one price (daily, weekly, or monthly) must be provided"));
+    }
+    next();
+});
 exports.Spots = (0, mongoose_1.model)("Spots", exports.spotsSchema);

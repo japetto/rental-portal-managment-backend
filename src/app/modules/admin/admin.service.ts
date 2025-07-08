@@ -256,6 +256,18 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
     );
   }
 
+  // Validate that at least one price is provided
+  if (
+    !spotData.price.daily &&
+    !spotData.price.weekly &&
+    !spotData.price.monthly
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "At least one price (daily, weekly, or monthly) must be provided",
+    );
+  }
+
   // No limit on spots - they are managed independently
 
   // Create the spot with validated data

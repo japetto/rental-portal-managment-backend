@@ -18,15 +18,28 @@ export const createSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required"),
     propertyId: z.string().regex(objectIdRegex, "Invalid property ID format"),
-    size: z.object({
-      length: z.number().min(1, "Length must be at least 1 foot"),
-      width: z.number().min(1, "Width must be at least 1 foot"),
-    }),
-    price: z.object({
-      daily: z.number().min(0, "Daily price must be non-negative"),
-      weekly: z.number().min(0, "Weekly price must be non-negative"),
-      monthly: z.number().min(0, "Monthly price must be non-negative"),
-    }),
+    // size: z
+    //   .object({
+    //     length: z.number().min(1, "Length must be at least 1 foot").optional(),
+    //     width: z.number().min(1, "Width must be at least 1 foot").optional(),
+    //   })
+    //   .optional(),
+    price: z
+      .object({
+        daily: z.number().min(0, "Daily price must be non-negative").optional(),
+        weekly: z
+          .number()
+          .min(0, "Weekly price must be non-negative")
+          .optional(),
+        monthly: z
+          .number()
+          .min(0, "Monthly price must be non-negative")
+          .optional(),
+      })
+      .refine(
+        price => price.daily || price.weekly || price.monthly,
+        "At least one price (daily, weekly, or monthly) must be provided",
+      ),
     description: z.string().min(1, "Description is required"),
     images: z.array(z.string()).optional(),
   }),

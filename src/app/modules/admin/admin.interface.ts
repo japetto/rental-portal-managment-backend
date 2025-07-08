@@ -11,9 +11,9 @@ export interface ICreateSpot {
   spotNumber: string;
   propertyId: string;
   status?: "AVAILABLE" | "MAINTENANCE";
-  size: {
-    length: number;
-    width: number;
+  size?: {
+    length?: number;
+    width?: number;
   };
   amenities: string[];
   hookups: {
@@ -23,9 +23,9 @@ export interface ICreateSpot {
     wifi: boolean;
   };
   price: {
-    daily: number;
-    weekly: number;
-    monthly: number;
+    daily?: number;
+    weekly?: number;
+    monthly?: number;
   };
   description: string;
   images?: string[];

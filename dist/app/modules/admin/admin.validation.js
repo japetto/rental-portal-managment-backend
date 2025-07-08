@@ -18,15 +18,25 @@ exports.createSpotValidationSchema = zod_1.z.object({
     body: zod_1.z.object({
         spotNumber: zod_1.z.string().min(1, "Spot number is required"),
         propertyId: zod_1.z.string().regex(objectIdRegex, "Invalid property ID format"),
-        size: zod_1.z.object({
-            length: zod_1.z.number().min(1, "Length must be at least 1 foot"),
-            width: zod_1.z.number().min(1, "Width must be at least 1 foot"),
-        }),
-        price: zod_1.z.object({
-            daily: zod_1.z.number().min(0, "Daily price must be non-negative"),
-            weekly: zod_1.z.number().min(0, "Weekly price must be non-negative"),
-            monthly: zod_1.z.number().min(0, "Monthly price must be non-negative"),
-        }),
+        // size: z
+        //   .object({
+        //     length: z.number().min(1, "Length must be at least 1 foot").optional(),
+        //     width: z.number().min(1, "Width must be at least 1 foot").optional(),
+        //   })
+        //   .optional(),
+        price: zod_1.z
+            .object({
+            daily: zod_1.z.number().min(0, "Daily price must be non-negative").optional(),
+            weekly: zod_1.z
+                .number()
+                .min(0, "Weekly price must be non-negative")
+                .optional(),
+            monthly: zod_1.z
+                .number()
+                .min(0, "Monthly price must be non-negative")
+                .optional(),
+        })
+            .refine(price => price.daily || price.weekly || price.monthly, "At least one price (daily, weekly, or monthly) must be provided"),
         description: zod_1.z.string().min(1, "Description is required"),
         images: zod_1.z.array(zod_1.z.string()).optional(),
     }),
