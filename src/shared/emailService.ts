@@ -1,64 +1,11 @@
-import nodemailer from "nodemailer";
+import Mailjet from "node-mailjet";
 import config from "../config/config";
 
-// Create transporter with SMTP configuration for Gmail
-const createTransporter = () => {
-  // Check if we're in production and use different settings
-  const isProduction = config.node_env === "production";
-
-  const transporterConfig = {
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: config.nodemailer_user,
-      pass: config.nodemailer_pass,
-    },
-    // Optional: Add these settings for better reliability
-    tls: {
-      rejectUnauthorized: false,
-    },
-    // Optional: Add timeout settings
-    connectionTimeout: 60000,
-    greetingTimeout: 30000,
-    socketTimeout: 60000,
-  };
-
-  // Alternative configuration for production with more robust settings
-  if (isProduction) {
-    transporterConfig.port = 465;
-    transporterConfig.secure = true;
-    transporterConfig.tls = {
-      rejectUnauthorized: false,
-    };
-  }
-
-  return nodemailer.createTransport(transporterConfig);
-};
-
-const transporter = createTransporter();
-
-// Verify transporter connection
-export const verifyEmailConnection = async (): Promise<boolean> => {
-  try {
-    await transporter.verify();
-    console.log("Email transporter verified successfully");
-    return true;
-  } catch (error) {
-    console.error("Email transporter verification failed:", error);
-    return false;
-  }
-};
-
-// Alternative configuration using service (simpler but less control)
-
-// const transporter = nodemailer.createTransport({
-//   service: "gmail", // You can change this to: 'outlook', 'yahoo', 'hotmail', etc.
-//   auth: {
-//     user: config.nodemailer_user,
-//     pass: config.nodemailer_pass,
-//   },
-// });
+// Initialize Mailjet client
+const mailjet = new Mailjet({
+  apiKey: config.mailjet_api_key,
+  apiSecret: config.mailjet_api_secret,
+});
 
 // Email service interface
 interface IEmailOptions {
@@ -67,41 +14,59 @@ interface IEmailOptions {
   html: string;
 }
 
-// Send email function with enhanced error handling
+// Verify Mailjet connection
+export const verifyEmailConnection = async (): Promise<boolean> => {
+  try {
+    // Test the connection by making a simple API call
+    const response = await mailjet.get("sender", { version: "v3" }).request();
+    console.log("Mailjet connection verified successfully");
+    return true;
+  } catch (error) {
+    console.error("Mailjet connection verification failed:", error);
+    return false;
+  }
+};
+
+// Send email function using Mailjet v3.1 API
 export const sendEmail = async (emailOptions: IEmailOptions): Promise<void> => {
   try {
-    // Verify connection before sending
-    const isConnected = await verifyEmailConnection();
-    if (!isConnected) {
-      throw new Error("Email service is not properly configured");
-    }
-
-    const mailOptions = {
-      from: config.nodemailer_user,
-      to: emailOptions.to,
-      subject: emailOptions.subject,
-      html: emailOptions.html,
-    };
+    const request = mailjet.post("send", { version: "v3.1" }).request({
+      Messages: [
+        {
+          From: {
+            Email: config.mailjet_sender_email,
+            Name: "Rental Portal Management",
+          },
+          To: [
+            {
+              Email: emailOptions.to,
+            },
+          ],
+          Subject: emailOptions.subject,
+          HTMLPart: emailOptions.html,
+        },
+      ],
+    });
 
     console.log("Attempting to send email to:", emailOptions.to);
-    const result = await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully. Message ID:", result.messageId);
+    const result = await request;
+    console.log("Email sent successfully. Result:", result.body);
   } catch (error) {
     console.error("Error sending email:", error);
 
     // Provide more specific error messages
     if (error instanceof Error) {
-      if (error.message.includes("Invalid login")) {
+      if (error.message.includes("Unauthorized")) {
         throw new Error(
-          "Email authentication failed. Please check your Gmail credentials and ensure you're using an App Password.",
+          "Mailjet authentication failed. Please check your API key and secret.",
         );
-      } else if (error.message.includes("Connection timeout")) {
+      } else if (error.message.includes("Bad Request")) {
         throw new Error(
-          "Email connection timeout. Please check your network connection and try again.",
+          "Invalid email request. Please check the email format and content.",
         );
-      } else if (error.message.includes("Authentication failed")) {
+      } else if (error.message.includes("Forbidden")) {
         throw new Error(
-          "Gmail authentication failed. Please enable 2FA and use an App Password.",
+          "Mailjet access denied. Please check your account permissions.",
         );
       }
     }
@@ -120,7 +85,7 @@ export const sendTenantInvitationEmail = async (
   propertyName: string,
   spotNumber: string,
 ): Promise<void> => {
-  const subject = "Welcome to Your New Rental Property!";
+  const subject = `Welcome to ${propertyName}!`;
 
   const html = `
     <!DOCTYPE html>
@@ -179,13 +144,13 @@ export const sendTenantInvitationEmail = async (
     </head>
     <body>
       <div class="header">
-        <h1>Welcome to Your New Rental Property!</h1>
+        <h1>Welcome to ${propertyName}!</h1>
       </div>
       
       <div class="content">
         <p>Dear ${tenantName},</p>
         
-        <p>Welcome! You have been successfully invited to join our rental property management system.</p>
+        <p>Welcome! You have been successfully invited to join our rental property <strong>${propertyName}</strong>.</p>
         
         <div class="highlight">
           <strong>Property Details:</strong><br>
@@ -230,4 +195,5 @@ export const sendTenantInvitationEmail = async (
 export default {
   sendEmail,
   sendTenantInvitationEmail,
+  verifyEmailConnection,
 };

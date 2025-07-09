@@ -29,9 +29,19 @@ export const usersSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
       select: false,
-      minlength: [6, "Password must be at least 6 characters long"],
+      validate: {
+        validator: function (value: string) {
+          // If password is provided, it must be at least 6 characters
+          if (value && value.trim() !== "") {
+            return value.length >= 6;
+          }
+          // If password is empty or not provided, it's valid
+          return true;
+        },
+        message: "Password must be at least 6 characters long",
+      },
     },
     role: {
       type: String,
@@ -69,8 +79,24 @@ export const usersSchema = new Schema<IUser>(
 );
 
 usersSchema.pre("save", async function (next) {
-  this.password = await bcrypt.hash(this.password, Number(config.salt_round));
+  if (
+    this.password &&
+    this.password.trim() !== "" &&
+    this.isModified("password")
+  ) {
+    this.password = await bcrypt.hash(this.password, Number(config.salt_round));
+  }
   next();
 });
+
+// Instance method to compare password
+usersSchema.methods.comparePassword = async function (
+  candidatePassword: string,
+): Promise<boolean> {
+  if (!this.password) {
+    return false;
+  }
+  return bcrypt.compare(candidatePassword, this.password);
+};
 
 export const Users = model<IUser>("Users", usersSchema);

@@ -41,9 +41,19 @@ exports.usersSchema = new mongoose_1.Schema({
     },
     password: {
         type: String,
-        required: true,
+        required: false,
         select: false,
-        minlength: [6, "Password must be at least 6 characters long"],
+        validate: {
+            validator: function (value) {
+                // If password is provided, it must be at least 6 characters
+                if (value && value.trim() !== "") {
+                    return value.length >= 6;
+                }
+                // If password is empty or not provided, it's valid
+                return true;
+            },
+            message: "Password must be at least 6 characters long",
+        },
     },
     role: {
         type: String,
@@ -79,8 +89,21 @@ exports.usersSchema = new mongoose_1.Schema({
 });
 exports.usersSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
-        this.password = yield bcrypt_1.default.hash(this.password, Number(config_1.default.salt_round));
+        if (this.password &&
+            this.password.trim() !== "" &&
+            this.isModified("password")) {
+            this.password = yield bcrypt_1.default.hash(this.password, Number(config_1.default.salt_round));
+        }
         next();
     });
 });
+// Instance method to compare password
+exports.usersSchema.methods.comparePassword = function (candidatePassword) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!this.password) {
+            return false;
+        }
+        return bcrypt_1.default.compare(candidatePassword, this.password);
+    });
+};
 exports.Users = (0, mongoose_1.model)("Users", exports.usersSchema);

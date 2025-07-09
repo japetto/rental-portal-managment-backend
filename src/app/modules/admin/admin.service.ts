@@ -88,17 +88,13 @@ const inviteTenant = async (
     );
   }
 
-  // Generate a temporary password (tenant will change it on first login)
-  const tempPassword =
-    Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
-
-  // Create the user with tenant role and invitation status
+  // Create the user with tenant role and invitation status (no password - they'll set it via invitation link)
   const userData = {
     name: inviteData.name,
     email: inviteData.email,
     phoneNumber: inviteData.phoneNumber,
-    password: tempPassword,
-    confirmPassword: tempPassword,
+    password: "", // Empty password - tenant will set it via invitation link
+    confirmPassword: "", // Empty confirmation password
     role: "TENANT" as const,
     isInvited: true,
     isVerified: false,

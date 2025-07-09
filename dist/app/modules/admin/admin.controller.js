@@ -32,10 +32,22 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         preferredLocation: result.user.preferredLocation,
         propertyId: result.user.propertyId,
         spotId: result.user.spotId,
+        // Add property details
+        property: {
+            id: result.property._id,
+            name: result.property.name,
+            address: result.property.address,
+        },
+        // Add spot details
+        spot: {
+            id: result.spot._id,
+            spotNumber: result.spot.spotNumber,
+            description: result.spot.description,
+        },
     };
     // Encode the data as base64 to make it URL-safe
     const encodedData = Buffer.from(JSON.stringify(tenantData)).toString("base64");
-    const autoFillUrl = `${baseUrl}/tenant-setup?data=${encodedData}`;
+    const autoFillUrl = `${baseUrl}/auth/tenant-setup?data=${encodedData}`;
     // Send invitation email to the tenant
     try {
         yield (0, emailService_1.sendTenantInvitationEmail)(result.user.email, result.user.name, autoFillUrl, result.property.name, result.spot.spotNumber);
@@ -55,6 +67,7 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
     //     try {
     //       const tenantData = JSON.parse(atob(encodedData));
     //       return {
+    //         // User details
     //         id: tenantData.id,
     //         name: tenantData.name,
     //         email: tenantData.email,
@@ -62,6 +75,10 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
     //         preferredLocation: tenantData.preferredLocation,
     //         propertyId: tenantData.propertyId,
     //         spotId: tenantData.spotId,
+    //         // Property details
+    //         property: tenantData.property,
+    //         // Spot details
+    //         spot: tenantData.spot,
     //       };
     //     } catch (error) {
     //       console.error('Error decoding tenant data:', error);
@@ -81,6 +98,10 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
     //     phone: tenantData.phone,
     //     preferredLocation: tenantData.preferredLocation,
     //   });
+    //
+    //   // Display property and spot information
+    //   setPropertyInfo(tenantData.property);
+    //   setSpotInfo(tenantData.spot);
     // }
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.CREATED,
@@ -88,8 +109,23 @@ const inviteTenant = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         message: "Tenant invited successfully",
         data: {
             user: {
+                id: result.user._id,
                 name: result.user.name,
                 email: result.user.email,
+                phone: result.user.phoneNumber,
+                preferredLocation: result.user.preferredLocation,
+                propertyId: result.user.propertyId,
+                spotId: result.user.spotId,
+            },
+            property: {
+                id: result.property._id,
+                name: result.property.name,
+                address: result.property.address,
+            },
+            spot: {
+                id: result.spot._id,
+                spotNumber: result.spot.spotNumber,
+                description: result.spot.description,
             },
             autoFillUrl: autoFillUrl,
             message: "Invitation sent successfully. Tenant will receive login credentials via email.",
@@ -450,6 +486,15 @@ const deleteUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
 // Test email endpoint for debugging
 const testEmail = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const { email } = req.query;
+        if (!email || typeof email !== "string") {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: 400,
+                success: false,
+                message: "Email parameter is required",
+                data: null,
+            });
+        }
         // Test email connection
         const isConnected = yield (0, emailService_1.verifyEmailConnection)();
         if (!isConnected) {
@@ -460,16 +505,98 @@ const testEmail = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
                 data: null,
             });
         }
+        // Send test email
+        const testHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Service Test</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+          }
+          .content {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 0 0 5px 5px;
+          }
+          .success {
+            color: #4CAF50;
+            font-weight: bold;
+          }
+          .info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 15px 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>✅ Email Service Test Successful!</h1>
+        </div>
+        
+        <div class="content">
+          <p>Hello!</p>
+          
+          <p class="success">This is a test email to verify that your Mailjet email service is working correctly.</p>
+          
+          <div class="info">
+            <strong>Test Details:</strong><br>
+            • Email sent at: ${new Date().toLocaleString()}<br>
+            • Service: Mailjet<br>
+            • Status: Working correctly
+          </div>
+          
+          <p>If you received this email, it means:</p>
+          <ul>
+            <li>Your Mailjet API keys are configured correctly</li>
+            <li>Your sender email is verified</li>
+            <li>The email service is ready for production use</li>
+          </ul>
+          
+          <p>You can now use the email service to send invitation emails and other notifications.</p>
+          
+          <p>Best regards,<br>
+          Rental Portal Management System</p>
+        </div>
+      </body>
+      </html>
+    `;
+        yield (0, emailService_1.sendEmail)({
+            to: email,
+            subject: "🎉 Email Service Test - Rental Portal Management",
+            html: testHtml,
+        });
         return (0, sendResponse_1.default)(res, {
             statusCode: 200,
             success: true,
-            message: "Email service is working correctly",
+            message: "Test email sent successfully",
             data: {
                 connected: true,
-                nodemailer_user: process.env.NODEMAILER_USER
+                email_sent_to: email,
+                mailjet_api_key: process.env.MAILJET_API_KEY
                     ? "Configured"
                     : "Not configured",
-                nodemailer_pass: process.env.NODEMAILER_PASS
+                mailjet_api_secret: process.env.MAILJET_SECRET_KEY
+                    ? "Configured"
+                    : "Not configured",
+                mailjet_sender_email: process.env.MAILJET_SENDER_EMAIL
                     ? "Configured"
                     : "Not configured",
             },

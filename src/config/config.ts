@@ -18,5 +18,8 @@ export default {
   redis_crypto_key: process.env.REDIS_CRYPTO_KEY as string,
   nodemailer_user: process.env.NODEMAILER_USER as string,
   nodemailer_pass: process.env.NODEMAILER_PASS as string,
+  mailjet_api_key: process.env.MAILJET_API_KEY as string,
+  mailjet_api_secret: process.env.MAILJET_SECRET_KEY as string,
+  mailjet_sender_email: process.env.MAILJET_SENDER_EMAIL as string,
   client_url: process.env.CLIENT_URL as string,
 };

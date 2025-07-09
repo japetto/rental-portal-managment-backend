@@ -14,9 +14,7 @@ const usersZodSchema = zod_1.z.object({
         phoneNumber: zod_1.z.string({
             required_error: "Phone Number is Required",
         }),
-        password: zod_1.z.string({
-            required_error: "Password is Required",
-        }),
+        password: zod_1.z.string().optional(),
         role: zod_1.z.enum([...user_constant_1.UserRoleEnums], {
             required_error: "Role is Required",
         }),
@@ -107,15 +105,25 @@ exports.createUserValidationSchema = zod_1.z.object({
         .object({
         name: zod_1.z.string().min(1, "Name is required"),
         email: zod_1.z.string().email("Invalid email format"),
-        password: zod_1.z.string().min(6, "Password must be at least 6 characters"),
+        password: zod_1.z
+            .string()
+            .min(6, "Password must be at least 6 characters")
+            .optional(),
         confirmPassword: zod_1.z
             .string()
-            .min(6, "Confirm password must be at least 6 characters"),
+            .min(6, "Confirm password must be at least 6 characters")
+            .optional(),
         phoneNumber: zod_1.z.string().min(1, "Phone number is required"),
         role: zod_1.z.enum(["SUPER_ADMIN", "TENANT"]).default("TENANT"),
         preferredLocation: zod_1.z.string().min(1, "Preferred location is required"),
     })
-        .refine(data => data.password === data.confirmPassword, {
+        .refine(data => {
+        // Only validate password match if both password and confirmPassword are provided
+        if (data.password && data.confirmPassword) {
+            return data.password === data.confirmPassword;
+        }
+        return true;
+    }, {
         message: "Passwords don't match",
         path: ["confirmPassword"],
     }),

@@ -12,9 +12,7 @@ const usersZodSchema = z.object({
     phoneNumber: z.string({
       required_error: "Phone Number is Required",
     }),
-    password: z.string({
-      required_error: "Password is Required",
-    }),
+    password: z.string().optional(),
     role: z.enum([...UserRoleEnums] as [string, ...string[]], {
       required_error: "Role is Required",
     }),
@@ -110,18 +108,31 @@ export const createUserValidationSchema = z.object({
     .object({
       name: z.string().min(1, "Name is required"),
       email: z.string().email("Invalid email format"),
-      password: z.string().min(6, "Password must be at least 6 characters"),
+      password: z
+        .string()
+        .min(6, "Password must be at least 6 characters")
+        .optional(),
       confirmPassword: z
         .string()
-        .min(6, "Confirm password must be at least 6 characters"),
+        .min(6, "Confirm password must be at least 6 characters")
+        .optional(),
       phoneNumber: z.string().min(1, "Phone number is required"),
       role: z.enum(["SUPER_ADMIN", "TENANT"]).default("TENANT"),
       preferredLocation: z.string().min(1, "Preferred location is required"),
     })
-    .refine(data => data.password === data.confirmPassword, {
-      message: "Passwords don't match",
-      path: ["confirmPassword"],
-    }),
+    .refine(
+      data => {
+        // Only validate password match if both password and confirmPassword are provided
+        if (data.password && data.confirmPassword) {
+          return data.password === data.confirmPassword;
+        }
+        return true;
+      },
+      {
+        message: "Passwords don't match",
+        path: ["confirmPassword"],
+      },
+    ),
 });
 
 export const setPasswordValidationSchema = z.object({
