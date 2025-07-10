@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -237,6 +270,157 @@ const checkUserInvitationStatus = (0, catchAsync_1.default)((req, res) => __awai
         data: result,
     });
 }));
+// Get User's Service Requests
+const getUserServiceRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    const filters = req.query;
+    const options = {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        sortBy: req.query.sortBy || "requestedDate",
+        sortOrder: req.query.sortOrder || "desc",
+    };
+    // Import the service request service
+    const { ServiceRequestService } = yield Promise.resolve().then(() => __importStar(require("../service-requests/service-requests.service")));
+    const result = yield ServiceRequestService.getServiceRequests(filters, options, userId, ((_c = req.user) === null || _c === void 0 ? void 0 : _c.role) || "TENANT");
+    const responseData = {
+        serviceRequests: result.data,
+        pagination: result.meta,
+    };
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service requests retrieved successfully",
+        data: responseData,
+    });
+}));
+// Get User's Service Request by ID
+const getUserServiceRequestById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    const { id } = req.params;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId || !id) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated or invalid request ID",
+            data: null,
+        });
+    }
+    // Import the service request service
+    const { ServiceRequestService } = yield Promise.resolve().then(() => __importStar(require("../service-requests/service-requests.service")));
+    const result = yield ServiceRequestService.getServiceRequestById(id, userId, ((_c = req.user) === null || _c === void 0 ? void 0 : _c.role) || "TENANT");
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Service request retrieved successfully",
+        data: result,
+    });
+}));
+// Get User's Announcements
+const getUserAnnouncements = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    // Get propertyId from query or use user's assigned property
+    const { propertyId: queryPropertyId } = req.query;
+    const userPropertyId = (_d = (_c = req.user) === null || _c === void 0 ? void 0 : _c.propertyId) === null || _d === void 0 ? void 0 : _d.toString();
+    const propertyId = queryPropertyId || userPropertyId;
+    // Import the announcement service
+    const { AnnouncementService } = yield Promise.resolve().then(() => __importStar(require("../announcements/announcements.service")));
+    const result = yield AnnouncementService.getActiveAnnouncements(userId, propertyId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Announcements retrieved successfully",
+        data: result,
+    });
+}));
+// Get User's Announcement by ID
+const getUserAnnouncementById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { announcementId } = req.params;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId || !announcementId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated or invalid announcement ID",
+            data: null,
+        });
+    }
+    // Import the announcement service
+    const { AnnouncementService } = yield Promise.resolve().then(() => __importStar(require("../announcements/announcements.service")));
+    const result = yield AnnouncementService.getAnnouncementById(announcementId, userId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Announcement retrieved successfully",
+        data: result,
+    });
+}));
+// Mark Announcement as Read for User
+const markAnnouncementAsRead = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const markAsReadData = __rest(req.body, []);
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    // Add userId to the markAsReadData
+    const dataWithUserId = Object.assign(Object.assign({}, markAsReadData), { userId });
+    // Import the announcement service
+    const { AnnouncementService } = yield Promise.resolve().then(() => __importStar(require("../announcements/announcements.service")));
+    const result = yield AnnouncementService.markAsRead(dataWithUserId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Announcement marked as read",
+        data: result,
+    });
+}));
+// Get User's Own Profile
+const getMyProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    // The user data is already available from the userAuth middleware
+    const userData = req.user;
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "User profile retrieved successfully",
+        data: userData,
+    });
+}));
 exports.UserController = {
     userRegister,
     userLogin,
@@ -247,11 +431,10 @@ exports.UserController = {
     getAllTenants,
     getUserById,
     checkUserInvitationStatus,
-    // checkUserForProviderLogin,
-    // providerLogin,
-    // updatedUser,
-    // updatePassword,
-    // findUserForForgotPassword,
-    // verifyOtpForForgotPassword,
-    // forgotPassword,
+    getUserServiceRequests,
+    getUserServiceRequestById,
+    getUserAnnouncements,
+    getUserAnnouncementById,
+    markAnnouncementAsRead,
+    getMyProfile,
 };

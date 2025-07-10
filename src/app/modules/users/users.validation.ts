@@ -169,6 +169,12 @@ export const deleteUserValidationSchema = z.object({
   }),
 });
 
+export const getUserAnnouncementsValidationSchema = z.object({
+  query: z.object({
+    propertyId: z.string().optional(),
+  }),
+});
+
 export const UserValidation = {
   usersZodSchema,
   loginUserZodSchema,
@@ -177,4 +183,5 @@ export const UserValidation = {
   setPasswordValidationSchema,
   updateUserInfoValidationSchema,
   deleteUserValidationSchema,
+  getUserAnnouncementsValidationSchema,
 };

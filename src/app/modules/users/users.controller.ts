@@ -261,6 +261,220 @@ const checkUserInvitationStatus = catchAsync(
   },
 );
 
+// Get User's Service Requests
+const getUserServiceRequests = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?._id?.toString();
+
+    if (!userId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated",
+        data: null,
+      });
+    }
+
+    const filters = req.query;
+    const options = {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || "requestedDate",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+    };
+
+    // Import the service request service
+    const { ServiceRequestService } = await import(
+      "../service-requests/service-requests.service"
+    );
+
+    const result = await ServiceRequestService.getServiceRequests(
+      filters,
+      options,
+      userId,
+      req.user?.role || "TENANT", // Use actual user role
+    );
+
+    const responseData = {
+      serviceRequests: result.data,
+      pagination: result.meta,
+    };
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service requests retrieved successfully",
+      data: responseData,
+    });
+  },
+);
+
+// Get User's Service Request by ID
+const getUserServiceRequestById = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = req.user?._id?.toString();
+
+    if (!userId || !id) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated or invalid request ID",
+        data: null,
+      });
+    }
+
+    // Import the service request service
+    const { ServiceRequestService } = await import(
+      "../service-requests/service-requests.service"
+    );
+
+    const result = await ServiceRequestService.getServiceRequestById(
+      id,
+      userId,
+      req.user?.role || "TENANT", // Use actual user role
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Service request retrieved successfully",
+      data: result,
+    });
+  },
+);
+
+// Get User's Announcements
+const getUserAnnouncements = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?._id?.toString();
+
+  if (!userId) {
+    return sendResponse(res, {
+      statusCode: httpStatus.UNAUTHORIZED,
+      success: false,
+      message: "User not authenticated",
+      data: null,
+    });
+  }
+
+  // Get propertyId from query or use user's assigned property
+  const { propertyId: queryPropertyId } = req.query;
+  const userPropertyId = req.user?.propertyId?.toString();
+  const propertyId = (queryPropertyId as string) || userPropertyId;
+
+  // Import the announcement service
+  const { AnnouncementService } = await import(
+    "../announcements/announcements.service"
+  );
+
+  const result = await AnnouncementService.getActiveAnnouncements(
+    userId,
+    propertyId,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Announcements retrieved successfully",
+    data: result,
+  });
+});
+
+// Get User's Announcement by ID
+const getUserAnnouncementById = catchAsync(
+  async (req: Request, res: Response) => {
+    const { announcementId } = req.params;
+    const userId = req.user?._id?.toString();
+
+    if (!userId || !announcementId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated or invalid announcement ID",
+        data: null,
+      });
+    }
+
+    // Import the announcement service
+    const { AnnouncementService } = await import(
+      "../announcements/announcements.service"
+    );
+
+    const result = await AnnouncementService.getAnnouncementById(
+      announcementId,
+      userId,
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Announcement retrieved successfully",
+      data: result,
+    });
+  },
+);
+
+// Mark Announcement as Read for User
+const markAnnouncementAsRead = catchAsync(
+  async (req: Request, res: Response) => {
+    const { ...markAsReadData } = req.body;
+    const userId = req.user?._id?.toString();
+
+    if (!userId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated",
+        data: null,
+      });
+    }
+
+    // Add userId to the markAsReadData
+    const dataWithUserId = {
+      ...markAsReadData,
+      userId,
+    };
+
+    // Import the announcement service
+    const { AnnouncementService } = await import(
+      "../announcements/announcements.service"
+    );
+
+    const result = await AnnouncementService.markAsRead(dataWithUserId);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Announcement marked as read",
+      data: result,
+    });
+  },
+);
+
+// Get User's Own Profile
+const getMyProfile = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?._id?.toString();
+
+  if (!userId) {
+    return sendResponse(res, {
+      statusCode: httpStatus.UNAUTHORIZED,
+      success: false,
+      message: "User not authenticated",
+      data: null,
+    });
+  }
+
+  // The user data is already available from the userAuth middleware
+  const userData = req.user;
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User profile retrieved successfully",
+    data: userData,
+  });
+});
+
 export const UserController = {
   userRegister,
   userLogin,
@@ -271,11 +485,10 @@ export const UserController = {
   getAllTenants,
   getUserById,
   checkUserInvitationStatus,
-  // checkUserForProviderLogin,
-  // providerLogin,
-  // updatedUser,
-  // updatePassword,
-  // findUserForForgotPassword,
-  // verifyOtpForForgotPassword,
-  // forgotPassword,
+  getUserServiceRequests,
+  getUserServiceRequestById,
+  getUserAnnouncements,
+  getUserAnnouncementById,
+  markAnnouncementAsRead,
+  getMyProfile,
 };

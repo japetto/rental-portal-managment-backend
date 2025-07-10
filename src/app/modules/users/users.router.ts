@@ -1,6 +1,9 @@
 import express from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
+import { userAuth } from "../../../middlewares/userAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
+import { AnnouncementValidation } from "../announcements/announcements.validation";
+import { ServiceRequestValidation } from "../service-requests/service-requests.validation";
 import { UserController } from "./users.controller";
 import { UserValidation } from "./users.validation";
 
@@ -33,6 +36,57 @@ router.get("/", adminAuth, UserController.getAllUsers);
 
 router.get("/tenants", adminAuth, UserController.getAllTenants);
 
+// User routes - require user authentication (must come before parameterized routes)
+// Get user's service requests
+router.get(
+  "/service-requests",
+  userAuth,
+  zodValidationRequest(
+    ServiceRequestValidation.getServiceRequestsValidationSchema,
+  ),
+  UserController.getUserServiceRequests,
+);
+
+// Get user's specific service request
+router.get(
+  "/service-requests/:id",
+  userAuth,
+  zodValidationRequest(
+    ServiceRequestValidation.getServiceRequestValidationSchema,
+  ),
+  UserController.getUserServiceRequestById,
+);
+
+// Get user's announcements
+router.get(
+  "/announcements",
+  userAuth,
+  zodValidationRequest(UserValidation.getUserAnnouncementsValidationSchema),
+  UserController.getUserAnnouncements,
+);
+
+// Get user's specific announcement
+router.get(
+  "/announcements/:announcementId",
+  userAuth,
+  zodValidationRequest(
+    AnnouncementValidation.getAnnouncementByIdValidationSchema,
+  ),
+  UserController.getUserAnnouncementById,
+);
+
+// Mark announcement as read
+router.post(
+  "/announcements/mark-read",
+  userAuth,
+  zodValidationRequest(AnnouncementValidation.markAsReadValidationSchema),
+  UserController.markAnnouncementAsRead,
+);
+
+// Get user's own profile
+router.get("/me", userAuth, UserController.getMyProfile);
+
+// Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth, UserController.getUserById);
 
 router.patch(

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserValidation = exports.deleteUserValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
+exports.UserValidation = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
 const zod_1 = require("zod");
 const user_constant_1 = require("./user.constant");
 const usersZodSchema = zod_1.z.object({
@@ -159,6 +159,11 @@ exports.deleteUserValidationSchema = zod_1.z.object({
         userId: zod_1.z.string().min(1, "User ID is required"),
     }),
 });
+exports.getUserAnnouncementsValidationSchema = zod_1.z.object({
+    query: zod_1.z.object({
+        propertyId: zod_1.z.string().optional(),
+    }),
+});
 exports.UserValidation = {
     usersZodSchema,
     loginUserZodSchema,
@@ -167,4 +172,5 @@ exports.UserValidation = {
     setPasswordValidationSchema: exports.setPasswordValidationSchema,
     updateUserInfoValidationSchema: exports.updateUserInfoValidationSchema,
     deleteUserValidationSchema: exports.deleteUserValidationSchema,
+    getUserAnnouncementsValidationSchema: exports.getUserAnnouncementsValidationSchema,
 };

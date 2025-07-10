@@ -62,22 +62,34 @@ const getActiveAnnouncements = async (
   userId?: string,
   propertyId?: string,
 ): Promise<IAnnouncement[]> => {
-  const query: any = {
+  // Build the base query for active, non-expired announcements
+  const baseQuery: any = {
     isActive: true,
     createdAt: { $lte: new Date() },
     $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
   };
 
-  // Filter by property if specified
+  // Build target audience conditions
+  const targetAudienceConditions: any[] = [
+    { targetAudience: "ALL" },
+    { targetAudience: "TENANTS_ONLY" },
+  ];
+
+  // Always include PROPERTY_SPECIFIC announcements for user's property
   if (propertyId) {
-    query.$or = [
-      { propertyId: propertyId },
-      { propertyId: null }, // System-wide announcements
-    ];
+    targetAudienceConditions.push({
+      $and: [
+        { targetAudience: "PROPERTY_SPECIFIC" },
+        { propertyId: propertyId },
+      ],
+    });
   }
 
-  // Filter by target audience
-  query.$or = [{ targetAudience: "ALL" }, { targetAudience: "TENANTS_ONLY" }];
+  // Combine all conditions
+  const query = {
+    ...baseQuery,
+    $or: targetAudienceConditions,
+  };
 
   const announcements = await Announcements.find(query)
     .populate({
@@ -311,23 +323,35 @@ const getUnreadAnnouncements = async (
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
 
-  const query: any = {
+  // Build the base query for active, non-expired, unread announcements
+  const baseQuery: any = {
     isActive: true,
     createdAt: { $lte: new Date() },
     $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
     readBy: { $ne: userId },
   };
 
-  // Filter by property if specified
+  // Build target audience conditions
+  const targetAudienceConditions: any[] = [
+    { targetAudience: "ALL" },
+    { targetAudience: "TENANTS_ONLY" },
+  ];
+
+  // Always include PROPERTY_SPECIFIC announcements for user's property
   if (propertyId) {
-    query.$or = [
-      { propertyId: propertyId },
-      { propertyId: null }, // System-wide announcements
-    ];
+    targetAudienceConditions.push({
+      $and: [
+        { targetAudience: "PROPERTY_SPECIFIC" },
+        { propertyId: propertyId },
+      ],
+    });
   }
 
-  // Filter by target audience
-  query.$or = [{ targetAudience: "ALL" }, { targetAudience: "TENANTS_ONLY" }];
+  // Combine all conditions
+  const query = {
+    ...baseQuery,
+    $or: targetAudienceConditions,
+  };
 
   const announcements = await Announcements.find(query)
     .populate({
