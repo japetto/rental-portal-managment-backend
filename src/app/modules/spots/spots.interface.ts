@@ -1,15 +1,17 @@
 import { Document, Types } from "mongoose";
 
-export type SpotStatus = "AVAILABLE" | "MAINTENANCE";
+export type SpotStatus = "AVAILABLE" | "MAINTENANCE" | "RESERVED" | "BOOKED";
 
 export interface ISpot extends Document {
   spotNumber: string;
+  spotIdentifier: string;
   propertyId: Types.ObjectId;
   status: SpotStatus;
   size?: {
     length?: number; // in feet
     width?: number; // in feet
   };
+  amenities: string[];
   price: {
     daily?: number;
     weekly?: number;
@@ -24,11 +26,13 @@ export interface ISpot extends Document {
 
 export interface ICreateSpot {
   spotNumber: string;
+  spotIdentifier: string;
   propertyId: string;
   size?: {
     length?: number;
     width?: number;
   };
+  amenities: string[];
   price: {
     daily?: number;
     weekly?: number;
@@ -40,11 +44,13 @@ export interface ICreateSpot {
 
 export interface IUpdateSpot {
   spotNumber?: string;
+  spotIdentifier?: string;
   status?: SpotStatus;
   size?: {
     length?: number;
     width?: number;
   };
+  amenities?: string[];
   price?: {
     daily?: number;
     weekly?: number;

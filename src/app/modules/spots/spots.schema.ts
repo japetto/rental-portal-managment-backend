@@ -4,6 +4,7 @@ import { ISpot } from "./spots.interface";
 export const spotsSchema = new Schema<ISpot>(
   {
     spotNumber: { type: String, required: true },
+    spotIdentifier: { type: String, required: true },
     propertyId: {
       type: Schema.Types.ObjectId,
       ref: "Properties",
@@ -11,7 +12,7 @@ export const spotsSchema = new Schema<ISpot>(
     },
     status: {
       type: String,
-      enum: ["AVAILABLE", "MAINTENANCE"],
+      enum: ["AVAILABLE", "MAINTENANCE", "RESERVED", "BOOKED"],
       required: true,
       default: "AVAILABLE",
     },
@@ -19,6 +20,7 @@ export const spotsSchema = new Schema<ISpot>(
       length: { type: Number },
       width: { type: Number },
     },
+    amenities: [{ type: String }],
     price: {
       daily: { type: Number, min: 0 },
       weekly: { type: Number, min: 0 },

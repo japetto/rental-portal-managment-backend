@@ -9,19 +9,14 @@ export interface IInviteTenant {
 
 export interface ICreateSpot {
   spotNumber: string;
+  spotIdentifier: string;
   propertyId: string;
-  status?: "AVAILABLE" | "MAINTENANCE";
+  status?: "AVAILABLE" | "MAINTENANCE" | "RESERVED";
   size?: {
     length?: number;
     width?: number;
   };
   amenities: string[];
-  hookups: {
-    water: boolean;
-    electricity: boolean;
-    sewer: boolean;
-    wifi: boolean;
-  };
   price: {
     daily?: number;
     weekly?: number;
@@ -33,18 +28,13 @@ export interface ICreateSpot {
 
 export interface IUpdateSpot {
   spotNumber?: string;
-  status?: "AVAILABLE" | "MAINTENANCE";
+  spotIdentifier?: string;
+  status?: "AVAILABLE" | "MAINTENANCE" | "RESERVED";
   size?: {
     length?: number;
     width?: number;
   };
   amenities?: string[];
-  hookups?: {
-    water?: boolean;
-    electricity?: boolean;
-    sewer?: boolean;
-    wifi?: boolean;
-  };
   price?: {
     daily?: number;
     weekly?: number;

@@ -17,6 +17,7 @@ export const inviteTenantValidationSchema = z.object({
 export const createSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required"),
+    spotIdentifier: z.string().min(1, "Spot identifier is required"),
     propertyId: z.string().regex(objectIdRegex, "Invalid property ID format"),
     // size: z
     //   .object({
@@ -24,6 +25,7 @@ export const createSpotValidationSchema = z.object({
     //     width: z.number().min(1, "Width must be at least 1 foot").optional(),
     //   })
     //   .optional(),
+    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
     price: z
       .object({
         daily: z.number().min(0, "Daily price must be non-negative").optional(),
@@ -48,6 +50,7 @@ export const createSpotValidationSchema = z.object({
 export const updateSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required").optional(),
+    spotIdentifier: z.string().min(1, "Spot identifier is required").optional(),
     status: z.enum(["AVAILABLE", "MAINTENANCE"]).optional(),
     size: z
       .object({
@@ -55,6 +58,7 @@ export const updateSpotValidationSchema = z.object({
         width: z.number().min(1, "Width must be at least 1 foot").optional(),
       })
       .optional(),
+    amenities: z.array(z.string()).optional(),
     price: z
       .object({
         daily: z.number().min(0, "Daily price must be non-negative").optional(),

@@ -230,14 +230,26 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
   // Property is always active now (no isActive field)
 
   // Check if spot number already exists in this property
-  const existingSpot = await Spots.findOne({
+  const existingSpotByNumber = await Spots.findOne({
     propertyId: spotData.propertyId,
     spotNumber: spotData.spotNumber,
   });
-  if (existingSpot) {
+  if (existingSpotByNumber) {
     throw new ApiError(
       httpStatus.CONFLICT,
       "Spot number already exists in this property",
+    );
+  }
+
+  // Check if spot identifier already exists in this property
+  const existingSpotByIdentifier = await Spots.findOne({
+    propertyId: spotData.propertyId,
+    spotIdentifier: spotData.spotIdentifier,
+  });
+  if (existingSpotByIdentifier) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      "Spot identifier already exists in this property",
     );
   }
 
@@ -337,15 +349,33 @@ const updateSpot = async (
 
   // If updating spot number, check for uniqueness within the property
   if (updateData.spotNumber && updateData.spotNumber !== spot.spotNumber) {
-    const existingSpot = await Spots.findOne({
+    const existingSpotByNumber = await Spots.findOne({
       propertyId: spot.propertyId,
       spotNumber: updateData.spotNumber,
       _id: { $ne: spotId },
     });
-    if (existingSpot) {
+    if (existingSpotByNumber) {
       throw new ApiError(
         httpStatus.CONFLICT,
         "Spot number already exists in this property",
+      );
+    }
+  }
+
+  // If updating spot identifier, check for uniqueness within the property
+  if (
+    updateData.spotIdentifier &&
+    updateData.spotIdentifier !== spot.spotIdentifier
+  ) {
+    const existingSpotByIdentifier = await Spots.findOne({
+      propertyId: spot.propertyId,
+      spotIdentifier: updateData.spotIdentifier,
+      _id: { $ne: spotId },
+    });
+    if (existingSpotByIdentifier) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        "Spot identifier already exists in this property",
       );
     }
   }
@@ -368,11 +398,12 @@ const deleteSpot = async (spotId: string): Promise<void> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
 
-  // Check if spot is in maintenance
-  if (spot.status === "MAINTENANCE") {
+  // Check if spot is assigned to a tenant (reserved/booked)
+  const assignedTenant = await Users.findOne({ spotId });
+  if (assignedTenant) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Cannot delete a spot that is under maintenance",
+      `Cannot delete a spot that is assigned to tenant: ${assignedTenant.name}`,
     );
   }
 
