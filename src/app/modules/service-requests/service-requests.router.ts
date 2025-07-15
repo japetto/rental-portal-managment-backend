@@ -54,7 +54,28 @@ router.delete(
   ServiceRequestController.deleteServiceRequest,
 );
 
+// Archive a service request
+router.patch(
+  "/:id/archive",
+  zodValidationRequest(
+    ServiceRequestValidation.deleteServiceRequestValidationSchema,
+  ),
+  ServiceRequestController.archiveServiceRequest,
+);
+
+// Restore a service request
+router.patch(
+  "/:id/restore",
+  zodValidationRequest(
+    ServiceRequestValidation.deleteServiceRequestValidationSchema,
+  ),
+  ServiceRequestController.restoreServiceRequest,
+);
+
+// Get archived service requests (admin only)
+router.get("/archived", ServiceRequestController.getArchivedServiceRequests);
+
 // Get service request statistics (Admin only)
 router.get("/stats/overview", ServiceRequestController.getServiceRequestStats);
 
-export const ServiceRequestRoutes = router;
+export const ServiceRequestRouter = router;

@@ -32,6 +32,8 @@ export interface IAnnouncement extends Document {
   targetAudience: AnnouncementTargetAudience;
   sendNotification?: boolean; // Optional notification flag
   tags: string[];
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   // Virtual fields

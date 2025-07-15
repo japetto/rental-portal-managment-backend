@@ -1,7 +1,7 @@
 import express from "express";
 import { AdminRouter } from "../modules/admin/admin.router";
 import { AnnouncementRouter } from "../modules/announcements/announcements.router";
-import { ServiceRequestRoutes } from "../modules/service-requests/service-requests.router";
+import { ServiceRequestRouter } from "../modules/service-requests/service-requests.router";
 import { UserRouter } from "../modules/users/users.router";
 
 const router = express.Router();
@@ -21,7 +21,7 @@ const routes = [
   },
   {
     path: "/service-requests",
-    route: ServiceRequestRoutes,
+    route: ServiceRequestRouter,
   },
 ];
 

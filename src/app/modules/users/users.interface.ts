@@ -25,13 +25,23 @@ export interface IUser extends Document {
   // Tenant-specific fields (only for TENANT role)
   propertyId?: Types.ObjectId; // Which property the tenant belongs to
   spotId?: Types.ObjectId; // Which spot the tenant is assigned to
-  emergencyContact?: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  specialRequests?: string[];
+  leaseId?: Types.ObjectId; // Reference to active lease
+  isActive: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
+  // History tracking for property and spot assignments
+  userHistory?: Array<{
+    propertyId: Types.ObjectId;
+    spotId: Types.ObjectId;
+    leaseId: Types.ObjectId;
+    assignedAt: Date;
+    removedAt?: Date;
+    reason: string; // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
+  }>;
   comparePassword(candidate: string): Promise<boolean>;
+  // Virtual properties
+  activeLease?: any;
+  pendingPaymentsCount?: number;
 }
 
 export interface ICheckUserExists {
@@ -90,12 +100,6 @@ export interface IUpdateUserInfo {
   preferredLocation?: string;
   bio?: string;
   profileImage?: string;
-  emergencyContact?: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  specialRequests?: string[];
 }
 
 export interface IDeleteUser {

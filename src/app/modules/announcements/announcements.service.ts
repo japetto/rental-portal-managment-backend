@@ -9,6 +9,9 @@ import {
 } from "./announcements.interface";
 import { Announcements } from "./announcements.schema";
 
+// Import soft delete utilities
+import * as SoftDeleteUtils from "../../../shared/softDeleteUtils";
+
 //* Create Announcement
 const createAnnouncement = async (
   payload: ICreateAnnouncement,
@@ -187,10 +190,10 @@ const deleteAnnouncement = async (
     throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
   }
 
-  await Announcements.findByIdAndDelete(announcementId);
+  await SoftDeleteUtils.softDelete(Announcements, announcementId, adminId);
 
   return {
-    message: "Announcement deleted successfully",
+    message: "Announcement archived successfully",
   };
 };
 
@@ -225,6 +228,86 @@ const markAsRead = async (
   return {
     message: "Announcement marked as read",
   };
+};
+
+// Archive an announcement (soft delete)
+const archiveAnnouncement = async (
+  announcementId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can archive announcements",
+    );
+  }
+
+  const announcement = await Announcements.findById(announcementId);
+  if (!announcement) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
+  }
+
+  await SoftDeleteUtils.softDelete(Announcements, announcementId, adminId);
+
+  return {
+    message: "Announcement archived successfully",
+  };
+};
+
+// Restore an announcement
+const restoreAnnouncement = async (
+  announcementId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can restore announcements",
+    );
+  }
+
+  const announcement = await Announcements.findById(announcementId);
+  if (!announcement) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
+  }
+
+  if (!announcement.isDeleted) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Announcement is not archived");
+  }
+
+  await SoftDeleteUtils.restoreRecord(Announcements, announcementId, adminId);
+
+  return {
+    message: "Announcement restored successfully",
+  };
+};
+
+// Get archived announcements
+const getArchivedAnnouncements = async (
+  adminId: string,
+): Promise<IAnnouncement[]> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view archived announcements",
+    );
+  }
+
+  const archivedAnnouncements = await Announcements.find({ isDeleted: true })
+    .populate({
+      path: "propertyId",
+      select: "name description address",
+    })
+    .populate({
+      path: "readBy",
+      select: "name email",
+    })
+    .sort({ deletedAt: -1 });
+
+  return archivedAnnouncements;
 };
 
 //* Get Announcements by Property
@@ -375,4 +458,7 @@ export const AnnouncementService = {
   getAnnouncementsByType,
   getAnnouncementsByPriority,
   getUnreadAnnouncements,
+  archiveAnnouncement,
+  restoreAnnouncement,
+  getArchivedAnnouncements,
 };

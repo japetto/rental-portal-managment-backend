@@ -99,6 +99,8 @@ export const announcementsSchema = new Schema<IAnnouncement>(
         trim: true,
       },
     ],
+    isDeleted: { type: Boolean, required: true, default: false },
+    deletedAt: { type: Date },
   },
   {
     timestamps: true,

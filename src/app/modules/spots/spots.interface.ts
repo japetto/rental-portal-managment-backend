@@ -20,6 +20,8 @@ export interface ISpot extends Document {
   description: string;
   images: string[];
   isActive: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

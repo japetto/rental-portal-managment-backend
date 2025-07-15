@@ -38,8 +38,14 @@ export interface IPayment extends Document {
   lateFeeAmount?: number;
   totalAmount: number; // amount + lateFeeAmount
   createdBy: string; // Admin who created the payment record
+  isActive: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Virtual properties
+  isOverdue: boolean;
+  daysOverdue: number;
 }
 
 export interface ICreatePayment {

@@ -193,6 +193,106 @@ const getServiceRequestStats = catchAsync(
   },
 );
 
+// Archive and Restore Controllers
+
+const archiveServiceRequest = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = req.user?._id?.toString();
+    const userRole = req.user?.role;
+
+    if (!userId || !id) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated or invalid request ID",
+        data: null,
+      });
+    }
+
+    const result = await ServiceRequestService.archiveServiceRequest(
+      id,
+      userId,
+      userRole || "",
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: result.message,
+      data: null,
+    });
+  },
+);
+
+const restoreServiceRequest = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = req.user?._id?.toString();
+    const userRole = req.user?.role;
+
+    if (!userId || !id) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated or invalid request ID",
+        data: null,
+      });
+    }
+
+    const result = await ServiceRequestService.restoreServiceRequest(
+      id,
+      userId,
+      userRole || "",
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: result.message,
+      data: null,
+    });
+  },
+);
+
+const getArchivedServiceRequests = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?._id?.toString();
+    const userRole = req.user?.role;
+
+    if (!userId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated",
+        data: null,
+      });
+    }
+
+    const filters = req.query;
+    const options = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 10,
+      sortBy: (req.query.sortBy as string) || "deletedAt",
+      sortOrder: (req.query.sortOrder as string) || "desc",
+    };
+
+    const result = await ServiceRequestService.getArchivedServiceRequests(
+      userId,
+      userRole || "",
+      filters,
+      options,
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Archived service requests retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const ServiceRequestController = {
   createServiceRequest,
   getServiceRequestById,
@@ -200,4 +300,7 @@ export const ServiceRequestController = {
   updateServiceRequest,
   deleteServiceRequest,
   getServiceRequestStats,
+  archiveServiceRequest,
+  restoreServiceRequest,
+  getArchivedServiceRequests,
 };

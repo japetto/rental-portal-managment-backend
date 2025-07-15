@@ -42,6 +42,9 @@ export const paymentsSchema = new Schema<IPayment>(
     lateFeeAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     createdBy: { type: String, required: true },
+    isActive: { type: Boolean, required: true, default: true },
+    isDeleted: { type: Boolean, required: true, default: false },
+    deletedAt: { type: Date },
   },
   {
     timestamps: true,
@@ -74,7 +77,6 @@ paymentsSchema.index({ tenantId: 1, status: 1 });
 paymentsSchema.index({ propertyId: 1, status: 1 });
 paymentsSchema.index({ dueDate: 1, status: 1 });
 paymentsSchema.index({ paidDate: 1 });
-paymentsSchema.index({ receiptNumber: 1 }, { unique: true });
 paymentsSchema.index({ transactionId: 1 });
 
 // Virtual to check if payment is overdue

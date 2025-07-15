@@ -30,6 +30,9 @@ export interface IServiceRequest extends Document {
   images: string[]; // Photos of the issue
   adminNotes?: string; // Notes from admin
   tenantNotes?: string; // Additional notes from tenant
+  isActive: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

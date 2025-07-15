@@ -720,6 +720,110 @@ const testEmail = catchAsync(async (req: Request, res: Response) => {
   }
 });
 
+// Archive and Restore Controllers
+
+const archiveProperty = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.archiveProperty(id, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Property archived successfully",
+    data: result,
+  });
+});
+
+const restoreProperty = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.restoreProperty(id, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Property restored successfully",
+    data: result,
+  });
+});
+
+const archiveSpot = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.archiveSpot(id, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Spot archived successfully",
+    data: result,
+  });
+});
+
+const restoreSpot = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.restoreSpot(id, adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Spot restored successfully",
+    data: result,
+  });
+});
+
+const getArchivedProperties = catchAsync(
+  async (req: Request, res: Response) => {
+    const adminId = req.user?._id?.toString();
+    if (!adminId) {
+      throw new Error("Admin ID not found");
+    }
+
+    const result = await AdminService.getArchivedProperties(adminId);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Archived properties retrieved successfully",
+      data: result,
+    });
+  },
+);
+
+const getArchivedSpots = catchAsync(async (req: Request, res: Response) => {
+  const adminId = req.user?._id?.toString();
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AdminService.getArchivedSpots(adminId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Archived spots retrieved successfully",
+    data: result,
+  });
+});
+
 export const AdminController = {
   inviteTenant,
   getAllTenants,
@@ -746,4 +850,10 @@ export const AdminController = {
   updateUser,
   deleteUser,
   testEmail,
+  archiveProperty,
+  restoreProperty,
+  archiveSpot,
+  restoreSpot,
+  getArchivedProperties,
+  getArchivedSpots,
 };

@@ -234,6 +234,69 @@ const getUnreadAnnouncements = catchAsync(
   },
 );
 
+// Archive and Restore Controllers
+
+const archiveAnnouncement = catchAsync(async (req: Request, res: Response) => {
+  const { announcementId } = req.params;
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AnnouncementService.archiveAnnouncement(
+    announcementId,
+    adminId,
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Announcement archived successfully",
+    data: result,
+  });
+});
+
+const restoreAnnouncement = catchAsync(async (req: Request, res: Response) => {
+  const { announcementId } = req.params;
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await AnnouncementService.restoreAnnouncement(
+    announcementId,
+    adminId,
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Announcement restored successfully",
+    data: result,
+  });
+});
+
+const getArchivedAnnouncements = catchAsync(
+  async (req: Request, res: Response) => {
+    const adminId = req.user?._id?.toString();
+
+    if (!adminId) {
+      throw new Error("Admin ID not found");
+    }
+
+    const result = await AnnouncementService.getArchivedAnnouncements(adminId);
+
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Archived announcements retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const AnnouncementController = {
   createAnnouncement,
   getAllAnnouncements,
@@ -246,4 +309,7 @@ export const AnnouncementController = {
   getAnnouncementsByType,
   getAnnouncementsByPriority,
   getUnreadAnnouncements,
+  archiveAnnouncement,
+  restoreAnnouncement,
+  getArchivedAnnouncements,
 };

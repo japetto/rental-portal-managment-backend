@@ -13,8 +13,14 @@ export interface IProperty extends Document {
   amenities: string[];
   images: string[];
   rules: string[];
+  isActive: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Virtual properties
+  totalSpots: number;
+  availableSpots: number;
 }
 
 export interface ICreateProperty {

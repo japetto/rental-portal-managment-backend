@@ -62,6 +62,33 @@ router.delete(
   AnnouncementController.deleteAnnouncement,
 );
 
+// Archive an announcement
+router.patch(
+  "/:announcementId/archive",
+  adminAuth,
+  zodValidationRequest(
+    AnnouncementValidation.deleteAnnouncementValidationSchema,
+  ),
+  AnnouncementController.archiveAnnouncement,
+);
+
+// Restore an announcement
+router.patch(
+  "/:announcementId/restore",
+  adminAuth,
+  zodValidationRequest(
+    AnnouncementValidation.deleteAnnouncementValidationSchema,
+  ),
+  AnnouncementController.restoreAnnouncement,
+);
+
+// Get archived announcements
+router.get(
+  "/archived",
+  adminAuth,
+  AnnouncementController.getArchivedAnnouncements,
+);
+
 // Filter routes (Admin only)
 router.get(
   "/property/:propertyId",

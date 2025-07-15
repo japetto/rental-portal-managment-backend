@@ -1,6 +1,7 @@
 import httpStatus from "http-status";
 import mongoose from "mongoose";
 import ApiError from "../../../errors/ApiError";
+import { restoreRecord, softDelete } from "../../../shared/softDeleteUtils";
 import { Properties } from "../properties/properties.schema";
 import { Spots } from "../spots/spots.schema";
 import { Users } from "../users/users.schema";
@@ -268,7 +269,7 @@ const deleteServiceRequest = async (
     );
   }
 
-  await ServiceRequests.findByIdAndDelete(requestId);
+  await softDelete(ServiceRequests, requestId);
 
   return {
     message: "Service request deleted successfully",
@@ -327,6 +328,138 @@ const getServiceRequestStats = async (userRole: string) => {
   };
 };
 
+// Archive a service request (soft delete)
+const archiveServiceRequest = async (
+  requestId: string,
+  userId: string,
+  userRole: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid service request ID format",
+    );
+  }
+
+  const serviceRequest = await ServiceRequests.findById(requestId);
+  if (!serviceRequest) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
+  }
+
+  // Check access permissions
+  if (
+    userRole !== "SUPER_ADMIN" &&
+    serviceRequest.tenantId.toString() !== userId
+  ) {
+    throw new ApiError(httpStatus.FORBIDDEN, "Access denied");
+  }
+
+  // Only allow archiving if status is PENDING or COMPLETED
+  if (serviceRequest.status === "IN_PROGRESS") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot archive service request that is in progress",
+    );
+  }
+
+  await softDelete(ServiceRequests, requestId, userId);
+
+  return {
+    message: "Service request archived successfully",
+  };
+};
+
+// Restore a service request
+const restoreServiceRequest = async (
+  requestId: string,
+  userId: string,
+  userRole: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid service request ID format",
+    );
+  }
+
+  const serviceRequest = await ServiceRequests.findById(requestId);
+  if (!serviceRequest) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
+  }
+
+  // Check access permissions
+  if (
+    userRole !== "SUPER_ADMIN" &&
+    serviceRequest.tenantId.toString() !== userId
+  ) {
+    throw new ApiError(httpStatus.FORBIDDEN, "Access denied");
+  }
+
+  if (!serviceRequest.isDeleted) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Service request is not archived",
+    );
+  }
+
+  await restoreRecord(ServiceRequests, requestId, userId);
+
+  return {
+    message: "Service request restored successfully",
+  };
+};
+
+// Get archived service requests
+const getArchivedServiceRequests = async (
+  userId: string,
+  userRole: string,
+  filters: Record<string, unknown> = {},
+  options: any = {},
+) => {
+  if (userRole !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only admins can view archived service requests",
+    );
+  }
+
+  const page = options.page || 1;
+  const limit = options.limit || 10;
+  const skip = (page - 1) * limit;
+  const sortBy = options.sortBy || "deletedAt";
+  const sortOrder = options.sortOrder === "asc" ? 1 : -1;
+
+  // Build filter conditions for deleted records
+  const filterConditions: Record<string, unknown> = {
+    isDeleted: true,
+    ...filters,
+  };
+
+  // Build sort conditions
+  const sortConditions: Record<string, 1 | -1> = {};
+  sortConditions[sortBy] = sortOrder;
+
+  const serviceRequests = await ServiceRequests.find(filterConditions)
+    .populate("tenantId", "name email phoneNumber")
+    .populate("propertyId", "name address")
+    .populate("spotId", "spotNumber status")
+    .sort(sortConditions)
+    .skip(skip)
+    .limit(limit);
+
+  const total = await ServiceRequests.countDocuments(filterConditions);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: serviceRequests,
+  };
+};
+
 export const ServiceRequestService = {
   createServiceRequest,
   getServiceRequestById,
@@ -334,4 +467,7 @@ export const ServiceRequestService = {
   updateServiceRequest,
   deleteServiceRequest,
   getServiceRequestStats,
+  archiveServiceRequest,
+  restoreServiceRequest,
+  getArchivedServiceRequests,
 };

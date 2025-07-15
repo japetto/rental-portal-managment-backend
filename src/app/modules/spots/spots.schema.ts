@@ -29,6 +29,8 @@ export const spotsSchema = new Schema<ISpot>(
     description: { type: String, required: true },
     images: [{ type: String }],
     isActive: { type: Boolean, required: true, default: true },
+    isDeleted: { type: Boolean, required: true, default: false },
+    deletedAt: { type: Date },
   },
   {
     timestamps: true,

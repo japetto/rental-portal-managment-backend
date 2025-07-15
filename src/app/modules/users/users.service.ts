@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import httpStatus from "http-status";
+import mongoose from "mongoose";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
 import { Spots } from "../spots/spots.schema";
@@ -203,7 +204,7 @@ const deleteUser = async (
     );
   }
 
-  // Cascade delete: Remove user assignments and update related data
+  // Soft delete: Mark user as deleted and update related data
   try {
     // If user has a spot assignment, free up the spot
     if (user.spotId) {
@@ -212,14 +213,12 @@ const deleteUser = async (
       });
     }
 
-    // Property lots are now calculated from spots, no need to update manually
-
-    // Delete the user
-    await Users.findByIdAndDelete(userId);
+    // Soft delete the user
+    await softDelete(Users, userId, adminId);
 
     return {
       message:
-        "User and all associated assignments have been successfully removed.",
+        "User has been soft deleted successfully. All associated assignments have been updated.",
     };
   } catch (error) {
     throw new ApiError(
@@ -239,7 +238,7 @@ const getAllUsers = async (adminId: string): Promise<IUser[]> => {
     );
   }
 
-  const users = await Users.find({})
+  const users = await Users.find({ isDeleted: false })
     .select("-password")
     .populate({
       path: "propertyId",
@@ -263,7 +262,7 @@ const getAllTenants = async (adminId: string): Promise<IUser[]> => {
     );
   }
 
-  const tenants = await Users.find({ role: "TENANT" })
+  const tenants = await Users.find({ role: "TENANT", isDeleted: false })
     .select("-password")
     .populate({
       path: "propertyId",
@@ -304,6 +303,10 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
 
+  if (user.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User has been deleted");
+  }
+
   return user;
 };
 
@@ -316,7 +319,6 @@ const checkUserInvitationStatus = async (
   hasPassword: boolean;
 }> => {
   const user = await Users.findOne({ email }).select("+password");
-
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
@@ -326,6 +328,317 @@ const checkUserInvitationStatus = async (
     isVerified: user.isVerified || false,
     hasPassword: !!(user.password && user.password !== ""),
   };
+};
+
+// Get comprehensive user profile with all related information
+const getComprehensiveUserProfile = async (userId: string) => {
+  const user = await Users.findById(userId)
+    .populate("propertyId", "name description address amenities images rules")
+    .populate(
+      "spotId",
+      "spotNumber spotIdentifier status size amenities price description images",
+    );
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Initialize variables with proper types
+  let activeLease: any = null;
+  let recentPayments: any[] = [];
+  let pendingPayments: any[] = [];
+  let recentServiceRequests: any[] = [];
+  let unreadAnnouncements: any[] = [];
+  let assignmentHistory: any[] = [];
+
+  // Only fetch tenant-specific data if user is a tenant
+  if (user.role === "TENANT") {
+    // Get user's active lease using direct reference
+    const { Leases } = await import("../leases/leases.schema");
+    activeLease = user.leaseId
+      ? await Leases.findById(user.leaseId).populate(
+          "spotId",
+          "spotNumber spotIdentifier status size amenities price description",
+        )
+      : await Leases.findOne({
+          tenantId: userId,
+          leaseStatus: "ACTIVE",
+        }).populate(
+          "spotId",
+          "spotNumber spotIdentifier status size amenities price description",
+        );
+
+    // Get user's payments (recent and pending)
+    const { Payments } = await import("../payments/payments.schema");
+    recentPayments = await Payments.find({
+      tenantId: userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    pendingPayments = await Payments.find({
+      tenantId: userId,
+      status: { $in: ["PENDING", "OVERDUE"] },
+    }).sort({ dueDate: 1 });
+
+    // Get user's service requests
+    const { ServiceRequests } = await import(
+      "../service-requests/service-requests.schema"
+    );
+    recentServiceRequests = await ServiceRequests.find({
+      tenantId: userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get user's unread announcements
+    const { Announcements } = await import(
+      "../announcements/announcements.schema"
+    );
+    unreadAnnouncements = await Announcements.find({
+      propertyId: user.propertyId,
+      isActive: true,
+      readBy: { $ne: userId },
+    }).sort({ createdAt: -1 });
+
+    // Get user's assignment history
+    assignmentHistory = await getUserAssignmentHistory(userId);
+  } else if (user.role === "SUPER_ADMIN") {
+    // For SUPER_ADMIN, get all announcements (they can see all)
+    const { Announcements } = await import(
+      "../announcements/announcements.schema"
+    );
+    unreadAnnouncements = await Announcements.find({
+      isActive: true,
+      targetAudience: { $in: ["ALL", "ADMINS_ONLY"] },
+    }).sort({ createdAt: -1 });
+  }
+
+  // Calculate payment summary (only for tenants)
+  const totalPendingAmount = pendingPayments.reduce(
+    (sum, payment) => sum + payment.totalAmount,
+    0,
+  );
+  const overduePayments = pendingPayments.filter(
+    payment => payment.status === "OVERDUE",
+  );
+
+  // Build comprehensive profile
+  const comprehensiveProfile = {
+    // Basic user info
+    user: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      profileImage: user.profileImage,
+      bio: user.bio,
+      preferredLocation: user.preferredLocation,
+      isVerified: user.isVerified,
+      isInvited: user.isInvited,
+    },
+    // Property information (only for tenants)
+    property: user.role === "TENANT" ? user.propertyId : null,
+    // Spot information (only for tenants)
+    spot: user.role === "TENANT" ? user.spotId : null,
+    // Lease information (only for tenants)
+    lease:
+      user.role === "TENANT" && activeLease
+        ? {
+            _id: activeLease._id,
+            leaseStart: activeLease.leaseStart,
+            leaseEnd: activeLease.leaseEnd,
+            rentAmount: activeLease.rentAmount,
+            depositAmount: activeLease.depositAmount,
+            paymentStatus: activeLease.paymentStatus,
+            leaseStatus: activeLease.leaseStatus,
+            occupants: activeLease.occupants,
+            rvInfo: activeLease.rvInfo,
+            emergencyContact: activeLease.emergencyContact,
+            specialRequests: activeLease.specialRequests,
+            documents: activeLease.documents,
+            notes: activeLease.notes,
+            durationDays: activeLease.durationDays,
+            isLeaseActive: activeLease.isLeaseActive,
+          }
+        : null,
+    // Payment information (only for tenants)
+    payments: {
+      recent: recentPayments,
+      pending: pendingPayments,
+      summary: {
+        totalPendingAmount,
+        overdueCount: overduePayments.length,
+        totalOverdueAmount: overduePayments.reduce(
+          (sum, payment) => sum + payment.totalAmount,
+          0,
+        ),
+      },
+    },
+    // Service requests (only for tenants)
+    serviceRequests: {
+      recent: recentServiceRequests,
+      count:
+        user.role === "TENANT"
+          ? await (
+              await import("../service-requests/service-requests.schema")
+            ).ServiceRequests.countDocuments({ tenantId: userId })
+          : 0,
+    },
+    // Announcements
+    announcements: {
+      unread: unreadAnnouncements,
+      unreadCount: unreadAnnouncements.length,
+    },
+    // Assignment History (only for tenants)
+    assignmentHistory: assignmentHistory,
+  };
+
+  return comprehensiveProfile;
+};
+
+// Track user property and spot assignment history
+const trackUserAssignment = async (
+  userId: string,
+  propertyId: string,
+  spotId: string,
+  leaseId: string,
+  reason: "LEASE_START" | "LEASE_END" | "TRANSFER" | "CANCELLATION",
+) => {
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // If this is a new assignment, close any previous active assignment
+  if (reason === "LEASE_START" || reason === "TRANSFER") {
+    if (user.userHistory && user.userHistory.length > 0) {
+      const lastActiveAssignment = user.userHistory.find(
+        history => !history.removedAt,
+      );
+      if (lastActiveAssignment) {
+        lastActiveAssignment.removedAt = new Date();
+        lastActiveAssignment.reason =
+          reason === "LEASE_START" ? "LEASE_END" : "TRANSFER";
+      }
+    }
+  }
+
+  // Add new assignment to history
+  const newAssignment = {
+    propertyId: new mongoose.Types.ObjectId(propertyId),
+    spotId: new mongoose.Types.ObjectId(spotId),
+    leaseId: new mongoose.Types.ObjectId(leaseId),
+    assignedAt: new Date(),
+    removedAt:
+      reason === "LEASE_END" || reason === "CANCELLATION"
+        ? new Date()
+        : undefined,
+    reason,
+  };
+
+  // Update user's current assignment and history
+  const updateData: any = {
+    propertyId: new mongoose.Types.ObjectId(propertyId),
+    spotId: new mongoose.Types.ObjectId(spotId),
+    leaseId: new mongoose.Types.ObjectId(leaseId),
+    $push: { userHistory: newAssignment },
+  };
+
+  // If ending assignment, clear current references
+  if (reason === "LEASE_END" || reason === "CANCELLATION") {
+    updateData.propertyId = null;
+    updateData.spotId = null;
+    updateData.leaseId = null;
+  }
+
+  const updatedUser = await Users.findByIdAndUpdate(userId, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  return updatedUser;
+};
+
+// Get user's complete assignment history
+const getUserAssignmentHistory = async (userId: string) => {
+  const user = await Users.findById(userId)
+    .populate("userHistory.propertyId", "name address")
+    .populate("userHistory.spotId", "spotNumber spotIdentifier")
+    .populate("userHistory.leaseId", "leaseStart leaseEnd rentAmount");
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  return user.userHistory || [];
+};
+
+// Utility function for soft delete
+const softDelete = async (model: any, id: string, deletedBy?: string) => {
+  const updateData: any = {
+    isActive: false,
+    isDeleted: true,
+    deletedAt: new Date(),
+  };
+
+  // Add deletedBy if provided
+  if (deletedBy) {
+    updateData.deletedBy = deletedBy;
+  }
+
+  const result = await model.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Record not found");
+  }
+
+  return result;
+};
+
+// Utility function to restore soft deleted record
+const restoreRecord = async (model: any, id: string, restoredBy?: string) => {
+  const updateData: any = {
+    isActive: true,
+    isDeleted: false,
+    deletedAt: null,
+  };
+
+  // Add restoredBy if provided
+  if (restoredBy) {
+    updateData.restoredBy = restoredBy;
+  }
+
+  const result = await model.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Record not found");
+  }
+
+  return result;
+};
+
+// Utility function to get only active records
+const getActiveRecords = async (model: any, query: any = {}) => {
+  return await model.find({
+    ...query,
+    isDeleted: false,
+  });
+};
+
+// Utility function to get deleted records
+const getDeletedRecords = async (model: any, query: any = {}) => {
+  return await model.find({
+    ...query,
+    isDeleted: true,
+  });
 };
 
 export const UserService = {
@@ -338,4 +651,11 @@ export const UserService = {
   getAllTenants,
   getUserById,
   checkUserInvitationStatus,
+  getComprehensiveUserProfile,
+  trackUserAssignment,
+  getUserAssignmentHistory,
+  softDelete,
+  restoreRecord,
+  getActiveRecords,
+  getDeletedRecords,
 };

@@ -15,6 +15,9 @@ export const propertiesSchema = new Schema<IProperty>(
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],
     rules: [{ type: String }],
+    isActive: { type: Boolean, required: true, default: true },
+    isDeleted: { type: Boolean, required: true, default: false },
+    deletedAt: { type: Date },
   },
   {
     timestamps: true,
@@ -23,5 +26,22 @@ export const propertiesSchema = new Schema<IProperty>(
     },
   },
 );
+
+// Virtual to get total spots count
+propertiesSchema.virtual("totalSpots", {
+  ref: "Spots",
+  localField: "_id",
+  foreignField: "propertyId",
+  count: true,
+});
+
+// Virtual to get available spots count
+propertiesSchema.virtual("availableSpots", {
+  ref: "Spots",
+  localField: "_id",
+  foreignField: "propertyId",
+  count: true,
+  match: { status: "AVAILABLE", isActive: true },
+});
 
 export const Properties = model<IProperty>("Properties", propertiesSchema);

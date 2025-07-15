@@ -63,12 +63,21 @@ export const usersSchema = new Schema<IUser>(
       required: false,
     },
     spotId: { type: Schema.Types.ObjectId, ref: "Spots", required: false },
-    emergencyContact: {
-      name: { type: String, required: false },
-      phone: { type: String, required: false },
-      relationship: { type: String, required: false },
-    },
-    specialRequests: [{ type: String }],
+    leaseId: { type: Schema.Types.ObjectId, ref: "Leases", required: false },
+    isActive: { type: Boolean, required: true, default: true },
+    isDeleted: { type: Boolean, required: true, default: false },
+    deletedAt: { type: Date },
+    // History tracking for property and spot assignments
+    userHistory: [
+      {
+        propertyId: { type: Schema.Types.ObjectId, ref: "Properties" },
+        spotId: { type: Schema.Types.ObjectId, ref: "Spots" },
+        leaseId: { type: Schema.Types.ObjectId, ref: "Leases" },
+        assignedAt: { type: Date, default: Date.now },
+        removedAt: { type: Date },
+        reason: { type: String }, // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
+      },
+    ],
   },
   {
     timestamps: true,
@@ -98,5 +107,23 @@ usersSchema.methods.comparePassword = async function (
   }
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// Virtual to get user's active lease
+usersSchema.virtual("activeLease", {
+  ref: "Leases",
+  localField: "_id",
+  foreignField: "tenantId",
+  justOne: true,
+  match: { leaseStatus: "ACTIVE" },
+});
+
+// Virtual to get user's pending payments count
+usersSchema.virtual("pendingPaymentsCount", {
+  ref: "Payments",
+  localField: "_id",
+  foreignField: "tenantId",
+  count: true,
+  match: { status: { $in: ["PENDING", "OVERDUE"] } },
+});
 
 export const Users = model<IUser>("Users", usersSchema);

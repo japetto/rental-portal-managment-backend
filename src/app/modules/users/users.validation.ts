@@ -150,16 +150,6 @@ export const updateUserInfoValidationSchema = z.object({
     preferredLocation: z.string().optional(),
     bio: z.string().optional(),
     profileImage: z.string().optional(),
-    emergencyContact: z
-      .object({
-        name: z.string().min(1, "Emergency contact name is required"),
-        phone: z.string().min(1, "Emergency contact phone is required"),
-        relationship: z
-          .string()
-          .min(1, "Emergency contact relationship is required"),
-      })
-      .optional(),
-    specialRequests: z.array(z.string()).optional(),
   }),
 });
 

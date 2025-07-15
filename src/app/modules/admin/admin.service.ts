@@ -1,6 +1,11 @@
 import httpStatus from "http-status";
 import mongoose from "mongoose";
 import ApiError from "../../../errors/ApiError";
+import {
+  getDeletedRecords,
+  restoreRecord,
+  softDelete,
+} from "../../../shared/softDeleteUtils";
 import { IProperty } from "../properties/properties.interface";
 import { Properties } from "../properties/properties.schema";
 import {
@@ -194,25 +199,31 @@ const deleteProperty = async (propertyId: string): Promise<void> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
 
-  // Check if property has any tenants
-  const tenantsCount = await Users.countDocuments({ propertyId });
-  if (tenantsCount > 0) {
+  // Check if property has any active tenants
+  const activeTenantsCount = await Users.countDocuments({
+    propertyId,
+    isDeleted: false,
+  });
+  if (activeTenantsCount > 0) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Cannot delete property with existing tenants",
+      "Cannot delete property with existing active tenants",
     );
   }
 
-  // Check if property has any spots
-  const spotsCount = await Spots.countDocuments({ propertyId });
-  if (spotsCount > 0) {
+  // Check if property has any active spots
+  const activeSpotsCount = await Spots.countDocuments({
+    propertyId,
+    isDeleted: false,
+  });
+  if (activeSpotsCount > 0) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Cannot delete property with existing spots",
+      "Cannot delete property with existing active spots",
     );
   }
 
-  await Properties.findByIdAndDelete(propertyId);
+  await softDelete(Properties, propertyId);
 };
 
 const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
@@ -398,8 +409,11 @@ const deleteSpot = async (spotId: string): Promise<void> => {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
 
-  // Check if spot is assigned to a tenant (reserved/booked)
-  const assignedTenant = await Users.findOne({ spotId });
+  // Check if spot is assigned to an active tenant (reserved/booked)
+  const assignedTenant = await Users.findOne({
+    spotId,
+    isDeleted: false,
+  });
   if (assignedTenant) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
@@ -407,7 +421,7 @@ const deleteSpot = async (spotId: string): Promise<void> => {
     );
   }
 
-  await Spots.findByIdAndDelete(spotId);
+  await softDelete(Spots, spotId);
 
   // Update property's available lots count
   await Properties.findByIdAndUpdate(spot.propertyId, {
@@ -962,6 +976,207 @@ const deleteUser = async (
   };
 };
 
+// Archive and Restore Methods
+
+// Archive a property (soft delete)
+const archiveProperty = async (
+  propertyId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can archive properties",
+    );
+  }
+
+  const property = await Properties.findById(propertyId);
+  if (!property) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
+  }
+
+  // Check if property has any active tenants
+  const activeTenantsCount = await Users.countDocuments({
+    propertyId,
+    isDeleted: false,
+  });
+  if (activeTenantsCount > 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot archive property with existing active tenants",
+    );
+  }
+
+  // Check if property has any active spots
+  const activeSpotsCount = await Spots.countDocuments({
+    propertyId,
+    isDeleted: false,
+  });
+  if (activeSpotsCount > 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot archive property with existing active spots",
+    );
+  }
+
+  await softDelete(Properties, propertyId, adminId);
+
+  return {
+    message: "Property archived successfully",
+  };
+};
+
+// Restore a property
+const restoreProperty = async (
+  propertyId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can restore properties",
+    );
+  }
+
+  const property = await Properties.findById(propertyId);
+  if (!property) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
+  }
+
+  if (!property.isDeleted) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Property is not archived");
+  }
+
+  await restoreRecord(Properties, propertyId, adminId);
+
+  return {
+    message: "Property restored successfully",
+  };
+};
+
+// Archive a spot (soft delete)
+const archiveSpot = async (
+  spotId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(spotId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can archive spots",
+    );
+  }
+
+  const spot = await Spots.findById(spotId);
+  if (!spot) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
+  }
+
+  // Check if spot is assigned to an active tenant
+  const assignedTenant = await Users.findOne({
+    spotId,
+    isDeleted: false,
+  });
+  if (assignedTenant) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Cannot archive a spot that is assigned to tenant: ${assignedTenant.name}`,
+    );
+  }
+
+  await softDelete(Spots, spotId, adminId);
+
+  // Update property's available lots count
+  await Properties.findByIdAndUpdate(spot.propertyId, {
+    $inc: { availableLots: -1 },
+  });
+
+  return {
+    message: "Spot archived successfully",
+  };
+};
+
+// Restore a spot
+const restoreSpot = async (
+  spotId: string,
+  adminId: string,
+): Promise<{ message: string }> => {
+  if (!mongoose.Types.ObjectId.isValid(spotId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
+  }
+
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can restore spots",
+    );
+  }
+
+  const spot = await Spots.findById(spotId);
+  if (!spot) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
+  }
+
+  if (!spot.isDeleted) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Spot is not archived");
+  }
+
+  await restoreRecord(Spots, spotId, adminId);
+
+  // Update property's available lots count
+  await Properties.findByIdAndUpdate(spot.propertyId, {
+    $inc: { availableLots: 1 },
+  });
+
+  return {
+    message: "Spot restored successfully",
+  };
+};
+
+// Get archived properties
+const getArchivedProperties = async (adminId: string): Promise<IProperty[]> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view archived properties",
+    );
+  }
+
+  const archivedProperties = await getDeletedRecords(Properties);
+  const propertiesWithLotData =
+    await addLotDataToProperties(archivedProperties);
+  return propertiesWithLotData;
+};
+
+// Get archived spots
+const getArchivedSpots = async (adminId: string): Promise<ISpot[]> => {
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can view archived spots",
+    );
+  }
+
+  return await getDeletedRecords(Spots);
+};
+
 export const AdminService = {
   inviteTenant,
   createProperty,
@@ -987,4 +1202,10 @@ export const AdminService = {
   getUserById,
   updateUser,
   deleteUser,
+  archiveProperty,
+  restoreProperty,
+  archiveSpot,
+  restoreSpot,
+  getArchivedProperties,
+  getArchivedSpots,
 };

@@ -464,14 +464,13 @@ const getMyProfile = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  // The user data is already available from the userAuth middleware
-  const userData = req.user;
+  const result = await UserService.getComprehensiveUserProfile(userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "User profile retrieved successfully",
-    data: userData,
+    data: result,
   });
 });
 

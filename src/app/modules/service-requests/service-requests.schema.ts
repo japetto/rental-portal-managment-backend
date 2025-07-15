@@ -37,6 +37,9 @@ export const serviceRequestsSchema = new Schema<IServiceRequest>(
     images: [{ type: String }],
     adminNotes: { type: String },
     tenantNotes: { type: String },
+    isActive: { type: Boolean, required: true, default: true },
+    isDeleted: { type: Boolean, required: true, default: false },
+    deletedAt: { type: Date },
   },
   {
     timestamps: true,

@@ -42,6 +42,15 @@ router.patch(
 // Delete a property
 router.delete("/properties/:id", AdminController.deleteProperty);
 
+// Archive a property
+router.patch("/properties/:id/archive", AdminController.archiveProperty);
+
+// Restore a property
+router.patch("/properties/:id/restore", AdminController.restoreProperty);
+
+// Get archived properties
+router.get("/properties/archived", AdminController.getArchivedProperties);
+
 // Spot management routes
 router.post(
   "/spots",
@@ -64,6 +73,15 @@ router.patch(
 
 // Delete a spot
 router.delete("/spots/:id", AdminController.deleteSpot);
+
+// Archive a spot
+router.patch("/spots/:id/archive", AdminController.archiveSpot);
+
+// Restore a spot
+router.patch("/spots/:id/restore", AdminController.restoreSpot);
+
+// Get archived spots
+router.get("/spots/archived", AdminController.getArchivedSpots);
 
 // Service Request Management Routes (Admin only)
 router.get(

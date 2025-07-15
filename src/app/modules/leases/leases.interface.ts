@@ -30,8 +30,14 @@ export interface ILease extends Document {
   specialRequests: string[];
   documents: string[]; // URLs to uploaded documents
   notes: string;
+  isActive: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Virtual properties
+  durationDays: number;
+  isLeaseActive: boolean;
 }
 
 export interface ICreateLease {
