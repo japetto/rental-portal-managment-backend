@@ -7,6 +7,7 @@ exports.Routers = void 0;
 const express_1 = __importDefault(require("express"));
 const admin_router_1 = require("../modules/admin/admin.router");
 const announcements_router_1 = require("../modules/announcements/announcements.router");
+const leases_router_1 = require("../modules/leases/leases.router");
 const service_requests_router_1 = require("../modules/service-requests/service-requests.router");
 const users_router_1 = require("../modules/users/users.router");
 const router = express_1.default.Router();
@@ -22,6 +23,10 @@ const routes = [
     {
         path: "/announcements",
         route: announcements_router_1.AnnouncementRouter,
+    },
+    {
+        path: "/leases",
+        route: leases_router_1.LeasesRoutes,
     },
     {
         path: "/service-requests",

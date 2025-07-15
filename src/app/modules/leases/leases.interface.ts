@@ -4,17 +4,29 @@ export type LeaseStatus = "ACTIVE" | "EXPIRED" | "CANCELLED" | "PENDING";
 
 export type PaymentStatus = "PAID" | "PENDING" | "OVERDUE" | "PARTIAL";
 
+export type LeaseType = "MONTHLY" | "FIXED_TERM";
+
 export interface ILease extends Document {
   tenantId: Types.ObjectId; // Reference to User
   spotId: Types.ObjectId; // Reference to Spot
   propertyId: Types.ObjectId; // Reference to Property
+  leaseType: LeaseType;
   leaseStart: Date;
-  leaseEnd: Date;
+  leaseEnd?: Date; // Optional for monthly leases (ongoing)
   rentAmount: number;
   depositAmount: number;
   paymentStatus: PaymentStatus;
   leaseStatus: LeaseStatus;
   occupants: number;
+  pets: {
+    hasPets: boolean;
+    petDetails?: {
+      type: string;
+      breed: string;
+      name: string;
+      weight: number;
+    }[];
+  };
   rvInfo: {
     make: string;
     model: string;
@@ -28,7 +40,7 @@ export interface ILease extends Document {
     relationship: string;
   };
   specialRequests: string[];
-  documents: string[]; // URLs to uploaded documents
+  documents: string[]; // URLs to uploaded documents (PDF/DOC)
   notes: string;
   isActive: boolean;
   isDeleted: boolean;
@@ -44,11 +56,21 @@ export interface ICreateLease {
   tenantId: string;
   spotId: string;
   propertyId: string;
+  leaseType: LeaseType;
   leaseStart: Date;
-  leaseEnd: Date;
+  leaseEnd?: Date; // Optional for monthly leases
   rentAmount: number;
   depositAmount: number;
   occupants: number;
+  pets: {
+    hasPets: boolean;
+    petDetails?: {
+      type: string;
+      breed: string;
+      name: string;
+      weight: number;
+    }[];
+  };
   rvInfo: {
     make: string;
     model: string;
@@ -67,6 +89,7 @@ export interface ICreateLease {
 }
 
 export interface IUpdateLease {
+  leaseType?: LeaseType;
   leaseStart?: Date;
   leaseEnd?: Date;
   rentAmount?: number;
@@ -74,6 +97,15 @@ export interface IUpdateLease {
   paymentStatus?: PaymentStatus;
   leaseStatus?: LeaseStatus;
   occupants?: number;
+  pets?: {
+    hasPets?: boolean;
+    petDetails?: {
+      type: string;
+      breed: string;
+      name: string;
+      weight: number;
+    }[];
+  };
   rvInfo?: {
     make?: string;
     model?: string;

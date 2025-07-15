@@ -10,8 +10,13 @@ exports.leasesSchema = new mongoose_1.Schema({
         ref: "Properties",
         required: true,
     },
+    leaseType: {
+        type: String,
+        enum: ["MONTHLY", "FIXED_TERM"],
+        required: true,
+    },
     leaseStart: { type: Date, required: true },
-    leaseEnd: { type: Date, required: true },
+    leaseEnd: { type: Date, required: false }, // Optional for monthly leases
     rentAmount: { type: Number, required: true, min: 0 },
     depositAmount: { type: Number, required: true, min: 0 },
     paymentStatus: {
@@ -27,6 +32,17 @@ exports.leasesSchema = new mongoose_1.Schema({
         default: "PENDING",
     },
     occupants: { type: Number, required: true, min: 1 },
+    pets: {
+        hasPets: { type: Boolean, required: true, default: false },
+        petDetails: [
+            {
+                type: { type: String, required: true },
+                breed: { type: String, required: true },
+                name: { type: String, required: true },
+                weight: { type: Number, required: true, min: 0 },
+            },
+        ],
+    },
     rvInfo: {
         make: { type: String, required: true },
         model: { type: String, required: true },
@@ -40,7 +56,7 @@ exports.leasesSchema = new mongoose_1.Schema({
         relationship: { type: String, required: true },
     },
     specialRequests: [{ type: String }],
-    documents: [{ type: String }],
+    documents: [{ type: String }], // URLs for PDF/DOC files
     notes: { type: String, default: "" },
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
@@ -53,19 +69,33 @@ exports.leasesSchema = new mongoose_1.Schema({
 });
 // Virtual for calculating lease duration in days
 exports.leasesSchema.virtual("durationDays").get(function () {
+    if (!this.leaseEnd) {
+        // For monthly leases without end date, calculate from start to current date
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - this.leaseStart.getTime());
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
     const diffTime = Math.abs(this.leaseEnd.getTime() - this.leaseStart.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 // Virtual for checking if lease is active
 exports.leasesSchema.virtual("isLeaseActive").get(function () {
     const now = new Date();
-    return (this.leaseStart <= now &&
-        this.leaseEnd >= now &&
-        this.leaseStatus === "ACTIVE");
+    if (this.leaseType === "MONTHLY" && !this.leaseEnd) {
+        // Monthly leases without end date are active if they've started and status is ACTIVE
+        return this.leaseStart <= now && this.leaseStatus === "ACTIVE";
+    }
+    if (this.leaseEnd) {
+        return (this.leaseStart <= now &&
+            this.leaseEnd >= now &&
+            this.leaseStatus === "ACTIVE");
+    }
+    return false;
 });
 // Index for efficient queries
 exports.leasesSchema.index({ tenantId: 1, leaseStatus: 1 });
 exports.leasesSchema.index({ spotId: 1, leaseStatus: 1 });
 exports.leasesSchema.index({ propertyId: 1, leaseStatus: 1 });
 exports.leasesSchema.index({ leaseStart: 1, leaseEnd: 1 });
+exports.leasesSchema.index({ leaseType: 1, leaseStatus: 1 });
 exports.Leases = (0, mongoose_1.model)("Leases", exports.leasesSchema);

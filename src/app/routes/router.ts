@@ -1,6 +1,7 @@
 import express from "express";
 import { AdminRouter } from "../modules/admin/admin.router";
 import { AnnouncementRouter } from "../modules/announcements/announcements.router";
+import { LeasesRoutes } from "../modules/leases/leases.router";
 import { ServiceRequestRouter } from "../modules/service-requests/service-requests.router";
 import { UserRouter } from "../modules/users/users.router";
 
@@ -18,6 +19,10 @@ const routes = [
   {
     path: "/announcements",
     route: AnnouncementRouter,
+  },
+  {
+    path: "/leases",
+    route: LeasesRoutes,
   },
   {
     path: "/service-requests",
