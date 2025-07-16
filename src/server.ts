@@ -2,6 +2,7 @@ import { Server } from "http";
 import mongoose from "mongoose";
 import app from "./app";
 import config from "./config/config";
+import { createDefaultAdmin } from "./shared/createDefaultAdmin";
 
 const port = config.port;
 
@@ -17,6 +18,9 @@ async function main() {
     const uri = config.database_url;
     await mongoose.connect(`${uri}`);
     console.log(`🛢 Database Connected Successfully`);
+
+    // Create default super admin if no users exist
+    await createDefaultAdmin();
 
     server = app.listen(port, () => {
       console.log(`Server is running on  http://localhost:${port}`);

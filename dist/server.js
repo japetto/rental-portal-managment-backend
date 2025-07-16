@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const app_1 = __importDefault(require("./app"));
 const config_1 = __importDefault(require("./config/config"));
+const createDefaultAdmin_1 = require("./shared/createDefaultAdmin");
 const port = config_1.default.port;
 process.on("uncaughtException", error => {
     console.error(error);
@@ -28,6 +29,8 @@ function main() {
             const uri = config_1.default.database_url;
             yield mongoose_1.default.connect(`${uri}`);
             console.log(`🛢 Database Connected Successfully`);
+            // Create default super admin if no users exist
+            yield (0, createDefaultAdmin_1.createDefaultAdmin)();
             server = app_1.default.listen(port, () => {
                 console.log(`Server is running on  http://localhost:${port}`);
             });

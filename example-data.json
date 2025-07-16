@@ -1,0 +1,357 @@
+{
+  "exampleUsers": {
+    "admins": [
+      {
+        "name": "John Smith",
+        "email": "john.smith@rvpark.com",
+        "password": "admin123456",
+        "phoneNumber": "+1-555-0101",
+        "role": "SUPER_ADMIN",
+        "preferredLocation": "Main Office",
+        "bio": "Senior Property Manager with 10+ years of experience in RV park management.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false
+      },
+      {
+        "name": "Sarah Johnson",
+        "email": "sarah.johnson@rvpark.com",
+        "password": "admin123456",
+        "phoneNumber": "+1-555-0102",
+        "role": "SUPER_ADMIN",
+        "preferredLocation": "North Property",
+        "bio": "Assistant Property Manager specializing in tenant relations and maintenance coordination.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false
+      },
+      {
+        "name": "Michael Davis",
+        "email": "michael.davis@rvpark.com",
+        "password": "admin123456",
+        "phoneNumber": "+1-555-0103",
+        "role": "SUPER_ADMIN",
+        "preferredLocation": "South Property",
+        "bio": "Operations Manager focused on property maintenance and guest services.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false
+      }
+    ],
+    "tenants": [
+      {
+        "name": "Robert Wilson",
+        "email": "robert.wilson@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0201",
+        "role": "TENANT",
+        "preferredLocation": "Lakeside View",
+        "bio": "Retired teacher enjoying RV life with my wife. We love fishing and hiking.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439012",
+        "leaseId": "507f1f77bcf86cd799439013",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439012",
+            "leaseId": "507f1f77bcf86cd799439013",
+            "assignedAt": "2024-01-15T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "Lisa Anderson",
+        "email": "lisa.anderson@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0202",
+        "role": "TENANT",
+        "preferredLocation": "Mountain View",
+        "bio": "Digital nomad working remotely. Love the peaceful environment here.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439014",
+        "leaseId": "507f1f77bcf86cd799439015",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439014",
+            "leaseId": "507f1f77bcf86cd799439015",
+            "assignedAt": "2024-02-01T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "David Thompson",
+        "email": "david.thompson@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0203",
+        "role": "TENANT",
+        "preferredLocation": "Riverside",
+        "bio": "Retired military veteran. Enjoying the community and outdoor activities.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439016",
+        "leaseId": "507f1f77bcf86cd799439017",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439016",
+            "leaseId": "507f1f77bcf86cd799439017",
+            "assignedAt": "2024-01-20T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "Jennifer Martinez",
+        "email": "jennifer.martinez@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0204",
+        "role": "TENANT",
+        "preferredLocation": "Sunset Ridge",
+        "bio": "Travel nurse exploring different locations. This is my favorite spot so far!",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439018",
+        "leaseId": "507f1f77bcf86cd799439019",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439018",
+            "leaseId": "507f1f77bcf86cd799439019",
+            "assignedAt": "2024-02-15T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "James Brown",
+        "email": "james.brown@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0205",
+        "role": "TENANT",
+        "preferredLocation": "Forest Edge",
+        "bio": "Photographer capturing nature's beauty. The wildlife here is amazing!",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439020",
+        "leaseId": "507f1f77bcf86cd799439021",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439020",
+            "leaseId": "507f1f77bcf86cd799439021",
+            "assignedAt": "2024-03-01T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "Maria Garcia",
+        "email": "maria.garcia@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0206",
+        "role": "TENANT",
+        "preferredLocation": "Meadow View",
+        "bio": "Retired teacher with my two dogs. We love the walking trails here.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439022",
+        "leaseId": "507f1f77bcf86cd799439023",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439022",
+            "leaseId": "507f1f77bcf86cd799439023",
+            "assignedAt": "2024-02-10T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "William Taylor",
+        "email": "william.taylor@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0207",
+        "role": "TENANT",
+        "preferredLocation": "Hilltop",
+        "bio": "Software engineer working remotely. The internet connection here is great!",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439024",
+        "leaseId": "507f1f77bcf86cd799439025",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439024",
+            "leaseId": "507f1f77bcf86cd799439025",
+            "assignedAt": "2024-01-25T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      },
+      {
+        "name": "Patricia White",
+        "email": "patricia.white@email.com",
+        "password": "tenant123456",
+        "phoneNumber": "+1-555-0208",
+        "role": "TENANT",
+        "preferredLocation": "Valley View",
+        "bio": "Retired nurse enjoying the peaceful environment. The community here is wonderful.",
+        "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+        "isVerified": true,
+        "isInvited": false,
+        "isActive": true,
+        "isDeleted": false,
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439026",
+        "leaseId": "507f1f77bcf86cd799439027",
+        "userHistory": [
+          {
+            "propertyId": "507f1f77bcf86cd799439011",
+            "spotId": "507f1f77bcf86cd799439026",
+            "leaseId": "507f1f77bcf86cd799439027",
+            "assignedAt": "2024-02-20T00:00:00.000Z",
+            "reason": "LEASE_START"
+          }
+        ]
+      }
+    ]
+  },
+  "apiEndpoints": {
+    "createAdmin": {
+      "method": "POST",
+      "endpoint": "/api/v1.0/users/register",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "name": "John Smith",
+        "email": "john.smith@rvpark.com",
+        "password": "admin123456",
+        "confirmPassword": "admin123456",
+        "phoneNumber": "+1-555-0101",
+        "role": "SUPER_ADMIN",
+        "preferredLocation": "Main Office"
+      }
+    },
+    "createTenant": {
+      "method": "POST",
+      "endpoint": "/api/v1.0/users/register",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "name": "Robert Wilson",
+        "email": "robert.wilson@email.com",
+        "password": "tenant123456",
+        "confirmPassword": "tenant123456",
+        "phoneNumber": "+1-555-0201",
+        "role": "TENANT",
+        "preferredLocation": "Lakeside View"
+      }
+    },
+    "inviteTenant": {
+      "method": "POST",
+      "endpoint": "/api/v1.0/admin/invite-tenant",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer <admin-jwt-token>"
+      },
+      "body": {
+        "name": "New Tenant",
+        "email": "new.tenant@email.com",
+        "phoneNumber": "+1-555-0301",
+        "preferredLocation": "Sunset Ridge",
+        "propertyId": "507f1f77bcf86cd799439011",
+        "spotId": "507f1f77bcf86cd799439028"
+      }
+    },
+    "login": {
+      "method": "POST",
+      "endpoint": "/api/v1.0/users/login",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "john.smith@rvpark.com",
+        "password": "admin123456"
+      }
+    }
+  },
+  "curlExamples": {
+    "createAdmin": "curl -X POST http://localhost:5000/api/v1.0/users/register \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"John Smith\",\n    \"email\": \"john.smith@rvpark.com\",\n    \"password\": \"admin123456\",\n    \"confirmPassword\": \"admin123456\",\n    \"phoneNumber\": \"+1-555-0101\",\n    \"role\": \"SUPER_ADMIN\",\n    \"preferredLocation\": \"Main Office\"\n  }'",
+    "createTenant": "curl -X POST http://localhost:5000/api/v1.0/users/register \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"Robert Wilson\",\n    \"email\": \"robert.wilson@email.com\",\n    \"password\": \"tenant123456\",\n    \"confirmPassword\": \"tenant123456\",\n    \"phoneNumber\": \"+1-555-0201\",\n    \"role\": \"TENANT\",\n    \"preferredLocation\": \"Lakeside View\"\n  }'",
+    "login": "curl -X POST http://localhost:5000/api/v1.0/users/login \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"email\": \"john.smith@rvpark.com\",\n    \"password\": \"admin123456\"\n  }'"
+  },
+  "notes": {
+    "requiredFields": [
+      "name",
+      "email",
+      "phoneNumber",
+      "role",
+      "preferredLocation"
+    ],
+    "optionalFields": [
+      "password",
+      "bio",
+      "profileImage",
+      "isVerified",
+      "isInvited",
+      "propertyId",
+      "spotId",
+      "leaseId"
+    ],
+    "tenantSpecificFields": ["propertyId", "spotId", "leaseId", "userHistory"],
+    "passwordRequirements": "Minimum 6 characters",
+    "emailFormat": "Must be valid email format",
+    "phoneNumberFormat": "Should be unique across all users",
+    "roleOptions": ["SUPER_ADMIN", "TENANT"],
+    "defaultValues": {
+      "role": "TENANT",
+      "isInvited": false,
+      "isVerified": false,
+      "bio": "Not Updated Yet!",
+      "profileImage": "https://i.ibb.co/dcHVrp8/User-Profile-PNG-Image.png",
+      "isActive": true,
+      "isDeleted": false
+    }
+  }
+}
