@@ -145,7 +145,9 @@ const createProperty = async (
 };
 
 const getAllProperties = async (): Promise<IProperty[]> => {
-  const properties = await Properties.find({}).sort({ createdAt: -1 });
+  const properties = await Properties.find({ isDeleted: false }).sort({
+    createdAt: -1,
+  });
   const propertiesWithLotData = await addLotDataToProperties(properties);
   return propertiesWithLotData;
 };
@@ -155,7 +157,10 @@ const getPropertyById = async (propertyId: string): Promise<IProperty> => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
   }
 
-  const property = await Properties.findById(propertyId);
+  const property = await Properties.findOne({
+    _id: propertyId,
+    isDeleted: false,
+  });
   if (!property) {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
@@ -172,7 +177,10 @@ const updateProperty = async (
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
   }
 
-  const property = await Properties.findById(propertyId);
+  const property = await Properties.findOne({
+    _id: propertyId,
+    isDeleted: false,
+  });
   if (!property) {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
@@ -194,7 +202,10 @@ const deleteProperty = async (propertyId: string): Promise<void> => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
   }
 
-  const property = await Properties.findById(propertyId);
+  const property = await Properties.findOne({
+    _id: propertyId,
+    isDeleted: false,
+  });
   if (!property) {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
@@ -308,13 +319,16 @@ const getSpotsByProperty = async (
   }
 
   // Check if property exists
-  const property = await Properties.findById(propertyId);
+  const property = await Properties.findOne({
+    _id: propertyId,
+    isDeleted: false,
+  });
   if (!property) {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
 
   // Build query
-  const query: any = { propertyId };
+  const query: any = { propertyId, isDeleted: false };
 
   // Add status filter if provided
   if (status) {
@@ -337,7 +351,7 @@ const getSpotById = async (spotId: string): Promise<ISpot> => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
   }
 
-  const spot = await Spots.findById(spotId);
+  const spot = await Spots.findOne({ _id: spotId, isDeleted: false });
   if (!spot) {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
@@ -353,7 +367,7 @@ const updateSpot = async (
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
   }
 
-  const spot = await Spots.findById(spotId);
+  const spot = await Spots.findOne({ _id: spotId, isDeleted: false });
   if (!spot) {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
@@ -404,7 +418,7 @@ const deleteSpot = async (spotId: string): Promise<void> => {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid spot ID format");
   }
 
-  const spot = await Spots.findById(spotId);
+  const spot = await Spots.findOne({ _id: spotId, isDeleted: false });
   if (!spot) {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
@@ -430,7 +444,7 @@ const deleteSpot = async (spotId: string): Promise<void> => {
 };
 
 const getAllTenants = async (): Promise<IUser[]> => {
-  const tenants = await Users.find({ role: "TENANT" })
+  const tenants = await Users.find({ role: "TENANT", isDeleted: false })
     .populate("propertyId", "name address")
     .populate("spotId", "spotNumber status size price description")
     .sort({ createdAt: -1 });
@@ -466,7 +480,9 @@ const getAllServiceRequests = async (
   const sortOrder = options.sortOrder === "asc" ? 1 : -1;
 
   // Build filter conditions
-  const filterConditions: Record<string, unknown> = {};
+  const filterConditions: Record<string, unknown> = {
+    isDeleted: false, // Only get non-deleted records
+  };
 
   // Add filters
   if (filters.status) {
@@ -530,7 +546,10 @@ const getServiceRequestById = async (
     );
   }
 
-  const serviceRequest = await ServiceRequests.findById(requestId)
+  const serviceRequest = await ServiceRequests.findOne({
+    _id: requestId,
+    isDeleted: false,
+  })
     .populate(
       "tenantId",
       "name email phoneNumber profileImage bio preferredLocation emergencyContact",
@@ -665,7 +684,10 @@ const getServiceRequestsByProperty = async (
   const sortOrder = options.sortOrder === "asc" ? 1 : -1;
 
   // Build filter conditions
-  const filterConditions: Record<string, unknown> = { propertyId };
+  const filterConditions: Record<string, unknown> = {
+    propertyId,
+    isDeleted: false,
+  };
 
   // Add additional filters
   if (filters.status) {
@@ -729,7 +751,10 @@ const getServiceRequestsByTenant = async (
   const sortOrder = options.sortOrder === "asc" ? 1 : -1;
 
   // Build filter conditions
-  const filterConditions: Record<string, unknown> = { tenantId };
+  const filterConditions: Record<string, unknown> = {
+    tenantId,
+    isDeleted: false,
+  };
 
   // Add additional filters
   if (filters.status) {
@@ -785,6 +810,7 @@ const getUrgentServiceRequests = async (options: any) => {
   const filterConditions = {
     priority: { $in: ["HIGH", "URGENT"] },
     status: { $ne: "COMPLETED" },
+    isDeleted: false,
   };
 
   const serviceRequests = await ServiceRequests.find(filterConditions)
@@ -819,19 +845,25 @@ const getUrgentServiceRequests = async (options: any) => {
 
 // Get service request dashboard statistics (Admin only)
 const getServiceRequestDashboardStats = async () => {
-  const totalRequests = await ServiceRequests.countDocuments();
+  const totalRequests = await ServiceRequests.countDocuments({
+    isDeleted: false,
+  });
   const pendingRequests = await ServiceRequests.countDocuments({
     status: "PENDING",
+    isDeleted: false,
   });
   const inProgressRequests = await ServiceRequests.countDocuments({
     status: "IN_PROGRESS",
+    isDeleted: false,
   });
   const completedRequests = await ServiceRequests.countDocuments({
     status: "COMPLETED",
+    isDeleted: false,
   });
   const urgentRequests = await ServiceRequests.countDocuments({
     priority: "URGENT",
     status: { $ne: "COMPLETED" },
+    isDeleted: false,
   });
 
   return {
@@ -853,7 +885,7 @@ const getAllUsers = async (adminId: string): Promise<IUser[]> => {
     );
   }
 
-  const users = await Users.find({})
+  const users = await Users.find({ isDeleted: false })
     .select("-password")
     .sort({ createdAt: -1 });
   return users;
@@ -872,7 +904,9 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     );
   }
 
-  const user = await Users.findById(userId).select("-password");
+  const user = await Users.findOne({ _id: userId, isDeleted: false }).select(
+    "-password",
+  );
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
@@ -905,7 +939,7 @@ const updateUser = async (
     );
   }
 
-  const user = await Users.findById(userId);
+  const user = await Users.findOne({ _id: userId, isDeleted: false });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
@@ -956,7 +990,7 @@ const deleteUser = async (
     );
   }
 
-  const user = await Users.findById(userId);
+  const user = await Users.findOne({ _id: userId, isDeleted: false });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
@@ -995,7 +1029,10 @@ const archiveProperty = async (
     );
   }
 
-  const property = await Properties.findById(propertyId);
+  const property = await Properties.findOne({
+    _id: propertyId,
+    isDeleted: false,
+  });
   if (!property) {
     throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
   }
@@ -1048,13 +1085,15 @@ const restoreProperty = async (
     );
   }
 
-  const property = await Properties.findById(propertyId);
+  const property = await Properties.findOne({
+    _id: propertyId,
+    isDeleted: true,
+  });
   if (!property) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
-  }
-
-  if (!property.isDeleted) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Property is not archived");
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      "Property not found or not archived",
+    );
   }
 
   await restoreRecord(Properties, propertyId, adminId);
@@ -1081,7 +1120,7 @@ const archiveSpot = async (
     );
   }
 
-  const spot = await Spots.findById(spotId);
+  const spot = await Spots.findOne({ _id: spotId, isDeleted: false });
   if (!spot) {
     throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
   }
@@ -1127,13 +1166,9 @@ const restoreSpot = async (
     );
   }
 
-  const spot = await Spots.findById(spotId);
+  const spot = await Spots.findOne({ _id: spotId, isDeleted: true });
   if (!spot) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found");
-  }
-
-  if (!spot.isDeleted) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Spot is not archived");
+    throw new ApiError(httpStatus.NOT_FOUND, "Spot not found or not archived");
   }
 
   await restoreRecord(Spots, spotId, adminId);

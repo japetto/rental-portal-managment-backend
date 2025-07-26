@@ -287,7 +287,7 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     );
   }
 
-  const user = await Users.findById(userId)
+  const user = await Users.findOne({ _id: userId, isDeleted: false })
     .select("-password")
     .populate({
       path: "propertyId",
@@ -301,10 +301,6 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
 
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
-  }
-
-  if (user.isDeleted) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User has been deleted");
   }
 
   return user;

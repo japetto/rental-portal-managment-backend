@@ -46,7 +46,7 @@ const getAllAnnouncements = async (
     );
   }
 
-  const announcements = await Announcements.find({})
+  const announcements = await Announcements.find({ isDeleted: false })
     .populate({
       path: "propertyId",
       select: "name description address",
@@ -68,6 +68,7 @@ const getActiveAnnouncements = async (
   // Build the base query for active, non-expired announcements
   const baseQuery: any = {
     isActive: true,
+    isDeleted: false, // Only get non-deleted announcements
     createdAt: { $lte: new Date() },
     $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
   };
@@ -109,7 +110,10 @@ const getAnnouncementById = async (
   announcementId: string,
   adminId?: string,
 ): Promise<IAnnouncement> => {
-  const announcement = await Announcements.findById(announcementId)
+  const announcement = await Announcements.findOne({
+    _id: announcementId,
+    isDeleted: false,
+  })
     .populate({
       path: "propertyId",
       select: "name description address",
@@ -243,7 +247,10 @@ const archiveAnnouncement = async (
     );
   }
 
-  const announcement = await Announcements.findById(announcementId);
+  const announcement = await Announcements.findOne({
+    _id: announcementId,
+    isDeleted: false,
+  });
   if (!announcement) {
     throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
   }
@@ -268,13 +275,15 @@ const restoreAnnouncement = async (
     );
   }
 
-  const announcement = await Announcements.findById(announcementId);
+  const announcement = await Announcements.findOne({
+    _id: announcementId,
+    isDeleted: true,
+  });
   if (!announcement) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
-  }
-
-  if (!announcement.isDeleted) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Announcement is not archived");
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      "Announcement not found or not archived",
+    );
   }
 
   await SoftDeleteUtils.restoreRecord(Announcements, announcementId, adminId);
@@ -324,6 +333,7 @@ const getAnnouncementsByProperty = async (
   }
 
   const announcements = await Announcements.find({
+    isDeleted: false,
     $or: [
       { propertyId: propertyId },
       { propertyId: null }, // System-wide announcements
@@ -355,7 +365,7 @@ const getAnnouncementsByType = async (
     );
   }
 
-  const announcements = await Announcements.find({ type })
+  const announcements = await Announcements.find({ type, isDeleted: false })
     .populate({
       path: "propertyId",
       select: "name description address",
@@ -382,7 +392,7 @@ const getAnnouncementsByPriority = async (
     );
   }
 
-  const announcements = await Announcements.find({ priority })
+  const announcements = await Announcements.find({ priority, isDeleted: false })
     .populate({
       path: "propertyId",
       select: "name description address",
@@ -409,6 +419,7 @@ const getUnreadAnnouncements = async (
   // Build the base query for active, non-expired, unread announcements
   const baseQuery: any = {
     isActive: true,
+    isDeleted: false, // Only get non-deleted announcements
     createdAt: { $lte: new Date() },
     $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
     readBy: { $ne: userId },

@@ -85,7 +85,10 @@ const getServiceRequestById = async (
     );
   }
 
-  const serviceRequest = await ServiceRequests.findById(requestId)
+  const serviceRequest = await ServiceRequests.findOne({
+    _id: requestId,
+    isDeleted: false,
+  })
     .populate("tenantId", "name email phoneNumber")
     .populate("propertyId", "name address")
     .populate("spotId", "spotNumber status");
@@ -119,7 +122,9 @@ const getServiceRequests = async (
   const sortOrder = options.sortOrder === "asc" ? 1 : -1;
 
   // Build filter conditions
-  const filterConditions: Record<string, unknown> = {};
+  const filterConditions: Record<string, unknown> = {
+    isDeleted: false, // Only get non-deleted records
+  };
 
   // Add filters
   if (filters.status) {
@@ -177,7 +182,10 @@ const updateServiceRequest = async (
     );
   }
 
-  const serviceRequest = await ServiceRequests.findById(requestId);
+  const serviceRequest = await ServiceRequests.findOne({
+    _id: requestId,
+    isDeleted: false,
+  });
   if (!serviceRequest) {
     throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
   }
@@ -248,7 +256,10 @@ const deleteServiceRequest = async (
     );
   }
 
-  const serviceRequest = await ServiceRequests.findById(requestId);
+  const serviceRequest = await ServiceRequests.findOne({
+    _id: requestId,
+    isDeleted: false,
+  });
   if (!serviceRequest) {
     throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
   }
@@ -341,7 +352,10 @@ const archiveServiceRequest = async (
     );
   }
 
-  const serviceRequest = await ServiceRequests.findById(requestId);
+  const serviceRequest = await ServiceRequests.findOne({
+    _id: requestId,
+    isDeleted: false,
+  });
   if (!serviceRequest) {
     throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
   }
@@ -382,9 +396,15 @@ const restoreServiceRequest = async (
     );
   }
 
-  const serviceRequest = await ServiceRequests.findById(requestId);
+  const serviceRequest = await ServiceRequests.findOne({
+    _id: requestId,
+    isDeleted: true,
+  });
   if (!serviceRequest) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Service request not found");
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      "Service request not found or not archived",
+    );
   }
 
   // Check access permissions
@@ -393,13 +413,6 @@ const restoreServiceRequest = async (
     serviceRequest.tenantId.toString() !== userId
   ) {
     throw new ApiError(httpStatus.FORBIDDEN, "Access denied");
-  }
-
-  if (!serviceRequest.isDeleted) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Service request is not archived",
-    );
   }
 
   await restoreRecord(ServiceRequests, requestId, userId);

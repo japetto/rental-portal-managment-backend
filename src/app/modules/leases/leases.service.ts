@@ -72,7 +72,9 @@ const getAllLeases = async (
     ...filtersData
   } = filters;
 
-  const andConditions = [];
+  const andConditions: any[] = [
+    { isDeleted: false }, // Only get non-deleted leases
+  ];
 
   if (searchTerm) {
     andConditions.push({
@@ -167,7 +169,7 @@ const getAllLeases = async (
 };
 
 const getLeaseById = async (id: string): Promise<ILease | null> => {
-  const lease = await Leases.findById(id)
+  const lease = await Leases.findOne({ _id: id, isDeleted: false })
     .populate(
       "tenantId",
       "name email phoneNumber profileImage bio preferredLocation",
@@ -192,7 +194,9 @@ const getLeasesByTenant = async (
 ) => {
   const { leaseStatus, leaseType, ...filtersData } = filters;
 
-  const andConditions: any[] = [];
+  const andConditions: any[] = [
+    { isDeleted: false }, // Only get non-deleted leases
+  ];
   andConditions.push({ tenantId: new Types.ObjectId(tenantId) });
   if (leaseStatus) {
     andConditions.push({ leaseStatus });
@@ -251,7 +255,7 @@ const updateLease = async (
   id: string,
   updateData: IUpdateLease,
 ): Promise<ILease | null> => {
-  const lease = await Leases.findById(id);
+  const lease = await Leases.findOne({ _id: id, isDeleted: false });
 
   if (!lease) {
     throw new ApiError(httpStatus.NOT_FOUND, "Lease not found");
@@ -317,7 +321,7 @@ const updateLease = async (
 };
 
 const deleteLease = async (id: string): Promise<ILease | null> => {
-  const lease = await Leases.findById(id);
+  const lease = await Leases.findOne({ _id: id, isDeleted: false });
 
   if (!lease) {
     throw new ApiError(httpStatus.NOT_FOUND, "Lease not found");
