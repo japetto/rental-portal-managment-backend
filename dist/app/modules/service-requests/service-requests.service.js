@@ -73,7 +73,10 @@ const getServiceRequestById = (requestId, userId, userRole) => __awaiter(void 0,
     if (!mongoose_1.default.Types.ObjectId.isValid(requestId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid service request ID format");
     }
-    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findById(requestId)
+    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findOne({
+        _id: requestId,
+        isDeleted: false,
+    })
         .populate("tenantId", "name email phoneNumber")
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status");
@@ -95,7 +98,9 @@ const getServiceRequests = (filters, options, userId, userRole) => __awaiter(voi
     const sortBy = options.sortBy || "requestedDate";
     const sortOrder = options.sortOrder === "asc" ? 1 : -1;
     // Build filter conditions
-    const filterConditions = {};
+    const filterConditions = {
+        isDeleted: false, // Only get non-deleted records
+    };
     // Add filters
     if (filters.status) {
         filterConditions.status = filters.status;
@@ -137,7 +142,10 @@ const updateServiceRequest = (requestId, payload, userId, userRole) => __awaiter
     if (!mongoose_1.default.Types.ObjectId.isValid(requestId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid service request ID format");
     }
-    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findById(requestId);
+    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findOne({
+        _id: requestId,
+        isDeleted: false,
+    });
     if (!serviceRequest) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Service request not found");
     }
@@ -171,7 +179,10 @@ const deleteServiceRequest = (requestId, userId, userRole) => __awaiter(void 0, 
     if (!mongoose_1.default.Types.ObjectId.isValid(requestId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid service request ID format");
     }
-    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findById(requestId);
+    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findOne({
+        _id: requestId,
+        isDeleted: false,
+    });
     if (!serviceRequest) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Service request not found");
     }
@@ -240,7 +251,10 @@ const archiveServiceRequest = (requestId, userId, userRole) => __awaiter(void 0,
     if (!mongoose_1.default.Types.ObjectId.isValid(requestId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid service request ID format");
     }
-    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findById(requestId);
+    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findOne({
+        _id: requestId,
+        isDeleted: false,
+    });
     if (!serviceRequest) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Service request not found");
     }
@@ -263,17 +277,17 @@ const restoreServiceRequest = (requestId, userId, userRole) => __awaiter(void 0,
     if (!mongoose_1.default.Types.ObjectId.isValid(requestId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid service request ID format");
     }
-    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findById(requestId);
+    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findOne({
+        _id: requestId,
+        isDeleted: true,
+    });
     if (!serviceRequest) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Service request not found");
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Service request not found or not archived");
     }
     // Check access permissions
     if (userRole !== "SUPER_ADMIN" &&
         serviceRequest.tenantId.toString() !== userId) {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Access denied");
-    }
-    if (!serviceRequest.isDeleted) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Service request is not archived");
     }
     yield (0, softDeleteUtils_1.restoreRecord)(service_requests_schema_1.ServiceRequests, requestId, userId);
     return {

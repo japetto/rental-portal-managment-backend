@@ -103,7 +103,9 @@ const createProperty = (propertyData) => __awaiter(void 0, void 0, void 0, funct
     return property;
 });
 const getAllProperties = () => __awaiter(void 0, void 0, void 0, function* () {
-    const properties = yield properties_schema_1.Properties.find({}).sort({ createdAt: -1 });
+    const properties = yield properties_schema_1.Properties.find({ isDeleted: false }).sort({
+        createdAt: -1,
+    });
     const propertiesWithLotData = yield (0, properties_service_1.addLotDataToProperties)(properties);
     return propertiesWithLotData;
 });
@@ -111,7 +113,10 @@ const getPropertyById = (propertyId) => __awaiter(void 0, void 0, void 0, functi
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
     }
-    const property = yield properties_schema_1.Properties.findById(propertyId);
+    const property = yield properties_schema_1.Properties.findOne({
+        _id: propertyId,
+        isDeleted: false,
+    });
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
@@ -122,7 +127,10 @@ const updateProperty = (propertyId, updateData) => __awaiter(void 0, void 0, voi
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
     }
-    const property = yield properties_schema_1.Properties.findById(propertyId);
+    const property = yield properties_schema_1.Properties.findOne({
+        _id: propertyId,
+        isDeleted: false,
+    });
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
@@ -135,7 +143,10 @@ const deleteProperty = (propertyId) => __awaiter(void 0, void 0, void 0, functio
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
     }
-    const property = yield properties_schema_1.Properties.findById(propertyId);
+    const property = yield properties_schema_1.Properties.findOne({
+        _id: propertyId,
+        isDeleted: false,
+    });
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
@@ -205,12 +216,15 @@ const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, voi
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
     }
     // Check if property exists
-    const property = yield properties_schema_1.Properties.findById(propertyId);
+    const property = yield properties_schema_1.Properties.findOne({
+        _id: propertyId,
+        isDeleted: false,
+    });
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
     // Build query
-    const query = { propertyId };
+    const query = { propertyId, isDeleted: false };
     // Add status filter if provided
     if (status) {
         const validStatuses = ["AVAILABLE", "MAINTENANCE"];
@@ -226,7 +240,7 @@ const getSpotById = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(spotId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid spot ID format");
     }
-    const spot = yield spots_schema_1.Spots.findById(spotId);
+    const spot = yield spots_schema_1.Spots.findOne({ _id: spotId, isDeleted: false });
     if (!spot) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found");
     }
@@ -236,7 +250,7 @@ const updateSpot = (spotId, updateData) => __awaiter(void 0, void 0, void 0, fun
     if (!mongoose_1.default.Types.ObjectId.isValid(spotId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid spot ID format");
     }
-    const spot = yield spots_schema_1.Spots.findById(spotId);
+    const spot = yield spots_schema_1.Spots.findOne({ _id: spotId, isDeleted: false });
     if (!spot) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found");
     }
@@ -273,7 +287,7 @@ const deleteSpot = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(spotId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid spot ID format");
     }
-    const spot = yield spots_schema_1.Spots.findById(spotId);
+    const spot = yield spots_schema_1.Spots.findOne({ _id: spotId, isDeleted: false });
     if (!spot) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found");
     }
@@ -292,7 +306,7 @@ const deleteSpot = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
     });
 });
 const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
-    const tenants = yield users_schema_1.Users.find({ role: "TENANT" })
+    const tenants = yield users_schema_1.Users.find({ role: "TENANT", isDeleted: false })
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
         .sort({ createdAt: -1 });
@@ -319,7 +333,9 @@ const getAllServiceRequests = (filters, options) => __awaiter(void 0, void 0, vo
     const sortBy = options.sortBy || "requestedDate";
     const sortOrder = options.sortOrder === "asc" ? 1 : -1;
     // Build filter conditions
-    const filterConditions = {};
+    const filterConditions = {
+        isDeleted: false, // Only get non-deleted records
+    };
     // Add filters
     if (filters.status) {
         filterConditions.status = filters.status;
@@ -362,7 +378,10 @@ const getServiceRequestById = (requestId) => __awaiter(void 0, void 0, void 0, f
     if (!mongoose_1.default.Types.ObjectId.isValid(requestId)) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid service request ID format");
     }
-    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findById(requestId)
+    const serviceRequest = yield service_requests_schema_1.ServiceRequests.findOne({
+        _id: requestId,
+        isDeleted: false,
+    })
         .populate("tenantId", "name email phoneNumber profileImage bio preferredLocation emergencyContact")
         .populate("propertyId", "name description address amenities totalLots availableLots isActive images rules")
         .populate("spotId", "spotNumber status size amenities hookups price description images isActive");
@@ -422,7 +441,10 @@ const getServiceRequestsByProperty = (propertyId, filters, options) => __awaiter
     const sortBy = options.sortBy || "requestedDate";
     const sortOrder = options.sortOrder === "asc" ? 1 : -1;
     // Build filter conditions
-    const filterConditions = { propertyId };
+    const filterConditions = {
+        propertyId,
+        isDeleted: false,
+    };
     // Add additional filters
     if (filters.status) {
         filterConditions.status = filters.status;
@@ -465,7 +487,10 @@ const getServiceRequestsByTenant = (tenantId, filters, options) => __awaiter(voi
     const sortBy = options.sortBy || "requestedDate";
     const sortOrder = options.sortOrder === "asc" ? 1 : -1;
     // Build filter conditions
-    const filterConditions = { tenantId };
+    const filterConditions = {
+        tenantId,
+        isDeleted: false,
+    };
     // Add additional filters
     if (filters.status) {
         filterConditions.status = filters.status;
@@ -505,6 +530,7 @@ const getUrgentServiceRequests = (options) => __awaiter(void 0, void 0, void 0, 
     const filterConditions = {
         priority: { $in: ["HIGH", "URGENT"] },
         status: { $ne: "COMPLETED" },
+        isDeleted: false,
     };
     const serviceRequests = yield service_requests_schema_1.ServiceRequests.find(filterConditions)
         .populate("tenantId", "name email phoneNumber profileImage bio preferredLocation emergencyContact")
@@ -526,19 +552,25 @@ const getUrgentServiceRequests = (options) => __awaiter(void 0, void 0, void 0, 
 });
 // Get service request dashboard statistics (Admin only)
 const getServiceRequestDashboardStats = () => __awaiter(void 0, void 0, void 0, function* () {
-    const totalRequests = yield service_requests_schema_1.ServiceRequests.countDocuments();
+    const totalRequests = yield service_requests_schema_1.ServiceRequests.countDocuments({
+        isDeleted: false,
+    });
     const pendingRequests = yield service_requests_schema_1.ServiceRequests.countDocuments({
         status: "PENDING",
+        isDeleted: false,
     });
     const inProgressRequests = yield service_requests_schema_1.ServiceRequests.countDocuments({
         status: "IN_PROGRESS",
+        isDeleted: false,
     });
     const completedRequests = yield service_requests_schema_1.ServiceRequests.countDocuments({
         status: "COMPLETED",
+        isDeleted: false,
     });
     const urgentRequests = yield service_requests_schema_1.ServiceRequests.countDocuments({
         priority: "URGENT",
         status: { $ne: "COMPLETED" },
+        isDeleted: false,
     });
     return {
         total: totalRequests,
@@ -554,7 +586,7 @@ const getAllUsers = (adminId) => __awaiter(void 0, void 0, void 0, function* () 
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view all users");
     }
-    const users = yield users_schema_1.Users.find({})
+    const users = yield users_schema_1.Users.find({ isDeleted: false })
         .select("-password")
         .sort({ createdAt: -1 });
     return users;
@@ -567,7 +599,7 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view user details");
     }
-    const user = yield users_schema_1.Users.findById(userId).select("-password");
+    const user = yield users_schema_1.Users.findOne({ _id: userId, isDeleted: false }).select("-password");
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
@@ -585,7 +617,7 @@ const updateUser = (userId, updateData, adminId) => __awaiter(void 0, void 0, vo
     if (userId === adminId) {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Cannot update your own account through this endpoint");
     }
-    const user = yield users_schema_1.Users.findById(userId);
+    const user = yield users_schema_1.Users.findOne({ _id: userId, isDeleted: false });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
@@ -619,7 +651,7 @@ const deleteUser = (userId, adminId) => __awaiter(void 0, void 0, void 0, functi
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can delete users");
     }
-    const user = yield users_schema_1.Users.findById(userId);
+    const user = yield users_schema_1.Users.findOne({ _id: userId, isDeleted: false });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
@@ -642,7 +674,10 @@ const archiveProperty = (propertyId, adminId) => __awaiter(void 0, void 0, void 
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can archive properties");
     }
-    const property = yield properties_schema_1.Properties.findById(propertyId);
+    const property = yield properties_schema_1.Properties.findOne({
+        _id: propertyId,
+        isDeleted: false,
+    });
     if (!property) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
     }
@@ -676,12 +711,12 @@ const restoreProperty = (propertyId, adminId) => __awaiter(void 0, void 0, void 
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can restore properties");
     }
-    const property = yield properties_schema_1.Properties.findById(propertyId);
+    const property = yield properties_schema_1.Properties.findOne({
+        _id: propertyId,
+        isDeleted: true,
+    });
     if (!property) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
-    }
-    if (!property.isDeleted) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Property is not archived");
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found or not archived");
     }
     yield (0, softDeleteUtils_1.restoreRecord)(properties_schema_1.Properties, propertyId, adminId);
     return {
@@ -697,7 +732,7 @@ const archiveSpot = (spotId, adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can archive spots");
     }
-    const spot = yield spots_schema_1.Spots.findById(spotId);
+    const spot = yield spots_schema_1.Spots.findOne({ _id: spotId, isDeleted: false });
     if (!spot) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found");
     }
@@ -727,12 +762,9 @@ const restoreSpot = (spotId, adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can restore spots");
     }
-    const spot = yield spots_schema_1.Spots.findById(spotId);
+    const spot = yield spots_schema_1.Spots.findOne({ _id: spotId, isDeleted: true });
     if (!spot) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found");
-    }
-    if (!spot.isDeleted) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Spot is not archived");
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Spot not found or not archived");
     }
     yield (0, softDeleteUtils_1.restoreRecord)(spots_schema_1.Spots, spotId, adminId);
     // Update property's available lots count

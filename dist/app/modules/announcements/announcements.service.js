@@ -68,7 +68,7 @@ const getAllAnnouncements = (adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view all announcements");
     }
-    const announcements = yield announcements_schema_1.Announcements.find({})
+    const announcements = yield announcements_schema_1.Announcements.find({ isDeleted: false })
         .populate({
         path: "propertyId",
         select: "name description address",
@@ -85,6 +85,7 @@ const getActiveAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0,
     // Build the base query for active, non-expired announcements
     const baseQuery = {
         isActive: true,
+        isDeleted: false, // Only get non-deleted announcements
         createdAt: { $lte: new Date() },
         $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
     };
@@ -114,7 +115,10 @@ const getActiveAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0,
 });
 //* Get Announcement by ID
 const getAnnouncementById = (announcementId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
-    const announcement = yield announcements_schema_1.Announcements.findById(announcementId)
+    const announcement = yield announcements_schema_1.Announcements.findOne({
+        _id: announcementId,
+        isDeleted: false,
+    })
         .populate({
         path: "propertyId",
         select: "name description address",
@@ -200,7 +204,10 @@ const archiveAnnouncement = (announcementId, adminId) => __awaiter(void 0, void 
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can archive announcements");
     }
-    const announcement = yield announcements_schema_1.Announcements.findById(announcementId);
+    const announcement = yield announcements_schema_1.Announcements.findOne({
+        _id: announcementId,
+        isDeleted: false,
+    });
     if (!announcement) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
     }
@@ -215,12 +222,12 @@ const restoreAnnouncement = (announcementId, adminId) => __awaiter(void 0, void 
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can restore announcements");
     }
-    const announcement = yield announcements_schema_1.Announcements.findById(announcementId);
+    const announcement = yield announcements_schema_1.Announcements.findOne({
+        _id: announcementId,
+        isDeleted: true,
+    });
     if (!announcement) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
-    }
-    if (!announcement.isDeleted) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Announcement is not archived");
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found or not archived");
     }
     yield SoftDeleteUtils.restoreRecord(announcements_schema_1.Announcements, announcementId, adminId);
     return {
@@ -252,6 +259,7 @@ const getAnnouncementsByProperty = (propertyId, adminId) => __awaiter(void 0, vo
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view property announcements");
     }
     const announcements = yield announcements_schema_1.Announcements.find({
+        isDeleted: false,
         $or: [
             { propertyId: propertyId },
             { propertyId: null }, // System-wide announcements
@@ -274,7 +282,7 @@ const getAnnouncementsByType = (type, adminId) => __awaiter(void 0, void 0, void
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can filter announcements");
     }
-    const announcements = yield announcements_schema_1.Announcements.find({ type })
+    const announcements = yield announcements_schema_1.Announcements.find({ type, isDeleted: false })
         .populate({
         path: "propertyId",
         select: "name description address",
@@ -292,7 +300,7 @@ const getAnnouncementsByPriority = (priority, adminId) => __awaiter(void 0, void
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can filter announcements");
     }
-    const announcements = yield announcements_schema_1.Announcements.find({ priority })
+    const announcements = yield announcements_schema_1.Announcements.find({ priority, isDeleted: false })
         .populate({
         path: "propertyId",
         select: "name description address",
@@ -313,6 +321,7 @@ const getUnreadAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0,
     // Build the base query for active, non-expired, unread announcements
     const baseQuery = {
         isActive: true,
+        isDeleted: false, // Only get non-deleted announcements
         createdAt: { $lte: new Date() },
         $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
         readBy: { $ne: userId },

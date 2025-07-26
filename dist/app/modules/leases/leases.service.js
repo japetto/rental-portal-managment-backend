@@ -50,7 +50,9 @@ const createLease = (leaseData) => __awaiter(void 0, void 0, void 0, function* (
 });
 const getAllLeases = (filters, paginationOptions) => __awaiter(void 0, void 0, void 0, function* () {
     const { searchTerm, leaseType, leaseStatus, propertyId, tenantId } = filters, filtersData = __rest(filters, ["searchTerm", "leaseType", "leaseStatus", "propertyId", "tenantId"]);
-    const andConditions = [];
+    const andConditions = [
+        { isDeleted: false }, // Only get non-deleted leases
+    ];
     if (searchTerm) {
         andConditions.push({
             $or: [
@@ -126,7 +128,7 @@ const getAllLeases = (filters, paginationOptions) => __awaiter(void 0, void 0, v
     };
 });
 const getLeaseById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const lease = yield leases_schema_1.Leases.findById(id)
+    const lease = yield leases_schema_1.Leases.findOne({ _id: id, isDeleted: false })
         .populate("tenantId", "name email phoneNumber profileImage bio preferredLocation")
         .populate("spotId", "spotNumber spotType")
         .populate("propertyId", "name address");
@@ -137,7 +139,9 @@ const getLeaseById = (id) => __awaiter(void 0, void 0, void 0, function* () {
 });
 const getLeasesByTenant = (tenantId, filters, paginationOptions) => __awaiter(void 0, void 0, void 0, function* () {
     const { leaseStatus, leaseType } = filters, filtersData = __rest(filters, ["leaseStatus", "leaseType"]);
-    const andConditions = [];
+    const andConditions = [
+        { isDeleted: false }, // Only get non-deleted leases
+    ];
     andConditions.push({ tenantId: new mongoose_1.Types.ObjectId(tenantId) });
     if (leaseStatus) {
         andConditions.push({ leaseStatus });
@@ -183,7 +187,7 @@ const getLeasesByTenant = (tenantId, filters, paginationOptions) => __awaiter(vo
 });
 const updateLease = (id, updateData) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const lease = yield leases_schema_1.Leases.findById(id);
+    const lease = yield leases_schema_1.Leases.findOne({ _id: id, isDeleted: false });
     if (!lease) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
     }
@@ -226,7 +230,7 @@ const updateLease = (id, updateData) => __awaiter(void 0, void 0, void 0, functi
     return updatedLease;
 });
 const deleteLease = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const lease = yield leases_schema_1.Leases.findById(id);
+    const lease = yield leases_schema_1.Leases.findOne({ _id: id, isDeleted: false });
     if (!lease) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
     }

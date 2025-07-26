@@ -223,7 +223,7 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view user details");
     }
-    const user = yield users_schema_1.Users.findById(userId)
+    const user = yield users_schema_1.Users.findOne({ _id: userId, isDeleted: false })
         .select("-password")
         .populate({
         path: "propertyId",
@@ -235,9 +235,6 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
-    }
-    if (user.isDeleted) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User has been deleted");
     }
     return user;
 });
