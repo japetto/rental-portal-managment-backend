@@ -64,6 +64,14 @@ export const usersSchema = new Schema<IUser>(
     },
     spotId: { type: Schema.Types.ObjectId, ref: "Spots", required: false },
     leaseId: { type: Schema.Types.ObjectId, ref: "Leases", required: false },
+    // RV Information (tenant's personal property)
+    rvInfo: {
+      make: { type: String, required: false },
+      model: { type: String, required: false },
+      year: { type: Number, required: false, min: 1900 },
+      length: { type: Number, required: false, min: 1 },
+      licensePlate: { type: String, required: false },
+    },
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },
@@ -98,6 +106,58 @@ usersSchema.pre("save", async function (next) {
   ) {
     this.password = await bcrypt.hash(this.password, Number(config.salt_round));
   }
+  next();
+});
+
+// Pre-save middleware for soft delete
+usersSchema.pre("save", function (next) {
+  if (this.isDeleted && !this.deletedAt) {
+    this.deletedAt = new Date();
+  }
+  next();
+});
+
+// Pre-save middleware for validation
+usersSchema.pre("save", async function (next) {
+  // Validate that if propertyId is set, it exists
+  if (this.propertyId) {
+    const { Properties } = await import("../properties/properties.schema");
+    const property = await Properties.findById(this.propertyId);
+    if (!property || property.isDeleted) {
+      return next(new Error("Invalid property ID or property is deleted"));
+    }
+  }
+
+  // Validate that if spotId is set, it exists and belongs to the property
+  if (this.spotId) {
+    const { Spots } = await import("../spots/spots.schema");
+    const spot = await Spots.findById(this.spotId);
+    if (!spot || spot.isDeleted) {
+      return next(new Error("Invalid spot ID or spot is deleted"));
+    }
+
+    // If both propertyId and spotId are set, validate they match
+    if (
+      this.propertyId &&
+      spot.propertyId.toString() !== this.propertyId.toString()
+    ) {
+      return next(new Error("Spot does not belong to the assigned property"));
+    }
+  }
+
+  // Validate that if leaseId is set, it exists and belongs to this tenant
+  if (this.leaseId) {
+    const { Leases } = await import("../leases/leases.schema");
+    const lease = await Leases.findById(this.leaseId);
+    if (!lease || lease.isDeleted) {
+      return next(new Error("Invalid lease ID or lease is deleted"));
+    }
+
+    if ((lease.tenantId as any).toString() !== (this._id as any).toString()) {
+      return next(new Error("Lease does not belong to this tenant"));
+    }
+  }
+
   next();
 });
 

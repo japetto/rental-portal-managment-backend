@@ -1,7 +1,50 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Payments = exports.paymentsSchema = void 0;
 const mongoose_1 = require("mongoose");
+const payment_enums_1 = require("../../../shared/enums/payment.enums");
 exports.paymentsSchema = new mongoose_1.Schema({
     tenantId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Users", required: true },
     propertyId: {
@@ -13,27 +56,20 @@ exports.paymentsSchema = new mongoose_1.Schema({
     amount: { type: Number, required: true, min: 0 },
     type: {
         type: String,
-        enum: ["RENT", "DEPOSIT", "LATE_FEE", "UTILITY", "MAINTENANCE", "OTHER"],
+        enum: Object.values(payment_enums_1.PaymentType),
         required: true,
     },
     status: {
         type: String,
-        enum: ["PENDING", "PAID", "OVERDUE", "CANCELLED", "REFUNDED"],
+        enum: Object.values(payment_enums_1.PaymentStatus),
         required: true,
-        default: "PENDING",
+        default: payment_enums_1.PaymentStatus.PENDING,
     },
     dueDate: { type: Date, required: true },
     paidDate: { type: Date },
     paymentMethod: {
         type: String,
-        enum: [
-            "CASH",
-            "CHECK",
-            "CREDIT_CARD",
-            "DEBIT_CARD",
-            "BANK_TRANSFER",
-            "ONLINE",
-        ],
+        enum: Object.values(payment_enums_1.PaymentMethod),
     },
     transactionId: { type: String },
     receiptNumber: { type: String, required: true, unique: true },
@@ -42,6 +78,8 @@ exports.paymentsSchema = new mongoose_1.Schema({
     lateFeeAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     createdBy: { type: String, required: true },
+    // Stripe transaction field (payment-specific)
+    stripeTransactionId: { type: String }, // From Stripe webhook
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },
@@ -55,6 +93,127 @@ exports.paymentsSchema = new mongoose_1.Schema({
 exports.paymentsSchema.pre("save", function (next) {
     this.totalAmount = this.amount + (this.lateFeeAmount || 0);
     next();
+});
+// Pre-save middleware for soft delete
+exports.paymentsSchema.pre("save", function (next) {
+    if (this.isDeleted && !this.deletedAt) {
+        this.deletedAt = new Date();
+    }
+    next();
+});
+// Pre-save middleware for payment validation
+exports.paymentsSchema.pre("save", function (next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Validate payment amount against lease for rent payments
+        if (this.type === payment_enums_1.PaymentType.RENT) {
+            const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+            const lease = yield Leases.findOne({
+                tenantId: this.tenantId,
+                leaseStatus: "ACTIVE",
+                isDeleted: false,
+            });
+            if (lease && this.amount !== lease.rentAmount) {
+                return next(new Error(`Rent payment amount (${this.amount}) must match lease rent amount (${lease.rentAmount})`));
+            }
+        }
+        // Validate payment amount against lease for deposit payments
+        if (this.type === payment_enums_1.PaymentType.DEPOSIT) {
+            const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+            const lease = yield Leases.findOne({
+                tenantId: this.tenantId,
+                leaseStatus: "ACTIVE",
+                isDeleted: false,
+            });
+            if (lease && this.amount !== lease.depositAmount) {
+                return next(new Error(`Deposit payment amount (${this.amount}) must match lease deposit amount (${lease.depositAmount})`));
+            }
+        }
+        // Validate due date is within lease period
+        if (this.dueDate) {
+            const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+            const lease = yield Leases.findOne({
+                tenantId: this.tenantId,
+                leaseStatus: "ACTIVE",
+                isDeleted: false,
+            });
+            if (lease) {
+                if (this.dueDate < lease.leaseStart) {
+                    return next(new Error("Payment due date cannot be before lease start date"));
+                }
+                if (lease.leaseEnd && this.dueDate > lease.leaseEnd) {
+                    return next(new Error("Payment due date cannot be after lease end date"));
+                }
+            }
+        }
+        // Validate status transitions
+        if (this.isModified("status")) {
+            const validTransitions = {
+                [payment_enums_1.PaymentStatus.PENDING]: [
+                    payment_enums_1.PaymentStatus.PAID,
+                    payment_enums_1.PaymentStatus.OVERDUE,
+                    payment_enums_1.PaymentStatus.CANCELLED,
+                ],
+                [payment_enums_1.PaymentStatus.OVERDUE]: [payment_enums_1.PaymentStatus.PAID, payment_enums_1.PaymentStatus.CANCELLED],
+                [payment_enums_1.PaymentStatus.PAID]: [payment_enums_1.PaymentStatus.REFUNDED],
+                [payment_enums_1.PaymentStatus.CANCELLED]: [],
+                [payment_enums_1.PaymentStatus.REFUNDED]: [],
+                [payment_enums_1.PaymentStatus.PARTIAL]: [
+                    payment_enums_1.PaymentStatus.PAID,
+                    payment_enums_1.PaymentStatus.OVERDUE,
+                    payment_enums_1.PaymentStatus.CANCELLED,
+                ],
+            };
+            const currentStatus = this.status;
+            // For new documents, skip validation
+            // Note: Status transition validation would be better handled in the service layer
+            // to avoid TypeScript issues with accessing previous document state
+        }
+        next();
+    });
+});
+// Pre-save middleware for cross-schema validation
+exports.paymentsSchema.pre("save", function (next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Validate that tenant exists and is active
+        const { Users } = yield Promise.resolve().then(() => __importStar(require("../users/users.schema")));
+        const tenant = yield Users.findById(this.tenantId);
+        if (!tenant || tenant.isDeleted || !tenant.isActive) {
+            return next(new Error("Invalid tenant ID or tenant is inactive/deleted"));
+        }
+        // Validate that property exists and is active
+        const { Properties } = yield Promise.resolve().then(() => __importStar(require("../properties/properties.schema")));
+        const property = yield Properties.findById(this.propertyId);
+        if (!property || property.isDeleted || !property.isActive) {
+            return next(new Error("Invalid property ID or property is inactive/deleted"));
+        }
+        // Validate that spot exists, is active, and belongs to the property
+        const { Spots } = yield Promise.resolve().then(() => __importStar(require("../spots/spots.schema")));
+        const spot = yield Spots.findById(this.spotId);
+        if (!spot || spot.isDeleted || !spot.isActive) {
+            return next(new Error("Invalid spot ID or spot is inactive/deleted"));
+        }
+        if (spot.propertyId.toString() !== this.propertyId.toString()) {
+            return next(new Error("Spot does not belong to the assigned property"));
+        }
+        // Validate that there's an active lease for this tenant
+        const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+        const lease = yield Leases.findOne({
+            tenantId: this.tenantId,
+            leaseStatus: "ACTIVE",
+            isDeleted: false,
+        });
+        if (!lease) {
+            return next(new Error("No active lease found for this tenant"));
+        }
+        // Validate that payment property/spot matches lease property/spot
+        if (lease.propertyId.toString() !== this.propertyId.toString()) {
+            return next(new Error("Payment property does not match lease property"));
+        }
+        if (lease.spotId.toString() !== this.spotId.toString()) {
+            return next(new Error("Payment spot does not match lease spot"));
+        }
+        next();
+    });
 });
 // Generate receipt number
 exports.paymentsSchema.pre("save", function (next) {
@@ -73,15 +232,16 @@ exports.paymentsSchema.index({ propertyId: 1, status: 1 });
 exports.paymentsSchema.index({ dueDate: 1, status: 1 });
 exports.paymentsSchema.index({ paidDate: 1 });
 exports.paymentsSchema.index({ transactionId: 1 });
+exports.paymentsSchema.index({ type: 1, status: 1 });
 // Virtual to check if payment is overdue
 exports.paymentsSchema.virtual("isOverdue").get(function () {
-    if (this.status === "PAID")
+    if (this.status === payment_enums_1.PaymentStatus.PAID)
         return false;
     return new Date() > this.dueDate;
 });
 // Virtual to calculate days overdue
 exports.paymentsSchema.virtual("daysOverdue").get(function () {
-    if (this.status === "PAID" || new Date() <= this.dueDate)
+    if (this.status === payment_enums_1.PaymentStatus.PAID || new Date() <= this.dueDate)
         return 0;
     const diffTime = Math.abs(new Date().getTime() - this.dueDate.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));

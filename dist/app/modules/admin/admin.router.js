@@ -17,6 +17,7 @@ router.post("/invite-tenant", (0, zodValidationRequest_1.default)(admin_validati
 // Get all tenants
 router.get("/tenants", admin_controller_1.AdminController.getAllTenants);
 // Property management routes
+// Create a property
 router.post("/properties", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.createPropertyValidationSchema), admin_controller_1.AdminController.createProperty);
 // Get all properties
 router.get("/properties", admin_controller_1.AdminController.getAllProperties);

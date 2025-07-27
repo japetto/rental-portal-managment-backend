@@ -1,10 +1,9 @@
 import { Document, Types } from "mongoose";
-
-export type LeaseStatus = "ACTIVE" | "EXPIRED" | "CANCELLED" | "PENDING";
-
-export type PaymentStatus = "PAID" | "PENDING" | "OVERDUE" | "PARTIAL";
-
-export type LeaseType = "MONTHLY" | "FIXED_TERM";
+import {
+  LeaseStatus,
+  LeaseType,
+  PaymentStatus,
+} from "../../../shared/enums/payment.enums";
 
 export interface ILease extends Document {
   tenantId: Types.ObjectId; // Reference to User
@@ -15,7 +14,6 @@ export interface ILease extends Document {
   leaseEnd?: Date; // Optional for monthly leases (ongoing)
   rentAmount: number;
   depositAmount: number;
-  paymentStatus: PaymentStatus;
   leaseStatus: LeaseStatus;
   occupants: number;
   pets: {
@@ -26,13 +24,6 @@ export interface ILease extends Document {
       name: string;
       weight: number;
     }[];
-  };
-  rvInfo: {
-    make: string;
-    model: string;
-    year: number;
-    length: number;
-    licensePlate: string;
   };
   emergencyContact: {
     name: string;
@@ -50,6 +41,7 @@ export interface ILease extends Document {
   // Virtual properties
   durationDays: number;
   isLeaseActive: boolean;
+  paymentStatus: PaymentStatus; // Virtual property calculated from payments
 }
 
 export interface ICreateLease {
@@ -71,13 +63,6 @@ export interface ICreateLease {
       weight: number;
     }[];
   };
-  rvInfo: {
-    make: string;
-    model: string;
-    year: number;
-    length: number;
-    licensePlate: string;
-  };
   emergencyContact: {
     name: string;
     phone: string;
@@ -94,7 +79,6 @@ export interface IUpdateLease {
   leaseEnd?: Date;
   rentAmount?: number;
   depositAmount?: number;
-  paymentStatus?: PaymentStatus;
   leaseStatus?: LeaseStatus;
   occupants?: number;
   pets?: {
@@ -105,13 +89,6 @@ export interface IUpdateLease {
       name: string;
       weight: number;
     }[];
-  };
-  rvInfo?: {
-    make?: string;
-    model?: string;
-    year?: number;
-    length?: number;
-    licensePlate?: string;
   };
   emergencyContact?: {
     name?: string;

@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
 const http_status_1 = __importDefault(require("http-status"));
-const router_1 = require("./app/routes/router");
+const router_1 = __importDefault(require("./app/routes/router"));
 const pathNotFoundErrorHandler_1 = __importDefault(require("./errors/pathNotFoundErrorHandler"));
 const globalErrorHandler_1 = __importDefault(require("./middlewares/globalErrorHandler"));
 const app = (0, express_1.default)();
@@ -31,7 +31,7 @@ app.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     });
 }));
 //* Main endpoint
-app.use("/api/v1.0", router_1.Routers);
+app.use("/api/v1.0", router_1.default);
 //* Global error Handler
 app.use(globalErrorHandler_1.default);
 //* Path Not Found Error Handler

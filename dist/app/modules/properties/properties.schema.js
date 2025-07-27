@@ -10,7 +10,7 @@ exports.propertiesSchema = new mongoose_1.Schema({
         city: { type: String, required: true },
         state: { type: String, required: true },
         zip: { type: String, required: true },
-        country: { type: String, required: true, default: "USA" },
+        country: { type: String, required: false },
     },
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],

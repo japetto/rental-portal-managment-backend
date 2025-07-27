@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -51,14 +84,26 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
     // Check if user already exists with this email
     const existingUser = yield users_schema_1.Users.findOne({ email: inviteData.email });
     if (existingUser) {
-        throw new ApiError_1.default(http_status_1.default.CONFLICT, "User with this email already exists");
+        if (existingUser.isDeleted) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with email "${inviteData.email}" was previously deleted. Please restore the existing account or use a different email address.`);
+        }
+        if (!existingUser.isActive) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with email "${inviteData.email}" exists but is currently deactivated. Please reactivate the existing account or use a different email address.`);
+        }
+        throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with email "${inviteData.email}" already exists in the system. Please use a different email address or contact the existing tenant.`);
     }
     // Check if user already exists with this phone number
     const existingUserByPhone = yield users_schema_1.Users.findOne({
         phoneNumber: inviteData.phoneNumber,
     });
     if (existingUserByPhone) {
-        throw new ApiError_1.default(http_status_1.default.CONFLICT, "User with this phone number already exists");
+        if (existingUserByPhone.isDeleted) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with phone number "${inviteData.phoneNumber}" was previously deleted. Please restore the existing account or use a different phone number.`);
+        }
+        if (!existingUserByPhone.isActive) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with phone number "${inviteData.phoneNumber}" exists but is currently deactivated. Please reactivate the existing account or use a different phone number.`);
+        }
+        throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with phone number "${inviteData.phoneNumber}" already exists in the system. Please use a different phone number or contact the existing tenant.`);
     }
     // Check if spot is already assigned to another user
     const existingSpotUser = yield users_schema_1.Users.findOne({ spotId: inviteData.spotId });
@@ -309,10 +354,21 @@ const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
     const tenants = yield users_schema_1.Users.find({ role: "TENANT", isDeleted: false })
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
+        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes")
         .sort({ createdAt: -1 });
-    // Transform the data to include lot number more prominently
+    // Transform the data to include lot number and lease info more prominently
     const tenantsWithLotNumber = tenants.map(tenant => {
         const tenantData = tenant.toObject();
+        // Add property info as a direct field for easier access
+        if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
+            tenantData.property = {
+                id: tenantData.propertyId._id,
+                name: tenantData.propertyId.name,
+                address: tenantData.propertyId.address,
+            };
+            // Remove the original propertyId to avoid duplication
+            delete tenantData.propertyId;
+        }
         // Add lot number as a direct field for easier access
         if (tenantData.spotId && typeof tenantData.spotId === "object") {
             tenantData.lotNumber = tenantData.spotId.spotNumber;
@@ -320,6 +376,33 @@ const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
             tenantData.lotSize = tenantData.spotId.size;
             tenantData.lotPrice = tenantData.spotId.price;
             tenantData.lotDescription = tenantData.spotId.description;
+            // Remove the original spotId to avoid duplication
+            delete tenantData.spotId;
+        }
+        // Add lease info as a direct field for easier access
+        if (tenantData.leaseId && typeof tenantData.leaseId === "object") {
+            tenantData.lease = {
+                id: tenantData.leaseId._id,
+                leaseType: tenantData.leaseId.leaseType,
+                leaseStart: tenantData.leaseId.leaseStart,
+                leaseEnd: tenantData.leaseId.leaseEnd,
+                rentAmount: tenantData.leaseId.rentAmount,
+                depositAmount: tenantData.leaseId.depositAmount,
+                leaseStatus: tenantData.leaseId.leaseStatus,
+                occupants: tenantData.leaseId.occupants,
+                pets: tenantData.leaseId.pets,
+                emergencyContact: tenantData.leaseId.emergencyContact,
+                specialRequests: tenantData.leaseId.specialRequests,
+                documents: tenantData.leaseId.documents,
+                notes: tenantData.leaseId.notes,
+            };
+            // Remove the original leaseId to avoid duplication
+            delete tenantData.leaseId;
+        }
+        else {
+            tenantData.lease = null;
+            // Remove the original leaseId to avoid duplication
+            delete tenantData.leaseId;
         }
         return tenantData;
     });
@@ -599,7 +682,11 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     if (!admin || admin.role !== "SUPER_ADMIN") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view user details");
     }
-    const user = yield users_schema_1.Users.findOne({ _id: userId, isDeleted: false }).select("-password");
+    const user = yield users_schema_1.Users.findOne({ _id: userId, isDeleted: false })
+        .select("-password")
+        .populate("propertyId", "name address")
+        .populate("spotId", "spotNumber status size price description")
+        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes");
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
@@ -787,11 +874,14 @@ const getArchivedProperties = (adminId) => __awaiter(void 0, void 0, void 0, fun
 });
 // Get archived spots
 const getArchivedSpots = (adminId) => __awaiter(void 0, void 0, void 0, function* () {
-    const admin = yield users_schema_1.Users.findById(adminId);
-    if (!admin || admin.role !== "SUPER_ADMIN") {
-        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can view archived spots");
-    }
-    return yield (0, softDeleteUtils_1.getDeletedRecords)(spots_schema_1.Spots);
+    const spots = yield spots_schema_1.Spots.find({
+        isDeleted: true,
+    }).populate("propertyId", "name");
+    return spots;
+});
+const createTestLease = (leaseData) => __awaiter(void 0, void 0, void 0, function* () {
+    const { LeasesService } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.service")));
+    return yield LeasesService.createLease(leaseData);
 });
 exports.AdminService = {
     inviteTenant,
@@ -824,4 +914,5 @@ exports.AdminService = {
     restoreSpot,
     getArchivedProperties,
     getArchivedSpots,
+    createTestLease,
 };

@@ -89,14 +89,26 @@ router.get("/me", userAuth, UserController.getMyProfile);
 // Get user's payment history
 router.get("/payment-history", userAuth, UserController.getPaymentHistory);
 
+// Get user's rent summary
+router.get("/rent-summary", userAuth, UserController.getRentSummary);
+
 // Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth, UserController.getUserById);
 
+// Update user info route
 router.patch(
   "/:userId",
   adminAuth,
   zodValidationRequest(UserValidation.updateUserInfoValidationSchema),
   UserController.updateUserInfo,
+);
+
+// Update tenant data route
+router.patch(
+  "/:userId/tenant-data",
+  adminAuth,
+  zodValidationRequest(UserValidation.updateTenantDataValidationSchema),
+  UserController.updateTenantData,
 );
 
 router.delete(

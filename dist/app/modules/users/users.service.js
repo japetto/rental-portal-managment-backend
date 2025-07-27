@@ -57,11 +57,27 @@ const users_utils_1 = require("./users.utils");
 //* User Register Custom
 const userRegister = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, phoneNumber } = payload;
-    const isExistsUser = yield users_schema_1.Users.findOne({
-        $or: [{ email }, { phoneNumber }],
-    });
-    if (isExistsUser) {
-        throw new ApiError_1.default(http_status_1.default.CONFLICT, "Email or Contact Already Exists");
+    // Check for existing user by email
+    const existingUserByEmail = yield users_schema_1.Users.findOne({ email });
+    if (existingUserByEmail) {
+        if (existingUserByEmail.isDeleted) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `An account with email "${email}" was previously deleted. Please contact administrator to restore your account or use a different email address.`);
+        }
+        if (!existingUserByEmail.isActive) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `An account with email "${email}" exists but is currently deactivated. Please contact administrator to reactivate your account.`);
+        }
+        throw new ApiError_1.default(http_status_1.default.CONFLICT, `An account with email "${email}" already exists. Please use a different email address or try logging in.`);
+    }
+    // Check for existing user by phone number
+    const existingUserByPhone = yield users_schema_1.Users.findOne({ phoneNumber });
+    if (existingUserByPhone) {
+        if (existingUserByPhone.isDeleted) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `An account with phone number "${phoneNumber}" was previously deleted. Please contact administrator to restore your account or use a different phone number.`);
+        }
+        if (!existingUserByPhone.isActive) {
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `An account with phone number "${phoneNumber}" exists but is currently deactivated. Please contact administrator to reactivate your account.`);
+        }
+        throw new ApiError_1.default(http_status_1.default.CONFLICT, `An account with phone number "${phoneNumber}" already exists. Please use a different phone number or try logging in.`);
     }
     // For regular user registration, set appropriate flags
     const userData = Object.assign(Object.assign({}, payload), { isInvited: false, isVerified: true });
@@ -74,6 +90,10 @@ const userLogin = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const isExists = yield users_schema_1.Users.findOne({ email: email }).select("+password");
     if (!isExists) {
         throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Invalid Email Or Password");
+    }
+    // Check if user is deleted or archived
+    if (isExists.isDeleted || !isExists.isActive) {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Account has been deactivated or deleted. Please contact administrator.");
     }
     // Check if user is invited but hasn't set password yet
     if (isExists.isInvited && (!isExists.password || isExists.password === "")) {
@@ -103,6 +123,10 @@ const setPassword = (payload) => __awaiter(void 0, void 0, void 0, function* () 
     const user = yield users_schema_1.Users.findOne({ email }).select("+password");
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    // Check if user is deleted or archived
+    if (user.isDeleted || !user.isActive) {
+        throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Account has been deactivated or deleted. Cannot set password.");
     }
     if (!user.isInvited) {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "User is not invited. Cannot set password.");
@@ -137,7 +161,13 @@ const updateUserInfo = (userId, payload, adminId) => __awaiter(void 0, void 0, v
             phoneNumber: payload.phoneNumber,
         });
         if (existingUser) {
-            throw new ApiError_1.default(http_status_1.default.CONFLICT, "Phone number already exists");
+            if (existingUser.isDeleted) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, `Phone number "${payload.phoneNumber}" belongs to a deleted account. Please use a different phone number or contact administrator to restore the deleted account.`);
+            }
+            if (!existingUser.isActive) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, `Phone number "${payload.phoneNumber}" belongs to a deactivated account. Please use a different phone number or contact administrator to reactivate the account.`);
+            }
+            throw new ApiError_1.default(http_status_1.default.CONFLICT, `Phone number "${payload.phoneNumber}" is already in use by another tenant. Please use a different phone number.`);
         }
     }
     const updatedUser = yield users_schema_1.Users.findByIdAndUpdate(userId, payload, {
@@ -148,6 +178,126 @@ const updateUserInfo = (userId, payload, adminId) => __awaiter(void 0, void 0, v
         throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to update user");
     }
     return updatedUser;
+});
+//* Update Tenant Data (Admin only)
+const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("🚀 ~ payload:", payload);
+    const user = yield users_schema_1.Users.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    // Check if the admin is trying to update themselves
+    const admin = yield users_schema_1.Users.findById(adminId);
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only super admins can update tenant information");
+    }
+    // Start a database transaction
+    const session = yield users_schema_1.Users.startSession();
+    session.startTransaction();
+    try {
+        let updatedUser = user;
+        let updatedLease = null;
+        // 1. Update user information if provided
+        if (payload.user) {
+            const userUpdateData = {};
+            if (payload.user.name)
+                userUpdateData.name = payload.user.name;
+            if (payload.user.phoneNumber)
+                userUpdateData.phoneNumber = payload.user.phoneNumber;
+            if (payload.user.email)
+                userUpdateData.email = payload.user.email;
+            if (payload.user.stripePaymentLinkId)
+                userUpdateData.stripePaymentLinkId = payload.user.stripePaymentLinkId;
+            if (payload.user.stripePaymentLinkUrl)
+                userUpdateData.stripePaymentLinkUrl = payload.user.stripePaymentLinkUrl;
+            if (payload.user.rvInfo)
+                userUpdateData.rvInfo = payload.user.rvInfo;
+            // Check for phone number uniqueness if being updated
+            if (payload.user.phoneNumber &&
+                payload.user.phoneNumber !== user.phoneNumber) {
+                const existingUser = yield users_schema_1.Users.findOne({
+                    phoneNumber: payload.user.phoneNumber,
+                    _id: { $ne: userId },
+                });
+                if (existingUser) {
+                    throw new ApiError_1.default(http_status_1.default.CONFLICT, `Phone number "${payload.user.phoneNumber}" is already in use by another tenant.`);
+                }
+            }
+            // Check for email uniqueness if being updated
+            if (payload.user.email && payload.user.email !== user.email) {
+                const existingUser = yield users_schema_1.Users.findOne({
+                    email: payload.user.email,
+                    _id: { $ne: userId },
+                });
+                if (existingUser) {
+                    throw new ApiError_1.default(http_status_1.default.CONFLICT, `Email "${payload.user.email}" is already in use by another tenant.`);
+                }
+            }
+            const result = yield users_schema_1.Users.findByIdAndUpdate(userId, userUpdateData, {
+                new: true,
+                runValidators: true,
+                session,
+            });
+            if (!result) {
+                throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to update user");
+            }
+            updatedUser = result;
+        }
+        // 2. Update lease if provided
+        if (payload.lease) {
+            const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+            console.log("🔍 User leaseId:", user.leaseId);
+            if (user.leaseId) {
+                // Update existing lease
+                console.log("📝 Updating existing lease...");
+                // Convert date strings to Date objects
+                const leaseUpdateData = Object.assign({}, payload.lease);
+                if (leaseUpdateData.leaseStart &&
+                    typeof leaseUpdateData.leaseStart === "string") {
+                    leaseUpdateData.leaseStart = new Date(leaseUpdateData.leaseStart);
+                }
+                if (leaseUpdateData.leaseEnd &&
+                    typeof leaseUpdateData.leaseEnd === "string") {
+                    leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
+                }
+                updatedLease = yield Leases.findByIdAndUpdate(user.leaseId, leaseUpdateData, { new: true, runValidators: false, session });
+                if (!updatedLease) {
+                    throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
+                }
+            }
+            else {
+                // Create new lease
+                console.log("🆕 Creating new lease...");
+                const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
+                    // Add default values for required fields
+                    leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, emergencyContact: payload.lease.emergencyContact || {
+                        name: "Emergency Contact",
+                        phone: "000-000-0000",
+                        relationship: "Other",
+                    } });
+                updatedLease = yield Leases.create([newLeaseData], { session });
+                updatedLease = updatedLease[0];
+                // Update user's leaseId
+                yield users_schema_1.Users.findByIdAndUpdate(userId, { leaseId: updatedLease._id }, { session });
+            }
+            console.log("✅ Lease updated/created:", updatedLease._id);
+        }
+        // Commit the transaction
+        yield session.commitTransaction();
+        return {
+            user: updatedUser,
+            lease: updatedLease,
+        };
+    }
+    catch (error) {
+        // Rollback the transaction
+        yield session.abortTransaction();
+        throw error;
+    }
+    finally {
+        // End the session
+        session.endSession();
+    }
 });
 //* Delete User (Super Admin only, cannot delete self)
 const deleteUser = (userId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -214,6 +364,10 @@ const getAllTenants = (adminId) => __awaiter(void 0, void 0, void 0, function* (
         .populate({
         path: "spotId",
         select: "spotNumber status size price description images isActive",
+    })
+        .populate({
+        path: "leaseId",
+        select: "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
     });
     return tenants;
 });
@@ -232,6 +386,10 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
         .populate({
         path: "spotId",
         select: "spotNumber status size price description images isActive",
+    })
+        .populate({
+        path: "leaseId",
+        select: "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
     });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
@@ -491,6 +649,7 @@ exports.UserService = {
     userLogin,
     setPassword,
     updateUserInfo,
+    updateTenantData,
     deleteUser,
     getAllUsers,
     getAllTenants,

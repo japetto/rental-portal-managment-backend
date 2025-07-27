@@ -8,7 +8,7 @@ export interface IProperty extends Document {
     city: string;
     state: string;
     zip: string;
-    country: string;
+    country?: string;
   };
   amenities: string[];
   images: string[];
@@ -33,7 +33,7 @@ export interface ICreateProperty {
     city: string;
     state: string;
     zip: string;
-    country: string;
+    country?: string;
   };
   amenities: string[];
   images?: string[];

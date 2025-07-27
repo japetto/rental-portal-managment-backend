@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserValidation = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
+exports.UserValidation = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateTenantDataValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
 const zod_1 = require("zod");
 const user_constant_1 = require("./user.constant");
 const usersZodSchema = zod_1.z.object({
@@ -144,6 +144,61 @@ exports.updateUserInfoValidationSchema = zod_1.z.object({
         profileImage: zod_1.z.string().optional(),
     }),
 });
+exports.updateTenantDataValidationSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        user: zod_1.z
+            .object({
+            name: zod_1.z.string().optional(),
+            phoneNumber: zod_1.z.string().optional(),
+            email: zod_1.z.string().email("Invalid email format").optional(),
+            stripePaymentLinkId: zod_1.z.string().optional(),
+            stripePaymentLinkUrl: zod_1.z.string().optional(),
+            rvInfo: zod_1.z
+                .object({
+                make: zod_1.z.string().optional(),
+                model: zod_1.z.string().optional(),
+                year: zod_1.z.number().optional(),
+                length: zod_1.z.number().optional(),
+                licensePlate: zod_1.z.string().optional(),
+            })
+                .optional(),
+        })
+            .optional(),
+        lease: zod_1.z
+            .object({
+            leaseType: zod_1.z.enum(["MONTHLY", "FIXED_TERM"]).optional(),
+            leaseStart: zod_1.z.string().optional(), // Will be converted to Date
+            leaseEnd: zod_1.z.string().optional(), // Will be converted to Date
+            rentAmount: zod_1.z.number().optional(),
+            depositAmount: zod_1.z.number().optional(),
+            occupants: zod_1.z.number().optional(),
+            pets: zod_1.z
+                .object({
+                hasPets: zod_1.z.boolean().optional(),
+                petDetails: zod_1.z
+                    .array(zod_1.z.object({
+                    type: zod_1.z.string(),
+                    breed: zod_1.z.string(),
+                    name: zod_1.z.string(),
+                    weight: zod_1.z.number(),
+                }))
+                    .optional(),
+            })
+                .optional(),
+            emergencyContact: zod_1.z
+                .object({
+                name: zod_1.z.string().optional(),
+                phone: zod_1.z.string().optional(),
+                relationship: zod_1.z.string().optional(),
+            })
+                .optional(),
+            specialRequests: zod_1.z.array(zod_1.z.string()).optional(),
+            documents: zod_1.z.array(zod_1.z.string()).optional(),
+            notes: zod_1.z.string().optional(),
+        })
+            .optional(),
+    }),
+});
 exports.deleteUserValidationSchema = zod_1.z.object({
     params: zod_1.z.object({
         userId: zod_1.z.string().min(1, "User ID is required"),
@@ -161,6 +216,7 @@ exports.UserValidation = {
     updatePasswordZodSchema,
     setPasswordValidationSchema: exports.setPasswordValidationSchema,
     updateUserInfoValidationSchema: exports.updateUserInfoValidationSchema,
+    updateTenantDataValidationSchema: exports.updateTenantDataValidationSchema,
     deleteUserValidationSchema: exports.deleteUserValidationSchema,
     getUserAnnouncementsValidationSchema: exports.getUserAnnouncementsValidationSchema,
 };

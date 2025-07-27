@@ -28,6 +28,7 @@ const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = require("mongoose");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const paginationHelpers_1 = require("../../../helpers/paginationHelpers");
+const payment_enums_1 = require("../../../shared/enums/payment.enums");
 const leases_schema_1 = require("./leases.schema");
 const createLease = (leaseData) => __awaiter(void 0, void 0, void 0, function* () {
     // Validate lease type and end date logic
@@ -44,7 +45,7 @@ const createLease = (leaseData) => __awaiter(void 0, void 0, void 0, function* (
     }
     // Set default lease status based on start date
     const now = new Date();
-    const leaseStatus = leaseData.leaseStart <= now ? "ACTIVE" : "PENDING";
+    const leaseStatus = leaseData.leaseStart <= now ? payment_enums_1.LeaseStatus.ACTIVE : payment_enums_1.LeaseStatus.PENDING;
     const lease = yield leases_schema_1.Leases.create(Object.assign(Object.assign({}, leaseData), { leaseStatus, paymentStatus: "PENDING" }));
     return lease;
 });
@@ -211,13 +212,13 @@ const updateLease = (id, updateData) => __awaiter(void 0, void 0, void 0, functi
         const endDate = updateData.leaseEnd || lease.leaseEnd;
         const now = new Date();
         if (startDate <= now && (!endDate || endDate >= now)) {
-            updateData.leaseStatus = "ACTIVE";
+            updateData.leaseStatus = payment_enums_1.LeaseStatus.ACTIVE;
         }
         else if (endDate && endDate < now) {
-            updateData.leaseStatus = "EXPIRED";
+            updateData.leaseStatus = payment_enums_1.LeaseStatus.EXPIRED;
         }
         else if (startDate > now) {
-            updateData.leaseStatus = "PENDING";
+            updateData.leaseStatus = payment_enums_1.LeaseStatus.PENDING;
         }
     }
     const updatedLease = yield leases_schema_1.Leases.findByIdAndUpdate(id, updateData, {

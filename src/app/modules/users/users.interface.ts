@@ -26,6 +26,14 @@ export interface IUser extends Document {
   propertyId?: Types.ObjectId; // Which property the tenant belongs to
   spotId?: Types.ObjectId; // Which spot the tenant is assigned to
   leaseId?: Types.ObjectId; // Reference to active lease
+  // RV Information (tenant's personal property)
+  rvInfo?: {
+    make: string;
+    model: string;
+    year: number;
+    length: number;
+    licensePlate: string;
+  };
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -106,6 +114,48 @@ export interface IUpdateUserInfo {
   preferredLocation?: string;
   bio?: string;
   profileImage?: string;
+}
+
+export interface IUpdateTenantData {
+  user?: {
+    name?: string;
+    phoneNumber?: string;
+    email?: string;
+    stripePaymentLinkId?: string;
+    stripePaymentLinkUrl?: string;
+    rvInfo?: {
+      make: string;
+      model: string;
+      year: number;
+      length: number;
+      licensePlate: string;
+    };
+  };
+  lease?: {
+    leaseType?: "MONTHLY" | "FIXED_TERM";
+    leaseStart?: Date;
+    leaseEnd?: Date;
+    rentAmount?: number;
+    depositAmount?: number;
+    occupants?: number;
+    pets?: {
+      hasPets: boolean;
+      petDetails?: {
+        type: string;
+        breed: string;
+        name: string;
+        weight: number;
+      }[];
+    };
+    emergencyContact?: {
+      name: string;
+      phone: string;
+      relationship: string;
+    };
+    specialRequests?: string[];
+    documents?: string[];
+    notes?: string;
+  };
 }
 
 export interface IDeleteUser {

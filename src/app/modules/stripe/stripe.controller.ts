@@ -27,9 +27,11 @@ export class StripeController {
       }
 
       res.json({ received: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Webhook error:", error);
-      res.status(400).send(`Webhook Error: ${error.message}`);
+      res
+        .status(400)
+        .send(`Webhook Error: ${error.message || "Unknown error"}`);
     }
   });
 
@@ -37,9 +39,10 @@ export class StripeController {
     const stripeService = new StripeService();
 
     try {
-      // Find user by payment link
+      // Find user by payment link - use metadata or other identifier
       const user = await Users.findOne({
-        stripePaymentLinkId: paymentIntent.payment_link,
+        stripePaymentLinkId:
+          (paymentIntent as any).payment_link || paymentIntent.id,
       });
 
       if (!user) {
@@ -47,16 +50,19 @@ export class StripeController {
       }
 
       // Create payment record with error handling
-      await stripeService.createPaymentFromStripe(paymentIntent, user._id);
+      await stripeService.createPaymentFromStripe(
+        paymentIntent,
+        (user as any)._id.toString(),
+      );
 
       console.log(
-        `Payment successful for user ${user._id}: ${paymentIntent.id}`,
+        `Payment successful for user ${(user as any)._id.toString()}: ${paymentIntent.id}`,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("Payment success handling error:", error);
 
       // If property not found, cancel payment
-      if (error.message.includes("Property not found")) {
+      if (error.message && error.message.includes("Property not found")) {
         await stripeService.cancelPaymentIntent(paymentIntent.id);
       }
 
@@ -67,9 +73,10 @@ export class StripeController {
   static async handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
     console.log("Payment failed:", paymentIntent.id);
 
-    // Find user by payment link
+    // Find user by payment link - use metadata or other identifier
     const user = await Users.findOne({
-      stripePaymentLinkId: paymentIntent.payment_link,
+      stripePaymentLinkId:
+        (paymentIntent as any).payment_link || paymentIntent.id,
     });
 
     if (user) {
@@ -97,9 +104,10 @@ export class StripeController {
   static async handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
     console.log("Payment canceled:", paymentIntent.id);
 
-    // Find user by payment link
+    // Find user by payment link - use metadata or other identifier
     const user = await Users.findOne({
-      stripePaymentLinkId: paymentIntent.payment_link,
+      stripePaymentLinkId:
+        (paymentIntent as any).payment_link || paymentIntent.id,
     });
 
     if (user) {

@@ -10,13 +10,11 @@ export const propertiesSchema = new Schema<IProperty>(
       city: { type: String, required: true },
       state: { type: String, required: true },
       zip: { type: String, required: true },
-      country: { type: String, required: true, default: "USA" },
+      country: { type: String, required: false },
     },
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],
     rules: [{ type: String }],
-    stripeAccountId: { type: String }, // Stripe Connect account ID for this property
-    propertyName: { type: String, required: true, unique: true }, // Unique identifier for Stripe metadata
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

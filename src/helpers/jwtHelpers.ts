@@ -26,7 +26,6 @@ const jwtVerify = (token: string, secret: Secret): JwtPayload => {
   }
 
   try {
-    console.log("🚀 ~ secret:", secret);
     return jwt.verify(token, secret) as JwtPayload;
   } catch (error) {
     console.log("🚀 ~ error:", error);

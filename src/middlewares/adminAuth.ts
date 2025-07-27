@@ -29,13 +29,13 @@ export const adminAuth = async (
         "Server configuration error: JWT_EXPIRES_IN not set",
       );
     }
-    console.log("🚀 ~ config.jwt_secret:", config.jwt_secret);
+    // console.log("🚀 ~ config.jwt_secret:", config.jwt_secret);
 
-    console.log("🚀 ~ token:", token);
+    // console.log("🚀 ~ token:", token);
 
     // Verify token
     const verifiedToken = jwtHelpers.jwtVerify(token, config.jwt_secret);
-    console.log("🚀 ~ verifiedToken:", verifiedToken);
+    // console.log("🚀 ~ verifiedToken:", verifiedToken);
 
     // Check if user exists
     const user = await Users.findById(verifiedToken.id).select("+password");

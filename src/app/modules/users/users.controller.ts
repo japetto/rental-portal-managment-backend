@@ -172,6 +172,30 @@ const updateUserInfo = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Update Tenant Data (Admin only)
+const updateTenantData = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { ...updateData } = req.body;
+  const adminId = req.user?._id?.toString();
+
+  if (!adminId) {
+    throw new Error("Admin ID not found");
+  }
+
+  const result = await UserService.updateTenantData(
+    userId,
+    updateData,
+    adminId,
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Tenant data updated successfully",
+    data: result,
+  });
+});
+
 // Delete User (Super Admin only)
 const deleteUser = catchAsync(async (req: Request, res: Response) => {
   const { userId } = req.params;
@@ -498,11 +522,38 @@ const getPaymentHistory = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Get user's rent summary
+const getRentSummary = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?._id?.toString();
+
+  if (!userId) {
+    return sendResponse(res, {
+      statusCode: httpStatus.UNAUTHORIZED,
+      success: false,
+      message: "User not authenticated",
+      data: null,
+    });
+  }
+
+  const result = await PaymentHistoryService.getRentSummary(userId);
+  console.log("🚀 ~ result:", result);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.hasActiveLease
+      ? "Rent summary retrieved successfully"
+      : "No active lease found",
+    data: result,
+  });
+});
+
 export const UserController = {
   userRegister,
   userLogin,
   setPassword,
   updateUserInfo,
+  updateTenantData,
   deleteUser,
   getAllUsers,
   getAllTenants,
@@ -514,5 +565,6 @@ export const UserController = {
   getUserAnnouncementById,
   markAnnouncementAsRead,
   getMyProfile,
-  getPaymentHistory, // Add this
+  getPaymentHistory,
+  getRentSummary, // Add this
 };

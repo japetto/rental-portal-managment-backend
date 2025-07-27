@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -76,6 +109,14 @@ exports.usersSchema = new mongoose_1.Schema({
     },
     spotId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Spots", required: false },
     leaseId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Leases", required: false },
+    // RV Information (tenant's personal property)
+    rvInfo: {
+        make: { type: String, required: false },
+        model: { type: String, required: false },
+        year: { type: Number, required: false, min: 1900 },
+        length: { type: Number, required: false, min: 1 },
+        licensePlate: { type: String, required: false },
+    },
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },
@@ -90,6 +131,9 @@ exports.usersSchema = new mongoose_1.Schema({
             reason: { type: String }, // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
         },
     ],
+    // Stripe payment link fields
+    stripePaymentLinkId: { type: String }, // Single payment link per tenant
+    stripePaymentLinkUrl: { type: String }, // Payment link URL
 }, {
     timestamps: true,
     toJSON: {
@@ -102,6 +146,51 @@ exports.usersSchema.pre("save", function (next) {
             this.password.trim() !== "" &&
             this.isModified("password")) {
             this.password = yield bcrypt_1.default.hash(this.password, Number(config_1.default.salt_round));
+        }
+        next();
+    });
+});
+// Pre-save middleware for soft delete
+exports.usersSchema.pre("save", function (next) {
+    if (this.isDeleted && !this.deletedAt) {
+        this.deletedAt = new Date();
+    }
+    next();
+});
+// Pre-save middleware for validation
+exports.usersSchema.pre("save", function (next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Validate that if propertyId is set, it exists
+        if (this.propertyId) {
+            const { Properties } = yield Promise.resolve().then(() => __importStar(require("../properties/properties.schema")));
+            const property = yield Properties.findById(this.propertyId);
+            if (!property || property.isDeleted) {
+                return next(new Error("Invalid property ID or property is deleted"));
+            }
+        }
+        // Validate that if spotId is set, it exists and belongs to the property
+        if (this.spotId) {
+            const { Spots } = yield Promise.resolve().then(() => __importStar(require("../spots/spots.schema")));
+            const spot = yield Spots.findById(this.spotId);
+            if (!spot || spot.isDeleted) {
+                return next(new Error("Invalid spot ID or spot is deleted"));
+            }
+            // If both propertyId and spotId are set, validate they match
+            if (this.propertyId &&
+                spot.propertyId.toString() !== this.propertyId.toString()) {
+                return next(new Error("Spot does not belong to the assigned property"));
+            }
+        }
+        // Validate that if leaseId is set, it exists and belongs to this tenant
+        if (this.leaseId) {
+            const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+            const lease = yield Leases.findById(this.leaseId);
+            if (!lease || lease.isDeleted) {
+                return next(new Error("Invalid lease ID or lease is deleted"));
+            }
+            if (lease.tenantId.toString() !== this._id.toString()) {
+                return next(new Error("Lease does not belong to this tenant"));
+            }
         }
         next();
     });

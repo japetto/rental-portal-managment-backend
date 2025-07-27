@@ -153,6 +153,64 @@ export const updateUserInfoValidationSchema = z.object({
   }),
 });
 
+export const updateTenantDataValidationSchema = z.object({
+  body: z.object({
+    user: z
+      .object({
+        name: z.string().optional(),
+        phoneNumber: z.string().optional(),
+        email: z.string().email("Invalid email format").optional(),
+        stripePaymentLinkId: z.string().optional(),
+        stripePaymentLinkUrl: z.string().optional(),
+        rvInfo: z
+          .object({
+            make: z.string().optional(),
+            model: z.string().optional(),
+            year: z.number().optional(),
+            length: z.number().optional(),
+            licensePlate: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    lease: z
+      .object({
+        leaseType: z.enum(["MONTHLY", "FIXED_TERM"]).optional(),
+        leaseStart: z.string().optional(), // Will be converted to Date
+        leaseEnd: z.string().optional(), // Will be converted to Date
+        rentAmount: z.number().optional(),
+        depositAmount: z.number().optional(),
+        occupants: z.number().optional(),
+        pets: z
+          .object({
+            hasPets: z.boolean().optional(),
+            petDetails: z
+              .array(
+                z.object({
+                  type: z.string(),
+                  breed: z.string(),
+                  name: z.string(),
+                  weight: z.number(),
+                }),
+              )
+              .optional(),
+          })
+          .optional(),
+        emergencyContact: z
+          .object({
+            name: z.string().optional(),
+            phone: z.string().optional(),
+            relationship: z.string().optional(),
+          })
+          .optional(),
+        specialRequests: z.array(z.string()).optional(),
+        documents: z.array(z.string()).optional(),
+        notes: z.string().optional(),
+      })
+      .optional(),
+  }),
+});
+
 export const deleteUserValidationSchema = z.object({
   params: z.object({
     userId: z.string().min(1, "User ID is required"),
@@ -172,6 +230,7 @@ export const UserValidation = {
   updatePasswordZodSchema,
   setPasswordValidationSchema,
   updateUserInfoValidationSchema,
+  updateTenantDataValidationSchema,
   deleteUserValidationSchema,
   getUserAnnouncementsValidationSchema,
 };

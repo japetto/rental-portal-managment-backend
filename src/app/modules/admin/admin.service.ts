@@ -67,9 +67,21 @@ const inviteTenant = async (
   // Check if user already exists with this email
   const existingUser = await Users.findOne({ email: inviteData.email });
   if (existingUser) {
+    if (existingUser.isDeleted) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        `A tenant with email "${inviteData.email}" was previously deleted. Please restore the existing account or use a different email address.`,
+      );
+    }
+    if (!existingUser.isActive) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        `A tenant with email "${inviteData.email}" exists but is currently deactivated. Please reactivate the existing account or use a different email address.`,
+      );
+    }
     throw new ApiError(
       httpStatus.CONFLICT,
-      "User with this email already exists",
+      `A tenant with email "${inviteData.email}" already exists in the system. Please use a different email address or contact the existing tenant.`,
     );
   }
 
@@ -78,9 +90,21 @@ const inviteTenant = async (
     phoneNumber: inviteData.phoneNumber,
   });
   if (existingUserByPhone) {
+    if (existingUserByPhone.isDeleted) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        `A tenant with phone number "${inviteData.phoneNumber}" was previously deleted. Please restore the existing account or use a different phone number.`,
+      );
+    }
+    if (!existingUserByPhone.isActive) {
+      throw new ApiError(
+        httpStatus.CONFLICT,
+        `A tenant with phone number "${inviteData.phoneNumber}" exists but is currently deactivated. Please reactivate the existing account or use a different phone number.`,
+      );
+    }
     throw new ApiError(
       httpStatus.CONFLICT,
-      "User with this phone number already exists",
+      `A tenant with phone number "${inviteData.phoneNumber}" already exists in the system. Please use a different phone number or contact the existing tenant.`,
     );
   }
 
@@ -447,11 +471,26 @@ const getAllTenants = async (): Promise<IUser[]> => {
   const tenants = await Users.find({ role: "TENANT", isDeleted: false })
     .populate("propertyId", "name address")
     .populate("spotId", "spotNumber status size price description")
+    .populate(
+      "leaseId",
+      "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+    )
     .sort({ createdAt: -1 });
 
-  // Transform the data to include lot number more prominently
+  // Transform the data to include lot number and lease info more prominently
   const tenantsWithLotNumber = tenants.map(tenant => {
     const tenantData = tenant.toObject() as any;
+
+    // Add property info as a direct field for easier access
+    if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
+      tenantData.property = {
+        id: tenantData.propertyId._id,
+        name: tenantData.propertyId.name,
+        address: tenantData.propertyId.address,
+      };
+      // Remove the original propertyId to avoid duplication
+      delete tenantData.propertyId;
+    }
 
     // Add lot number as a direct field for easier access
     if (tenantData.spotId && typeof tenantData.spotId === "object") {
@@ -460,6 +499,33 @@ const getAllTenants = async (): Promise<IUser[]> => {
       tenantData.lotSize = tenantData.spotId.size;
       tenantData.lotPrice = tenantData.spotId.price;
       tenantData.lotDescription = tenantData.spotId.description;
+      // Remove the original spotId to avoid duplication
+      delete tenantData.spotId;
+    }
+
+    // Add lease info as a direct field for easier access
+    if (tenantData.leaseId && typeof tenantData.leaseId === "object") {
+      tenantData.lease = {
+        id: tenantData.leaseId._id,
+        leaseType: tenantData.leaseId.leaseType,
+        leaseStart: tenantData.leaseId.leaseStart,
+        leaseEnd: tenantData.leaseId.leaseEnd,
+        rentAmount: tenantData.leaseId.rentAmount,
+        depositAmount: tenantData.leaseId.depositAmount,
+        leaseStatus: tenantData.leaseId.leaseStatus,
+        occupants: tenantData.leaseId.occupants,
+        pets: tenantData.leaseId.pets,
+        emergencyContact: tenantData.leaseId.emergencyContact,
+        specialRequests: tenantData.leaseId.specialRequests,
+        documents: tenantData.leaseId.documents,
+        notes: tenantData.leaseId.notes,
+      };
+      // Remove the original leaseId to avoid duplication
+      delete tenantData.leaseId;
+    } else {
+      tenantData.lease = null;
+      // Remove the original leaseId to avoid duplication
+      delete tenantData.leaseId;
     }
 
     return tenantData;
@@ -904,9 +970,14 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     );
   }
 
-  const user = await Users.findOne({ _id: userId, isDeleted: false }).select(
-    "-password",
-  );
+  const user = await Users.findOne({ _id: userId, isDeleted: false })
+    .select("-password")
+    .populate("propertyId", "name address")
+    .populate("spotId", "spotNumber status size price description")
+    .populate(
+      "leaseId",
+      "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+    );
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
@@ -1200,16 +1271,17 @@ const getArchivedProperties = async (adminId: string): Promise<IProperty[]> => {
 };
 
 // Get archived spots
-const getArchivedSpots = async (adminId: string): Promise<ISpot[]> => {
-  const admin = await Users.findById(adminId);
-  if (!admin || admin.role !== "SUPER_ADMIN") {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "Only super admins can view archived spots",
-    );
-  }
+const getArchivedSpots = async (adminId: string) => {
+  const spots = await Spots.find({
+    isDeleted: true,
+  }).populate("propertyId", "name");
 
-  return await getDeletedRecords(Spots);
+  return spots;
+};
+
+const createTestLease = async (leaseData: any) => {
+  const { LeasesService } = await import("../leases/leases.service");
+  return await LeasesService.createLease(leaseData);
 };
 
 export const AdminService = {
@@ -1243,4 +1315,5 @@ export const AdminService = {
   restoreSpot,
   getArchivedProperties,
   getArchivedSpots,
+  createTestLease,
 };

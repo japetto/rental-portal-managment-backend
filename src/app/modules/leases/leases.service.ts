@@ -3,13 +3,8 @@ import { Types } from "mongoose";
 import ApiError from "../../../errors/ApiError";
 import { calculatePaginationFunction } from "../../../helpers/paginationHelpers";
 import { IPaginationOptions } from "../../../interface/pagination";
-import {
-  ICreateLease,
-  ILease,
-  IUpdateLease,
-  LeaseStatus,
-  LeaseType,
-} from "./leases.interface";
+import { LeaseStatus, LeaseType } from "../../../shared/enums/payment.enums";
+import { ICreateLease, ILease, IUpdateLease } from "./leases.interface";
 import { Leases } from "./leases.schema";
 
 const createLease = async (leaseData: ICreateLease): Promise<ILease> => {
@@ -42,7 +37,7 @@ const createLease = async (leaseData: ICreateLease): Promise<ILease> => {
   // Set default lease status based on start date
   const now = new Date();
   const leaseStatus: LeaseStatus =
-    leaseData.leaseStart <= now ? "ACTIVE" : "PENDING";
+    leaseData.leaseStart <= now ? LeaseStatus.ACTIVE : LeaseStatus.PENDING;
 
   const lease = await Leases.create({
     ...leaseData,
@@ -298,11 +293,11 @@ const updateLease = async (
     const now = new Date();
 
     if (startDate <= now && (!endDate || endDate >= now)) {
-      updateData.leaseStatus = "ACTIVE";
+      updateData.leaseStatus = LeaseStatus.ACTIVE;
     } else if (endDate && endDate < now) {
-      updateData.leaseStatus = "EXPIRED";
+      updateData.leaseStatus = LeaseStatus.EXPIRED;
     } else if (startDate > now) {
-      updateData.leaseStatus = "PENDING";
+      updateData.leaseStatus = LeaseStatus.PENDING;
     }
   }
 

@@ -3,12 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Routers = void 0;
 const express_1 = __importDefault(require("express"));
 const admin_router_1 = require("../modules/admin/admin.router");
 const announcements_router_1 = require("../modules/announcements/announcements.router");
 const leases_router_1 = require("../modules/leases/leases.router");
 const service_requests_router_1 = require("../modules/service-requests/service-requests.router");
+const stripe_router_1 = require("../modules/stripe/stripe.router");
 const users_router_1 = require("../modules/users/users.router");
 const router = express_1.default.Router();
 const routes = [
@@ -32,6 +32,10 @@ const routes = [
         path: "/service-requests",
         route: service_requests_router_1.ServiceRequestRouter,
     },
+    {
+        path: "/webhooks",
+        route: stripe_router_1.StripeRouter,
+    },
 ];
 routes.map(r => router.use(r.path, r.route));
-exports.Routers = router;
+exports.default = router;

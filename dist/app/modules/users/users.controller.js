@@ -60,6 +60,7 @@ exports.UserController = void 0;
 const http_status_1 = __importDefault(require("http-status"));
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
+const payment_history_service_1 = require("../payments/payment-history.service");
 const users_service_1 = require("./users.service");
 // User Register
 const userRegister = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -194,6 +195,23 @@ const updateUserInfo = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         success: true,
         statusCode: http_status_1.default.OK,
         message: "User information updated successfully",
+        data: result,
+    });
+}));
+// Update Tenant Data (Admin only)
+const updateTenantData = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { userId } = req.params;
+    const updateData = __rest(req.body, []);
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield users_service_1.UserService.updateTenantData(userId, updateData, adminId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Tenant data updated successfully",
         data: result,
     });
 }));
@@ -420,11 +438,55 @@ const getMyProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result,
     });
 }));
+// Get user's payment history
+const getPaymentHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    const result = yield payment_history_service_1.PaymentHistoryService.getPaymentHistory(userId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Payment history retrieved successfully",
+        data: result,
+    });
+}));
+// Get user's rent summary
+const getRentSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    const result = yield payment_history_service_1.PaymentHistoryService.getRentSummary(userId);
+    console.log("🚀 ~ result:", result);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: result.hasActiveLease
+            ? "Rent summary retrieved successfully"
+            : "No active lease found",
+        data: result,
+    });
+}));
 exports.UserController = {
     userRegister,
     userLogin,
     setPassword,
     updateUserInfo,
+    updateTenantData,
     deleteUser,
     getAllUsers,
     getAllTenants,
@@ -436,4 +498,6 @@ exports.UserController = {
     getUserAnnouncementById,
     markAnnouncementAsRead,
     getMyProfile,
+    getPaymentHistory,
+    getRentSummary, // Add this
 };

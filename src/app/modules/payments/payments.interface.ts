@@ -1,25 +1,11 @@
 import { Document, Types } from "mongoose";
-
-export type PaymentStatus =
-  | "PENDING"
-  | "PAID"
-  | "OVERDUE"
-  | "CANCELLED"
-  | "REFUNDED";
-export type PaymentMethod =
-  | "CASH"
-  | "CHECK"
-  | "CREDIT_CARD"
-  | "DEBIT_CARD"
-  | "BANK_TRANSFER"
-  | "ONLINE";
-export type PaymentType =
-  | "RENT"
-  | "DEPOSIT"
-  | "LATE_FEE"
-  | "UTILITY"
-  | "MAINTENANCE"
-  | "OTHER";
+import {
+  LeaseStatus,
+  LeaseType,
+  PaymentMethod,
+  PaymentStatus,
+  PaymentType,
+} from "../../../shared/enums/payment.enums";
 
 export interface IPayment extends Document {
   tenantId: Types.ObjectId; // Reference to User (tenant)
@@ -38,8 +24,7 @@ export interface IPayment extends Document {
   lateFeeAmount?: number;
   totalAmount: number; // amount + lateFeeAmount
   createdBy: string; // Admin who created the payment record
-  // Stripe payment fields
-  stripePaymentLinkId?: string; // Link to Stripe payment link
+  // Stripe transaction field (payment-specific)
   stripeTransactionId?: string; // From Stripe webhook
   isActive: boolean;
   isDeleted: boolean;
@@ -91,4 +76,81 @@ export interface IPaymentHistory {
   endDate?: Date;
   status?: PaymentStatus;
   type?: PaymentType;
+}
+
+export interface IRentSummaryResponse {
+  hasActiveLease: boolean;
+  message?: string;
+  rentSummary?: {
+    // Payment link information
+    paymentLink: {
+      id?: string;
+      url?: string;
+    };
+    property: {
+      id: any;
+      name: string;
+      address: {
+        street: string;
+        city: string;
+        state: string;
+        zip: string;
+        country?: string;
+      };
+    };
+    spot: {
+      id: any;
+      spotNumber: string;
+      spotIdentifier: string;
+      amenities: string[];
+      size?: {
+        length?: number;
+        width?: number;
+      };
+    };
+    lease: {
+      id: any;
+      leaseType: LeaseType;
+      leaseStart: Date;
+      leaseEnd?: Date;
+      rentAmount: number;
+      depositAmount: number;
+      leaseStatus: LeaseStatus;
+      paymentStatus: PaymentStatus;
+    };
+    currentMonth: {
+      dueDate: Date;
+      rentAmount: number;
+      status: PaymentStatus;
+      paidDate?: Date;
+      paymentMethod?: PaymentMethod;
+      lateFeeAmount: number;
+      totalAmount: number;
+      daysOverdue: number;
+      receiptNumber?: string;
+    };
+    summary: {
+      totalOverdueAmount: number;
+      overdueCount: number;
+      pendingCount: number;
+      totalPaidAmount: number;
+      averagePaymentAmount: number;
+    };
+    recentPayments: Array<{
+      id: any;
+      dueDate: Date;
+      paidDate?: Date;
+      amount: number;
+      paymentMethod?: PaymentMethod;
+      receiptNumber: string;
+      status: PaymentStatus;
+    }>;
+    pendingPayments: Array<{
+      id: any;
+      dueDate: Date;
+      amount: number;
+      status: PaymentStatus;
+      daysOverdue: number;
+    }>;
+  };
 }

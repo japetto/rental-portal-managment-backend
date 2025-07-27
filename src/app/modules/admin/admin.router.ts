@@ -20,6 +20,7 @@ router.post(
 router.get("/tenants", AdminController.getAllTenants);
 
 // Property management routes
+// Create a property
 router.post(
   "/properties",
   zodValidationRequest(AdminValidation.createPropertyValidationSchema),
