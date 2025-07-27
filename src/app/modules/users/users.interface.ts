@@ -38,6 +38,12 @@ export interface IUser extends Document {
     removedAt?: Date;
     reason: string; // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
   }>;
+  // Stripe payment link fields
+  stripePaymentLinkId?: string; // Single payment link per tenant
+  stripePaymentLinkUrl?: string; // Payment link URL
+  // Timestamp fields
+  createdAt: Date;
+  updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
   // Virtual properties
   activeLease?: any;

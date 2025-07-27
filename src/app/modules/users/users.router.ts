@@ -86,6 +86,9 @@ router.post(
 // Get user's own profile
 router.get("/me", userAuth, UserController.getMyProfile);
 
+// Get user's payment history
+router.get("/payment-history", userAuth, UserController.getPaymentHistory);
+
 // Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth, UserController.getUserById);
 

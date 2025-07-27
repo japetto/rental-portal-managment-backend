@@ -91,4 +91,7 @@ export interface IAdminUpdateUser {
   role?: "SUPER_ADMIN" | "TENANT";
   isVerified?: boolean;
   isInvited?: boolean;
+  // Stripe payment link fields
+  stripePaymentLinkId?: string;
+  stripePaymentLinkUrl?: string;
 }

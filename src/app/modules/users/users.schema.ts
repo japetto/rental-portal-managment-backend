@@ -78,6 +78,9 @@ export const usersSchema = new Schema<IUser>(
         reason: { type: String }, // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
       },
     ],
+    // Stripe payment link fields
+    stripePaymentLinkId: { type: String }, // Single payment link per tenant
+    stripePaymentLinkUrl: { type: String }, // Payment link URL
   },
   {
     timestamps: true,

@@ -1,7 +1,7 @@
 import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import httpStatus from "http-status";
-import { Routers } from "./app/routes/router";
+import router from "./app/routes/router";
 import pathNotFoundErrorHandler from "./errors/pathNotFoundErrorHandler";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
 
@@ -21,7 +21,7 @@ app.get("/", async (req: Request, res: Response) => {
 });
 
 //* Main endpoint
-app.use("/api/v1.0", Routers);
+app.use("/api/v1.0", router);
 
 //* Global error Handler
 app.use(globalErrorHandler);

@@ -15,6 +15,8 @@ export const propertiesSchema = new Schema<IProperty>(
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],
     rules: [{ type: String }],
+    stripeAccountId: { type: String }, // Stripe Connect account ID for this property
+    propertyName: { type: String, required: true, unique: true }, // Unique identifier for Stripe metadata
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },
