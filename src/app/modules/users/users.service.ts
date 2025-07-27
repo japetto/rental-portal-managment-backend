@@ -3,7 +3,6 @@ import httpStatus from "http-status";
 import mongoose from "mongoose";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
-import { PaymentHistoryService } from "../payments/payment-history.service";
 import { Spots } from "../spots/spots.schema";
 import {
   IAuthUser,
@@ -46,6 +45,14 @@ const userLogin = async (payload: ILoginUser): Promise<IAuthUser> => {
 
   if (!isExists) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid Email Or Password");
+  }
+
+  // Check if user is deleted or archived
+  if (isExists.isDeleted || !isExists.isActive) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Account has been deactivated or deleted. Please contact administrator.",
+    );
   }
 
   // Check if user is invited but hasn't set password yet
@@ -98,6 +105,14 @@ const setPassword = async (
   const user = await Users.findOne({ email }).select("+password");
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Check if user is deleted or archived
+  if (user.isDeleted || !user.isActive) {
+    throw new ApiError(
+      httpStatus.UNAUTHORIZED,
+      "Account has been deactivated or deleted. Cannot set password.",
+    );
   }
 
   if (!user.isInvited) {
@@ -347,12 +362,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
   let recentServiceRequests: any[] = [];
   let unreadAnnouncements: any[] = [];
   let assignmentHistory: any[] = [];
-  let paymentSummary: any = {
-    totalPaid: 0,
-    totalPayments: 0,
-    successRate: 0,
-    overdueAmount: 0,
-  };
 
   // Only fetch tenant-specific data if user is a tenant
   if (user.role === "TENANT") {
@@ -375,7 +384,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
     const { Payments } = await import("../payments/payments.schema");
     recentPayments = await Payments.find({
       tenantId: userId,
-      isDeleted: false,
     })
       .sort({ createdAt: -1 })
       .limit(10);
@@ -383,11 +391,7 @@ const getComprehensiveUserProfile = async (userId: string) => {
     pendingPayments = await Payments.find({
       tenantId: userId,
       status: { $in: ["PENDING", "OVERDUE"] },
-      isDeleted: false,
     }).sort({ dueDate: 1 });
-
-    // Get payment summary
-    paymentSummary = await PaymentHistoryService.getPaymentSummary(userId);
 
     // Get user's service requests
     const { ServiceRequests } = await import(
@@ -395,7 +399,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
     );
     recentServiceRequests = await ServiceRequests.find({
       tenantId: userId,
-      isDeleted: false,
     })
       .sort({ createdAt: -1 })
       .limit(5);
@@ -407,7 +410,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
     unreadAnnouncements = await Announcements.find({
       propertyId: user.propertyId,
       isActive: true,
-      isDeleted: false,
       readBy: { $ne: userId },
     }).sort({ createdAt: -1 });
 
@@ -420,7 +422,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
     );
     unreadAnnouncements = await Announcements.find({
       isActive: true,
-      isDeleted: false,
       targetAudience: { $in: ["ALL", "ADMINS_ONLY"] },
     }).sort({ createdAt: -1 });
   }
@@ -442,16 +443,12 @@ const getComprehensiveUserProfile = async (userId: string) => {
       name: user.name,
       email: user.email,
       phoneNumber: user.phoneNumber,
+      role: user.role,
       profileImage: user.profileImage,
       bio: user.bio,
       preferredLocation: user.preferredLocation,
-      role: user.role,
       isVerified: user.isVerified,
       isInvited: user.isInvited,
-      stripePaymentLinkId: user.stripePaymentLinkId,
-      stripePaymentLinkUrl: user.stripePaymentLinkUrl,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
     },
     // Property information (only for tenants)
     property: user.role === "TENANT" ? user.propertyId : null,
@@ -471,6 +468,11 @@ const getComprehensiveUserProfile = async (userId: string) => {
             occupants: activeLease.occupants,
             rvInfo: activeLease.rvInfo,
             emergencyContact: activeLease.emergencyContact,
+            specialRequests: activeLease.specialRequests,
+            documents: activeLease.documents,
+            notes: activeLease.notes,
+            durationDays: activeLease.durationDays,
+            isLeaseActive: activeLease.isLeaseActive,
           }
         : null,
     // Payment information (only for tenants)
@@ -478,7 +480,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
       recent: recentPayments,
       pending: pendingPayments,
       summary: {
-        ...paymentSummary,
         totalPendingAmount,
         overdueCount: overduePayments.length,
         totalOverdueAmount: overduePayments.reduce(
@@ -498,9 +499,12 @@ const getComprehensiveUserProfile = async (userId: string) => {
           : 0,
     },
     // Announcements
-    announcements: unreadAnnouncements,
-    // Assignment history
-    assignmentHistory,
+    announcements: {
+      unread: unreadAnnouncements,
+      unreadCount: unreadAnnouncements.length,
+    },
+    // Assignment History (only for tenants)
+    assignmentHistory: assignmentHistory,
   };
 
   return comprehensiveProfile;
