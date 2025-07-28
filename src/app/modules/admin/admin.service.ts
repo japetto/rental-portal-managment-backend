@@ -151,21 +151,47 @@ const inviteTenant = async (
 const createProperty = async (
   propertyData: ICreateProperty,
 ): Promise<IProperty> => {
-  // Check if property with same name already exists
-  const existingProperty = await Properties.findOne({
-    name: propertyData.name,
-  });
-  if (existingProperty) {
-    throw new ApiError(
-      httpStatus.CONFLICT,
-      "Property with this name already exists",
-    );
+  try {
+    // Check if property with same name already exists (including soft-deleted ones)
+    const existingPropertyByName = await Properties.findOne({
+      name: propertyData.name,
+    });
+
+    if (existingPropertyByName) {
+      if (existingPropertyByName.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          `A property with the name "${propertyData.name}" was previously deleted. Please use a different name or restore the existing property.`,
+        );
+      } else {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          `A property with the name "${propertyData.name}" already exists. Please choose a different name.`,
+        );
+      }
+    }
+
+    // Create the property
+    const property = await Properties.create(propertyData);
+
+    return property;
+  } catch (error: any) {
+    // Handle MongoDB duplicate key errors specifically
+    if (error.code === 11000) {
+      if (error.keyPattern?.propertyName) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          "A property with this name already exists. Please choose a different name.",
+        );
+      } else if (error.keyPattern?.name) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          `A property with the name "${propertyData.name}" already exists. Please choose a different name.`,
+        );
+      }
+    }
+    throw error;
   }
-
-  // Create the property
-  const property = await Properties.create(propertyData);
-
-  return property;
 };
 
 const getAllProperties = async (): Promise<IProperty[]> => {
@@ -197,28 +223,66 @@ const updateProperty = async (
   propertyId: string,
   updateData: IUpdateProperty,
 ): Promise<IProperty> => {
-  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+  try {
+    if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Invalid property ID format");
+    }
+
+    const property = await Properties.findOne({
+      _id: propertyId,
+      isDeleted: false,
+    });
+    if (!property) {
+      throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
+    }
+
+    // Check if the new name conflicts with existing properties
+    if (updateData.name) {
+      const existingProperty = await Properties.findOne({
+        name: updateData.name,
+        _id: { $ne: propertyId }, // Exclude current property
+      });
+
+      if (existingProperty) {
+        if (existingProperty.isDeleted) {
+          throw new ApiError(
+            httpStatus.CONFLICT,
+            `A property with the name "${updateData.name}" was previously deleted. Please use a different name or restore the existing property.`,
+          );
+        } else {
+          throw new ApiError(
+            httpStatus.CONFLICT,
+            `A property with the name "${updateData.name}" already exists. Please choose a different name.`,
+          );
+        }
+      }
+    }
+
+    const updatedProperty = await Properties.findByIdAndUpdate(
+      propertyId,
+      updateData,
+      { new: true, runValidators: true },
+    );
+
+    const propertyWithLotData = await addLotDataToProperty(updatedProperty!);
+    return propertyWithLotData;
+  } catch (error: any) {
+    // Handle MongoDB duplicate key errors specifically
+    if (error.code === 11000) {
+      if (error.keyPattern?.propertyName) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          "A property with this name already exists. Please choose a different name.",
+        );
+      } else if (error.keyPattern?.name) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          `A property with the name "${updateData.name}" already exists. Please choose a different name.`,
+        );
+      }
+    }
+    throw error;
   }
-
-  const property = await Properties.findOne({
-    _id: propertyId,
-    isDeleted: false,
-  });
-  if (!property) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Property not found");
-  }
-
-  // No need to handle totalLots/availableLots updates - they are calculated from spots
-
-  const updatedProperty = await Properties.findByIdAndUpdate(
-    propertyId,
-    updateData,
-    { new: true, runValidators: true },
-  );
-
-  const propertyWithLotData = await addLotDataToProperty(updatedProperty!);
-  return propertyWithLotData;
 };
 
 const deleteProperty = async (propertyId: string): Promise<void> => {

@@ -14,7 +14,6 @@ export interface IProperty extends Document {
   images: string[];
   rules: string[];
   stripeAccountId?: string; // Stripe Connect account ID for this property
-  propertyName: string; // Unique identifier for Stripe metadata
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -38,7 +37,6 @@ export interface ICreateProperty {
   amenities: string[];
   images?: string[];
   rules?: string[];
-  propertyName: string; // Required for Stripe metadata
 }
 
 export interface IUpdateProperty {
@@ -55,5 +53,4 @@ export interface IUpdateProperty {
   images?: string[];
   rules?: string[];
   stripeAccountId?: string; // Stripe Connect account ID
-  propertyName?: string; // Unique identifier for Stripe metadata
 }

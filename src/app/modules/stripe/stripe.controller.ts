@@ -200,7 +200,7 @@ export class StripeController {
         stripePaymentLinkId: userDoc.stripePaymentLinkId,
       });
 
-      // Find property by propertyName from metadata or use user's assigned property
+      // Find property by name from metadata or use user's assigned property
       let property = null;
       if (paymentIntent.metadata?.propertyName) {
         console.log(
@@ -208,7 +208,7 @@ export class StripeController {
           paymentIntent.metadata.propertyName,
         );
         property = await Properties.findOne({
-          propertyName: paymentIntent.metadata.propertyName,
+          name: paymentIntent.metadata.propertyName,
         });
       }
 
@@ -226,7 +226,7 @@ export class StripeController {
       }
 
       console.log(
-        `✅ [${timestamp}] Property found: ${property._id} (${property.propertyName})`,
+        `✅ [${timestamp}] Property found: ${property._id} (${property.name})`,
       );
 
       // Get lease details for validation

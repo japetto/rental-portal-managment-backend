@@ -1,5 +1,7 @@
-import { IGenericErrorMessages } from "../interface/error";
-import { IGenericErrorResponse } from "../interface/error";
+import {
+  IGenericErrorMessages,
+  IGenericErrorResponse,
+} from "../interface/error";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleDuplicationError = (error: any): IGenericErrorResponse => {
@@ -9,14 +11,45 @@ const handleDuplicationError = (error: any): IGenericErrorResponse => {
     const duplicateValue = error.keyValue[duplicateKey];
     const statusCode = 409;
 
-    const errorMessage: IGenericErrorMessages = {
-      path: duplicateKey,
-      message: `Duplicate key error: '${duplicateKey}' with value '${duplicateValue}'`,
-    };
+    let message = "Duplicate Key Error";
+    let errorMessage: IGenericErrorMessages;
+
+    // Handle specific duplicate key errors with better messages
+    if (duplicateKey === "name") {
+      message = "Property Name Already Exists";
+      errorMessage = {
+        path: duplicateKey,
+        message: `A property with the name '${duplicateValue}' already exists. Please choose a different name.`,
+      };
+    } else if (duplicateKey === "propertyName") {
+      message = "Property Name Already Exists";
+      errorMessage = {
+        path: duplicateKey,
+        message: `A property with this name already exists. Please choose a different name.`,
+      };
+    } else if (duplicateKey === "email") {
+      message = "Email Already Exists";
+      errorMessage = {
+        path: duplicateKey,
+        message: `A user with the email '${duplicateValue}' already exists. Please use a different email address.`,
+      };
+    } else if (duplicateKey === "phoneNumber") {
+      message = "Phone Number Already Exists";
+      errorMessage = {
+        path: duplicateKey,
+        message: `A user with the phone number '${duplicateValue}' already exists. Please use a different phone number.`,
+      };
+    } else {
+      // Generic duplicate key error
+      errorMessage = {
+        path: duplicateKey,
+        message: `Duplicate key error: '${duplicateKey}' with value '${duplicateValue}'`,
+      };
+    }
 
     return {
       statusCode,
-      message: "Duplicate Key Error",
+      message,
       errorMessages: [errorMessage],
     };
   }

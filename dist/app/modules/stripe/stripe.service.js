@@ -79,11 +79,11 @@ class StripeService {
             const user = yield users_schema_1.Users.findById(tenantId);
             if (!user)
                 throw new Error("User not found");
-            // Find property by propertyName from metadata
+            // Find property by name from metadata
             const propertyName = (_a = stripePayment.metadata) === null || _a === void 0 ? void 0 : _a.propertyName;
             if (!propertyName)
                 throw new Error("Property name not found in payment metadata");
-            const property = yield properties_schema_1.Properties.findOne({ propertyName });
+            const property = yield properties_schema_1.Properties.findOne({ name: propertyName });
             if (!property) {
                 // Cancel payment if property not found
                 yield this.cancelPaymentIntent(stripePayment.id);

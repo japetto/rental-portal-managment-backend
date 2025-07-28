@@ -82,7 +82,7 @@ exports.createPropertyValidationSchema = zod_1.z.object({
             city: zod_1.z.string().min(1, "City is required"),
             state: zod_1.z.string().min(1, "State is required"),
             zip: zod_1.z.string().min(1, "ZIP code is required"),
-            country: zod_1.z.string().min(1, "Country is required").optional(),
+            country: zod_1.z.string().optional(),
         }),
         amenities: zod_1.z.array(zod_1.z.string()).min(1, "At least one amenity is required"),
         images: zod_1.z.array(zod_1.z.string()).optional(),
@@ -102,7 +102,7 @@ exports.updatePropertyValidationSchema = zod_1.z.object({
             city: zod_1.z.string().min(1, "City is required").optional(),
             state: zod_1.z.string().min(1, "State is required").optional(),
             zip: zod_1.z.string().min(1, "ZIP code is required").optional(),
-            country: zod_1.z.string().min(1, "Country is required").optional(),
+            country: zod_1.z.string().optional(),
         })
             .optional(),
         amenities: zod_1.z

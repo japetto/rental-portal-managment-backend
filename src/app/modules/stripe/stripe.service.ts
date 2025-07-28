@@ -66,12 +66,12 @@ export class StripeService {
     const user = await Users.findById(tenantId);
     if (!user) throw new Error("User not found");
 
-    // Find property by propertyName from metadata
+    // Find property by name from metadata
     const propertyName = stripePayment.metadata?.propertyName;
     if (!propertyName)
       throw new Error("Property name not found in payment metadata");
 
-    const property = await Properties.findOne({ propertyName });
+    const property = await Properties.findOne({ name: propertyName });
     if (!property) {
       // Cancel payment if property not found
       await this.cancelPaymentIntent(stripePayment.id);

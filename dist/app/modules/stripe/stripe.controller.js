@@ -126,12 +126,12 @@ class StripeController {
                     spotId: userDoc.spotId,
                     stripePaymentLinkId: userDoc.stripePaymentLinkId,
                 });
-                // Find property by propertyName from metadata or use user's assigned property
+                // Find property by name from metadata or use user's assigned property
                 let property = null;
                 if ((_c = paymentIntent.metadata) === null || _c === void 0 ? void 0 : _c.propertyName) {
                     console.log(`🏠 [${timestamp}] Looking for property by name:`, paymentIntent.metadata.propertyName);
                     property = yield properties_schema_1.Properties.findOne({
-                        propertyName: paymentIntent.metadata.propertyName,
+                        name: paymentIntent.metadata.propertyName,
                     });
                 }
                 if (!property) {
@@ -142,7 +142,7 @@ class StripeController {
                     console.error(`❌ [${timestamp}] Property not found for payment`);
                     throw new Error("Property not found for payment");
                 }
-                console.log(`✅ [${timestamp}] Property found: ${property._id} (${property.propertyName})`);
+                console.log(`✅ [${timestamp}] Property found: ${property._id} (${property.name})`);
                 // Get lease details for validation
                 const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
                 const lease = yield Leases.findOne({

@@ -136,16 +136,36 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
     };
 });
 const createProperty = (propertyData) => __awaiter(void 0, void 0, void 0, function* () {
-    // Check if property with same name already exists
-    const existingProperty = yield properties_schema_1.Properties.findOne({
-        name: propertyData.name,
-    });
-    if (existingProperty) {
-        throw new ApiError_1.default(http_status_1.default.CONFLICT, "Property with this name already exists");
+    var _a, _b;
+    try {
+        // Check if property with same name already exists (including soft-deleted ones)
+        const existingPropertyByName = yield properties_schema_1.Properties.findOne({
+            name: propertyData.name,
+        });
+        if (existingPropertyByName) {
+            if (existingPropertyByName.isDeleted) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, `A property with the name "${propertyData.name}" was previously deleted. Please use a different name or restore the existing property.`);
+            }
+            else {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, `A property with the name "${propertyData.name}" already exists. Please choose a different name.`);
+            }
+        }
+        // Create the property
+        const property = yield properties_schema_1.Properties.create(propertyData);
+        return property;
     }
-    // Create the property
-    const property = yield properties_schema_1.Properties.create(propertyData);
-    return property;
+    catch (error) {
+        // Handle MongoDB duplicate key errors specifically
+        if (error.code === 11000) {
+            if ((_a = error.keyPattern) === null || _a === void 0 ? void 0 : _a.propertyName) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, "A property with this name already exists. Please choose a different name.");
+            }
+            else if ((_b = error.keyPattern) === null || _b === void 0 ? void 0 : _b.name) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, `A property with the name "${propertyData.name}" already exists. Please choose a different name.`);
+            }
+        }
+        throw error;
+    }
 });
 const getAllProperties = () => __awaiter(void 0, void 0, void 0, function* () {
     const properties = yield properties_schema_1.Properties.find({ isDeleted: false }).sort({
@@ -169,20 +189,49 @@ const getPropertyById = (propertyId) => __awaiter(void 0, void 0, void 0, functi
     return propertyWithLotData;
 });
 const updateProperty = (propertyId, updateData) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
+    var _a, _b;
+    try {
+        if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {
+            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid property ID format");
+        }
+        const property = yield properties_schema_1.Properties.findOne({
+            _id: propertyId,
+            isDeleted: false,
+        });
+        if (!property) {
+            throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
+        }
+        // Check if the new name conflicts with existing properties
+        if (updateData.name) {
+            const existingProperty = yield properties_schema_1.Properties.findOne({
+                name: updateData.name,
+                _id: { $ne: propertyId }, // Exclude current property
+            });
+            if (existingProperty) {
+                if (existingProperty.isDeleted) {
+                    throw new ApiError_1.default(http_status_1.default.CONFLICT, `A property with the name "${updateData.name}" was previously deleted. Please use a different name or restore the existing property.`);
+                }
+                else {
+                    throw new ApiError_1.default(http_status_1.default.CONFLICT, `A property with the name "${updateData.name}" already exists. Please choose a different name.`);
+                }
+            }
+        }
+        const updatedProperty = yield properties_schema_1.Properties.findByIdAndUpdate(propertyId, updateData, { new: true, runValidators: true });
+        const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(updatedProperty);
+        return propertyWithLotData;
     }
-    const property = yield properties_schema_1.Properties.findOne({
-        _id: propertyId,
-        isDeleted: false,
-    });
-    if (!property) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Property not found");
+    catch (error) {
+        // Handle MongoDB duplicate key errors specifically
+        if (error.code === 11000) {
+            if ((_a = error.keyPattern) === null || _a === void 0 ? void 0 : _a.propertyName) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, "A property with this name already exists. Please choose a different name.");
+            }
+            else if ((_b = error.keyPattern) === null || _b === void 0 ? void 0 : _b.name) {
+                throw new ApiError_1.default(http_status_1.default.CONFLICT, `A property with the name "${updateData.name}" already exists. Please choose a different name.`);
+            }
+        }
+        throw error;
     }
-    // No need to handle totalLots/availableLots updates - they are calculated from spots
-    const updatedProperty = yield properties_schema_1.Properties.findByIdAndUpdate(propertyId, updateData, { new: true, runValidators: true });
-    const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(updatedProperty);
-    return propertyWithLotData;
 });
 const deleteProperty = (propertyId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {

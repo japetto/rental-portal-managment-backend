@@ -3,7 +3,7 @@ import { IProperty } from "./properties.interface";
 
 export const propertiesSchema = new Schema<IProperty>(
   {
-    name: { type: String, trim: true, required: true },
+    name: { type: String, unique: true, trim: true, required: true },
     description: { type: String, required: true },
     address: {
       street: { type: String, required: true },
