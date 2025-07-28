@@ -23,8 +23,7 @@ export const leasesSchema = new Schema<ILease>(
     leaseStatus: {
       type: String,
       enum: Object.values(LeaseStatus),
-      required: true,
-      default: LeaseStatus.PENDING,
+      required: false,
     },
     occupants: { type: Number, required: true, min: 1 },
     pets: {
@@ -40,9 +39,9 @@ export const leasesSchema = new Schema<ILease>(
     },
 
     emergencyContact: {
-      name: { type: String, required: true },
-      phone: { type: String, required: true },
-      relationship: { type: String, required: true },
+      name: { type: String, required: false },
+      phone: { type: String, required: false },
+      relationship: { type: String, required: false },
     },
     specialRequests: [{ type: String }],
     documents: [{ type: String }], // URLs for PDF/DOC files

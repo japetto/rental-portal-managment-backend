@@ -376,11 +376,11 @@ const updateTenantData = async (
           // Add default values for required fields
           leaseStart: payload.lease.leaseStart || new Date(),
           occupants: payload.lease.occupants || 1,
-
-          emergencyContact: payload.lease.emergencyContact || {
-            name: "Emergency Contact",
-            phone: "000-000-0000",
-            relationship: "Other",
+          rentAmount: payload.lease.rentAmount || 0,
+          depositAmount: payload.lease.depositAmount || 0,
+          pets: {
+            hasPets: payload.lease.pets?.hasPets || false,
+            petDetails: payload.lease.pets?.petDetails || [],
           },
         };
 

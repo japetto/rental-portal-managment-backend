@@ -21,11 +21,13 @@ const rvInfoSchema = z.object({
 });
 
 // Emergency contact validation schema
-const emergencyContactSchema = z.object({
-  name: z.string().min(1, "Emergency contact name is required"),
-  phone: z.string().min(1, "Emergency contact phone is required"),
-  relationship: z.string().min(1, "Relationship is required"),
-});
+const emergencyContactSchema = z
+  .object({
+    name: z.string().min(1, "Emergency contact name is required").optional(),
+    phone: z.string().min(1, "Emergency contact phone is required").optional(),
+    relationship: z.string().min(1, "Relationship is required").optional(),
+  })
+  .optional();
 
 // Create lease validation schema
 export const createLeaseValidationSchema = z.object({
@@ -141,7 +143,7 @@ export const updateLeaseValidationSchema = z.object({
         })
         .optional(),
       rvInfo: rvInfoSchema.partial().optional(),
-      emergencyContact: emergencyContactSchema.partial().optional(),
+      emergencyContact: emergencyContactSchema.optional(),
       specialRequests: z.array(z.string()).optional(),
       documents: z.array(z.string().url("Invalid document URL")).optional(),
       notes: z.string().optional(),
