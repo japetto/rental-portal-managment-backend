@@ -134,6 +134,7 @@ exports.usersSchema = new mongoose_1.Schema({
     // Stripe payment link fields
     stripePaymentLinkId: { type: String }, // Single payment link per tenant
     stripePaymentLinkUrl: { type: String }, // Payment link URL
+    stripeCustomerId: { type: String }, // Stripe customer ID for webhook lookup
 }, {
     timestamps: true,
     toJSON: {

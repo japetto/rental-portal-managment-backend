@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import config from "../../../config/config";
 import { Payments } from "../payments/payments.schema";
 import { Properties } from "../properties/properties.schema";
 import { Users } from "../users/users.schema";
@@ -7,7 +8,7 @@ export class StripeService {
   private stripe: Stripe;
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    this.stripe = new Stripe(config.stripe_secret_key, {
       apiVersion: "2025-06-30.basil",
     });
   }
@@ -103,14 +104,14 @@ export class StripeService {
     payload: any,
     signature: string | string[] | undefined,
   ) {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    const stripe = new Stripe(config.stripe_secret_key, {
       apiVersion: "2025-06-30.basil",
     });
 
     return stripe.webhooks.constructEvent(
       payload,
       signature as string,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      config.stripe_webhook_secret,
     );
   }
 }

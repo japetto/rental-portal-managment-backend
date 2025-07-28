@@ -14,12 +14,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StripeService = void 0;
 const stripe_1 = __importDefault(require("stripe"));
+const config_1 = __importDefault(require("../../../config/config"));
 const payments_schema_1 = require("../payments/payments.schema");
 const properties_schema_1 = require("../properties/properties.schema");
 const users_schema_1 = require("../users/users.schema");
 class StripeService {
     constructor() {
-        this.stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY, {
+        this.stripe = new stripe_1.default(config_1.default.stripe_secret_key, {
             apiVersion: "2025-06-30.basil",
         });
     }
@@ -111,10 +112,10 @@ class StripeService {
     }
     // Construct webhook event for verification
     static constructWebhookEvent(payload, signature) {
-        const stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY, {
+        const stripe = new stripe_1.default(config_1.default.stripe_secret_key, {
             apiVersion: "2025-06-30.basil",
         });
-        return stripe.webhooks.constructEvent(payload, signature, process.env.STRIPE_WEBHOOK_SECRET);
+        return stripe.webhooks.constructEvent(payload, signature, config_1.default.stripe_webhook_secret);
     }
 }
 exports.StripeService = StripeService;

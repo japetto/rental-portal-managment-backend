@@ -78,8 +78,9 @@ exports.paymentsSchema = new mongoose_1.Schema({
     lateFeeAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     createdBy: { type: String, required: true },
-    // Stripe transaction field (payment-specific)
+    // Stripe transaction fields
     stripeTransactionId: { type: String }, // From Stripe webhook
+    stripePaymentLinkId: { type: String }, // Payment link ID from Stripe
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

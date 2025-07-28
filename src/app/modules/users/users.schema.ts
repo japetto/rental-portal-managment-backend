@@ -89,6 +89,7 @@ export const usersSchema = new Schema<IUser>(
     // Stripe payment link fields
     stripePaymentLinkId: { type: String }, // Single payment link per tenant
     stripePaymentLinkUrl: { type: String }, // Payment link URL
+    stripeCustomerId: { type: String }, // Stripe customer ID for webhook lookup
   },
   {
     timestamps: true,

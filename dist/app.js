@@ -21,8 +21,17 @@ const globalErrorHandler_1 = __importDefault(require("./middlewares/globalErrorH
 const app = (0, express_1.default)();
 // ? Middlewares:
 app.use((0, cors_1.default)());
-app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+// Configure JSON parsing for all routes except webhooks
+app.use((req, res, next) => {
+    if (req.path.includes("/webhooks/webhook")) {
+        // Skip JSON parsing for webhook routes
+        next();
+    }
+    else {
+        express_1.default.json()(req, res, next);
+    }
+});
 // * Basic Page
 app.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     res.status(http_status_1.default.OK).send({

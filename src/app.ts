@@ -9,8 +9,17 @@ const app: Application = express();
 
 // ? Middlewares:
 app.use(cors());
-app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Configure JSON parsing for all routes except webhooks
+app.use((req, res, next) => {
+  if (req.path.includes("/webhooks/webhook")) {
+    // Skip JSON parsing for webhook routes
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
 // * Basic Page
 app.get("/", async (req: Request, res: Response) => {
