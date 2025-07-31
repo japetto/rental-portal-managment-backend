@@ -1,38 +1,111 @@
-import express from "express";
+import { Router } from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
-import { StripeController } from "./stripe.controller";
+import zodValidationRequest from "../../../middlewares/zodValidationRequest";
+import {
+  createPaymentWithLink,
+  createStripeAccount,
+  deleteStripeAccount,
+  getAllStripeAccounts,
+  getAvailableStripeAccounts,
+  getPaymentLinkDetails,
+  getStripeAccountById,
+  getStripeAccountByProperty,
+  handleWebhook,
+  linkStripeAccountToProperty,
+  syncPaymentHistory,
+  updateStripeAccount,
+  verifyStripeAccount,
+  webhookStatus,
+} from "./stripe.controller";
+import {
+  createPaymentWithLinkSchema,
+  createStripeAccountSchema,
+  deleteStripeAccountSchema,
+  getPaymentLinkDetailsSchema,
+  getStripeAccountByIdSchema,
+  getStripeAccountByPropertySchema,
+  linkStripeAccountToPropertySchema,
+  syncPaymentHistorySchema,
+  updateStripeAccountSchema,
+  verifyStripeAccountSchema,
+} from "./stripe.validation";
 
-const router = express.Router();
+const router = Router();
 
-// Webhook endpoint - needs raw body for signature verification
+// Stripe Account Management Routes (Admin only)
 router.post(
-  "/webhook",
-  express.raw({ type: "application/json" }),
-  StripeController.handleWebhook,
+  "/accounts",
+  adminAuth,
+  zodValidationRequest(createStripeAccountSchema),
+  createStripeAccount,
+);
+router.post(
+  "/accounts/link",
+  adminAuth,
+  zodValidationRequest(linkStripeAccountToPropertySchema),
+  linkStripeAccountToProperty,
+);
+router.get("/accounts", adminAuth, getAllStripeAccounts);
+router.get(
+  "/accounts/:accountId",
+  adminAuth,
+  zodValidationRequest(getStripeAccountByIdSchema),
+  getStripeAccountById,
+);
+router.get(
+  "/accounts/property/:propertyId",
+  adminAuth,
+  zodValidationRequest(getStripeAccountByPropertySchema),
+  getStripeAccountByProperty,
+);
+router.get(
+  "/accounts/available/:propertyId",
+  adminAuth,
+  getAvailableStripeAccounts,
+);
+router.patch(
+  "/accounts/:accountId",
+  adminAuth,
+  zodValidationRequest(updateStripeAccountSchema),
+  updateStripeAccount,
+);
+router.delete(
+  "/accounts/:accountId",
+  adminAuth,
+  zodValidationRequest(deleteStripeAccountSchema),
+  deleteStripeAccount,
+);
+router.patch(
+  "/accounts/:accountId/verify",
+  adminAuth,
+  zodValidationRequest(verifyStripeAccountSchema),
+  verifyStripeAccount,
 );
 
-// Webhook status check endpoint
-router.get("/webhook-status", StripeController.webhookStatus);
-
-// Create payment with unique payment link (admin only)
+// Payment Link Management Routes (Admin only)
 router.post(
   "/create-payment-link",
   adminAuth,
-  StripeController.createPaymentWithLink,
+  zodValidationRequest(createPaymentWithLinkSchema),
+  createPaymentWithLink,
 );
-
-// Get payment link details (admin only)
 router.get(
   "/payment-link/:paymentLinkId",
   adminAuth,
-  StripeController.getPaymentLinkDetails,
+  zodValidationRequest(getPaymentLinkDetailsSchema),
+  getPaymentLinkDetails,
 );
 
-// Admin-only endpoint for syncing payment history
-router.get(
+// Webhook Routes (No auth required for Stripe webhooks)
+router.post("/webhook", handleWebhook);
+router.get("/webhook/status", webhookStatus);
+
+// Payment History Sync (Admin only)
+router.post(
   "/sync-payment-history/:userId",
   adminAuth,
-  StripeController.syncPaymentHistory,
+  zodValidationRequest(syncPaymentHistorySchema),
+  syncPaymentHistory,
 );
 
-export const StripeRouter = router;
+export const stripeRoutes = router;

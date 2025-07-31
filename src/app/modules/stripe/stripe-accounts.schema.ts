@@ -8,19 +8,18 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
     propertyId: {
       type: Schema.Types.ObjectId,
       ref: "Properties",
-      required: true,
-      unique: true,
+      required: false, // Optional - can be linked later
     },
     // Stripe Connect account details
     stripeAccountId: { type: String, required: true, unique: true },
     // Account status
     isActive: { type: Boolean, required: true, default: true },
     isVerified: { type: Boolean, required: true, default: false },
+    // Global account flag - if true, can be used for all properties
+    isGlobalAccount: { type: Boolean, required: true, default: false },
     // Business information (minimal)
     businessName: { type: String, required: false },
     businessEmail: { type: String, required: false },
-    // Application fee settings
-    applicationFeePercent: { type: Number, default: 0, min: 0, max: 100 },
     // Metadata
     metadata: { type: Schema.Types.Mixed },
     isDeleted: { type: Boolean, required: true, default: false },

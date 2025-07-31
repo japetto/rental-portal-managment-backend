@@ -9,9 +9,9 @@ type IResponseType<T> = {
 
 const sendResponse = <T>(res: Response, data: IResponseType<T>): void => {
   res.status(data.statusCode).send({
-    success: true,
+    success: data.success,
     statusCode: data.statusCode,
-    message: data.message,
+    message: data.message || "Success",
     data: data.data || null,
   });
 };

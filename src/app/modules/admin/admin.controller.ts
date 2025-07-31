@@ -8,6 +8,7 @@ import {
   verifyEmailConnection,
 } from "../../../shared/emailService";
 import sendResponse from "../../../shared/sendResponse";
+import { PropertiesController } from "../properties/properties.controller";
 import {
   IAdminUpdateUser,
   ICreateProperty,
@@ -856,4 +857,11 @@ export const AdminController = {
   restoreSpot,
   getArchivedProperties,
   getArchivedSpots,
+  // Properties with Stripe details methods
+  getAllPropertiesWithStripeDetails:
+    PropertiesController.getAllPropertiesWithStripeDetails,
+  getPropertiesWithAvailableStripeAccounts:
+    PropertiesController.getPropertiesWithAvailableStripeAccounts,
+  getPropertiesWithoutStripeAccounts:
+    PropertiesController.getPropertiesWithoutStripeAccounts,
 };

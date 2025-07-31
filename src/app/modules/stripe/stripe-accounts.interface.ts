@@ -3,17 +3,17 @@ import { Document, Types } from "mongoose";
 export interface IStripeAccount extends Document {
   name: string;
   description?: string;
-  propertyId: Types.ObjectId;
+  propertyId?: Types.ObjectId; // Optional - can be linked later
   // Stripe Connect account details
   stripeAccountId: string;
   // Account status
   isActive: boolean;
   isVerified: boolean;
+  // Global account flag - if true, can be used for all properties
+  isGlobalAccount: boolean;
   // Business information (minimal)
   businessName?: string;
   businessEmail?: string;
-  // Application fee settings
-  applicationFeePercent: number;
   // Metadata
   metadata?: any;
   isDeleted: boolean;
@@ -25,11 +25,10 @@ export interface IStripeAccount extends Document {
 export interface ICreateStripeAccount {
   name: string;
   description?: string;
-  propertyId: string;
   stripeAccountId: string;
+  isGlobalAccount?: boolean;
   businessName?: string;
   businessEmail?: string;
-  applicationFeePercent?: number;
   metadata?: any;
 }
 
@@ -39,6 +38,5 @@ export interface IUpdateStripeAccount {
   isActive?: boolean;
   businessName?: string;
   businessEmail?: string;
-  applicationFeePercent?: number;
   metadata?: any;
 }

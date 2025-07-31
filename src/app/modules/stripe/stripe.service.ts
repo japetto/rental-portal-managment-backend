@@ -54,6 +54,66 @@ export class StripeService {
         isVerified: true,
       });
 
+      // If no property-specific account, try to find a global account
+      if (!stripeAccount) {
+        const globalAccount = await StripeAccounts.findOne({
+          isGlobalAccount: true,
+          isActive: true,
+          isVerified: true,
+        });
+
+        if (!globalAccount) {
+          throw new Error(
+            "No active Stripe account found for this property or globally",
+          );
+        }
+
+        // Use global account
+        const totalAmount =
+          paymentData.amount + (paymentData.lateFeeAmount || 0);
+
+        // Create payment link with unique metadata using global Stripe account
+        const paymentLink = await this.stripe.paymentLinks.create({
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: paymentData.description,
+                  description: `Payment for ${property.name} - ${paymentData.type}`,
+                },
+                unit_amount: Math.round(totalAmount * 100), // Convert to cents
+              },
+              quantity: 1,
+            },
+          ] as any,
+          metadata: {
+            tenantId: paymentData.tenantId,
+            propertyId: paymentData.propertyId,
+            spotId: paymentData.spotId,
+            leaseId: (activeLease as any)._id.toString(),
+            paymentType: paymentData.type,
+            dueDate: paymentData.dueDate.toISOString(),
+            receiptNumber: paymentData.receiptNumber,
+            propertyName: property.name,
+            tenantName: user.name,
+            amount: totalAmount.toString(),
+            lateFeeAmount: (paymentData.lateFeeAmount || 0).toString(),
+            stripeAccountId: globalAccount.stripeAccountId,
+            isGlobalAccount: "true",
+          },
+          after_completion: {
+            type: "redirect",
+            redirect: {
+              url: `${config.client_url}/payment-success?receipt=${paymentData.receiptNumber}`,
+            },
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days from now
+        } as any);
+
+        return paymentLink;
+      }
+
       if (!stripeAccount) {
         throw new Error("No active Stripe account found for this property");
       }
@@ -139,6 +199,46 @@ export class StripeService {
         isActive: true,
         isVerified: true,
       });
+
+      // If no property-specific account, try to find a global account
+      if (!stripeAccount) {
+        const globalAccount = await StripeAccounts.findOne({
+          isGlobalAccount: true,
+          isActive: true,
+          isVerified: true,
+        });
+
+        if (!globalAccount) {
+          throw new Error(
+            "No active Stripe account found for this property or globally",
+          );
+        }
+
+        // Create payment record with global account
+        const payment = await Payments.create({
+          ...paymentData,
+          receiptNumber,
+          status: "PENDING",
+          totalAmount: paymentData.amount + (paymentData.lateFeeAmount || 0),
+          stripeAccountId: globalAccount._id,
+        });
+
+        // Create unique payment link
+        const paymentLink = await this.createPaymentLink({
+          ...paymentData,
+          receiptNumber,
+        });
+
+        // Update payment record with payment link info
+        await Payments.findByIdAndUpdate(payment._id, {
+          stripePaymentLinkId: paymentLink.id,
+        });
+
+        return {
+          payment,
+          paymentLink,
+        };
+      }
 
       if (!stripeAccount) {
         throw new Error("No active Stripe account found for this property");
