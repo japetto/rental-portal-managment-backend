@@ -86,10 +86,8 @@ export const usersSchema = new Schema<IUser>(
         reason: { type: String }, // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
       },
     ],
-    // Stripe payment link fields
-    stripePaymentLinkId: { type: String }, // Single payment link per tenant
-    stripePaymentLinkUrl: { type: String }, // Payment link URL
-    stripeCustomerId: { type: String }, // Stripe customer ID for webhook lookup
+    // Stripe customer ID for webhook lookup (kept for backward compatibility)
+    stripeCustomerId: { type: String },
   },
   {
     timestamps: true,

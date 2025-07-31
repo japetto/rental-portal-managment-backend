@@ -43,6 +43,7 @@ export const paymentsSchema = new Schema<IPayment>(
     // Stripe transaction fields
     stripeTransactionId: { type: String }, // From Stripe webhook
     stripePaymentLinkId: { type: String }, // Payment link ID from Stripe
+    stripeAccountId: { type: Schema.Types.ObjectId, ref: "StripeAccounts" }, // Stripe account used for this payment
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

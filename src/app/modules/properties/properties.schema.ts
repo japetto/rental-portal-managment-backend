@@ -15,6 +15,12 @@ export const propertiesSchema = new Schema<IProperty>(
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],
     rules: [{ type: String }],
+    // Stripe account reference
+    stripeAccountId: {
+      type: Schema.Types.ObjectId,
+      ref: "StripeAccounts",
+      required: false,
+    },
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

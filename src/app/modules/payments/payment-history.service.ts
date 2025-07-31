@@ -241,12 +241,38 @@ export class PaymentHistoryService {
           )
         : 0;
 
+    // Create dynamic payment link for current month if payment is pending
+    let currentMonthPaymentLink = null;
+    if (currentMonthPayment && currentMonthPayment.status === "PENDING") {
+      try {
+        const stripeService = new StripeService();
+        currentMonthPaymentLink = await stripeService.createPaymentLink({
+          tenantId: currentMonthPayment.tenantId.toString(),
+          propertyId: currentMonthPayment.propertyId.toString(),
+          spotId: currentMonthPayment.spotId.toString(),
+          amount: currentMonthPayment.amount,
+          type: currentMonthPayment.type,
+          dueDate: currentMonthPayment.dueDate,
+          description: currentMonthPayment.description,
+          lateFeeAmount: currentMonthPayment.lateFeeAmount,
+          receiptNumber: currentMonthPayment.receiptNumber,
+        });
+      } catch (error) {
+        console.error("Error creating payment link for current month:", error);
+      }
+    }
+
     const rentSummary = {
-      // Payment link information
-      paymentLink: {
-        id: user.stripePaymentLinkId || undefined,
-        url: user.stripePaymentLinkUrl || undefined,
-      },
+      // Payment link information - now dynamic for current month
+      paymentLink: currentMonthPaymentLink
+        ? {
+            id: currentMonthPaymentLink.id,
+            url: currentMonthPaymentLink.url,
+          }
+        : {
+            id: undefined,
+            url: undefined,
+          },
       // Property and spot information
       property: {
         id: (property as any)._id?.toString() || property._id,

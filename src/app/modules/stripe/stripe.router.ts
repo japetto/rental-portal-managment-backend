@@ -14,6 +14,20 @@ router.post(
 // Webhook status check endpoint
 router.get("/webhook-status", StripeController.webhookStatus);
 
+// Create payment with unique payment link (admin only)
+router.post(
+  "/create-payment-link",
+  adminAuth,
+  StripeController.createPaymentWithLink,
+);
+
+// Get payment link details (admin only)
+router.get(
+  "/payment-link/:paymentLinkId",
+  adminAuth,
+  StripeController.getPaymentLinkDetails,
+);
+
 // Admin-only endpoint for syncing payment history
 router.get(
   "/sync-payment-history/:userId",

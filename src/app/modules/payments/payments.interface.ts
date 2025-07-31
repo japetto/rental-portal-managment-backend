@@ -27,6 +27,7 @@ export interface IPayment extends Document {
   // Stripe transaction fields
   stripeTransactionId?: string; // From Stripe webhook
   stripePaymentLinkId?: string; // Payment link ID from Stripe
+  stripeAccountId?: Types.ObjectId; // Stripe account used for this payment
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;

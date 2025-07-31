@@ -3,6 +3,8 @@ import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { PaymentHistoryService } from "../payments/payment-history.service";
+import { Payments } from "../payments/payments.schema";
+import { StripeService } from "../stripe/stripe.service";
 import { UserService } from "./users.service";
 
 // User Register
@@ -548,6 +550,78 @@ const getRentSummary = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Create payment link for a specific payment
+const createPaymentLink = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?._id?.toString();
+  const { paymentId } = req.params;
+
+  if (!userId) {
+    return sendResponse(res, {
+      statusCode: httpStatus.UNAUTHORIZED,
+      success: false,
+      message: "User not authenticated",
+      data: null,
+    });
+  }
+
+  // Find the payment and verify it belongs to the user
+  const payment = await Payments.findOne({
+    _id: paymentId,
+    tenantId: userId,
+    status: { $in: ["PENDING", "OVERDUE"] },
+    isDeleted: false,
+  });
+
+  if (!payment) {
+    return sendResponse(res, {
+      statusCode: httpStatus.NOT_FOUND,
+      success: false,
+      message: "Payment not found or not eligible for payment",
+      data: null,
+    });
+  }
+
+  try {
+    const stripeService = new StripeService();
+    const paymentLink = await stripeService.createPaymentLink({
+      tenantId: payment.tenantId.toString(),
+      propertyId: payment.propertyId.toString(),
+      spotId: payment.spotId.toString(),
+      amount: payment.amount,
+      type: payment.type,
+      dueDate: payment.dueDate,
+      description: payment.description,
+      lateFeeAmount: payment.lateFeeAmount,
+      receiptNumber: payment.receiptNumber,
+    });
+
+    // Update payment record with the new payment link
+    await Payments.findByIdAndUpdate(payment._id, {
+      stripePaymentLinkId: paymentLink.id,
+    });
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Payment link created successfully",
+      data: {
+        paymentId: payment._id,
+        paymentLink: {
+          id: paymentLink.id,
+          url: paymentLink.url,
+        },
+      },
+    });
+  } catch (error: any) {
+    sendResponse(res, {
+      statusCode: httpStatus.INTERNAL_SERVER_ERROR,
+      success: false,
+      message: "Failed to create payment link",
+      data: null,
+    });
+  }
+});
+
 export const UserController = {
   userRegister,
   userLogin,
@@ -566,5 +640,6 @@ export const UserController = {
   markAnnouncementAsRead,
   getMyProfile,
   getPaymentHistory,
-  getRentSummary, // Add this
+  getRentSummary,
+  createPaymentLink,
 };

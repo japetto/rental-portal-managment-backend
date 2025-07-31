@@ -4,12 +4,72 @@ import Stripe from "stripe";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { Payments } from "../payments/payments.schema";
-import { Properties } from "../properties/properties.schema";
-import { IUser } from "../users/users.interface";
 import { Users } from "../users/users.schema";
 import { StripeService } from "./stripe.service";
 
 export class StripeController {
+  // Create a new payment with unique payment link
+  static createPaymentWithLink = catchAsync(
+    async (req: Request, res: Response) => {
+      const {
+        tenantId,
+        propertyId,
+        spotId,
+        amount,
+        type,
+        dueDate,
+        description,
+        lateFeeAmount,
+      } = req.body;
+
+      const stripeService = new StripeService();
+
+      const result = await stripeService.createPaymentWithLink({
+        tenantId,
+        propertyId,
+        spotId,
+        amount,
+        type,
+        dueDate: new Date(dueDate),
+        description,
+        lateFeeAmount,
+        createdBy: req.user?.id || "SYSTEM",
+      });
+
+      sendResponse(res, {
+        statusCode: httpStatus.CREATED,
+        success: true,
+        message: "Payment created with payment link successfully",
+        data: {
+          payment: result.payment,
+          paymentLink: {
+            id: result.paymentLink.id,
+            url: result.paymentLink.url,
+            expiresAt: (result.paymentLink as any).expires_at,
+          },
+        },
+      });
+    },
+  );
+
+  // Get payment link details
+  static getPaymentLinkDetails = catchAsync(
+    async (req: Request, res: Response) => {
+      const { paymentLinkId } = req.params;
+
+      const stripeService = new StripeService();
+      const paymentLink =
+        await stripeService.getPaymentLinkDetails(paymentLinkId);
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Payment link details retrieved successfully",
+        data: paymentLink,
+      });
+    },
+  );
+
   static handleWebhook = catchAsync(async (req: Request, res: Response) => {
     const sig = req.headers["stripe-signature"];
     const timestamp = new Date().toISOString();
@@ -110,172 +170,69 @@ export class StripeController {
         currency: paymentIntent.currency,
       });
 
-      let user: IUser | null = null;
-      let lookupMethod = "";
+      // Extract metadata from the unique payment link
+      const metadata = paymentIntent.metadata;
+      console.log(`📋 [${timestamp}] Payment metadata:`, metadata);
 
-      // Find user by payment link ID in metadata
-      if (paymentIntent.metadata?.paymentLinkId) {
-        lookupMethod = "metadata.paymentLinkId";
-        console.log(
-          `🔍 [${timestamp}] Looking for user with paymentLinkId:`,
-          paymentIntent.metadata.paymentLinkId,
-        );
-        user = await Users.findOne({
-          stripePaymentLinkId: paymentIntent.metadata.paymentLinkId,
-        });
-        console.log(
-          `🔍 [${timestamp}] User found by ${lookupMethod}:`,
-          user ? `Yes (${user._id})` : "No",
-        );
-      }
-
-      // If not found, try to find by payment link ID from the payment intent
-      if (!user && (paymentIntent as any).payment_link) {
-        lookupMethod = "payment_link";
-        console.log(
-          `🔍 [${timestamp}] Looking for user with payment_link:`,
-          (paymentIntent as any).payment_link,
-        );
-        user = await Users.findOne({
-          stripePaymentLinkId: (paymentIntent as any).payment_link,
-        });
-        console.log(
-          `🔍 [${timestamp}] User found by ${lookupMethod}:`,
-          user ? `Yes (${user._id})` : "No",
-        );
-      }
-
-      // If still not found, try to find by customer ID
-      if (!user && paymentIntent.customer) {
-        lookupMethod = "customer";
-        console.log(
-          `🔍 [${timestamp}] Looking for user with customerId:`,
-          paymentIntent.customer,
-        );
-        user = await Users.findOne({
-          stripeCustomerId: paymentIntent.customer as string,
-        });
-        console.log(
-          `🔍 [${timestamp}] User found by ${lookupMethod}:`,
-          user ? `Yes (${user._id})` : "No",
-        );
-      }
-
-      if (!user) {
+      if (!metadata.tenantId || !metadata.receiptNumber) {
         console.error(
-          `❌ [${timestamp}] User not found for payment. Available data:`,
-          {
-            metadata: paymentIntent.metadata,
-            customer: paymentIntent.customer,
-            payment_link: (paymentIntent as any).payment_link,
-          },
+          `❌ [${timestamp}] Missing required metadata: tenantId or receiptNumber`,
         );
-        throw new Error("User not found for payment");
+        throw new Error("Missing required payment metadata");
       }
 
-      console.log(
-        `✅ [${timestamp}] User found: ${user._id} (via ${lookupMethod})`,
-      );
+      // Log additional metadata for debugging
+      console.log(`📋 [${timestamp}] Additional metadata:`, {
+        leaseId: metadata.leaseId,
+        stripeAccountId: metadata.stripeAccountId,
+        propertyName: metadata.propertyName,
+      });
+
+      // Find the existing payment record by receipt number
+      const existingPayment = await Payments.findOne({
+        receiptNumber: metadata.receiptNumber,
+      });
+
+      if (!existingPayment) {
+        console.error(
+          `❌ [${timestamp}] Payment record not found for receipt: ${metadata.receiptNumber}`,
+        );
+        throw new Error("Payment record not found");
+      }
 
       // Check if payment already exists
-      const existingPayment = await Payments.findOne({
+      const duplicatePayment = await Payments.findOne({
         stripeTransactionId: paymentIntent.id,
       });
 
-      if (existingPayment) {
+      if (duplicatePayment) {
         console.log(
           `⚠️ [${timestamp}] Payment already exists: ${paymentIntent.id}`,
         );
         return;
       }
 
-      // Get user details
-      const userDoc = await Users.findById(user._id);
-      if (!userDoc) throw new Error("User not found");
-
-      console.log(`👤 [${timestamp}] User details:`, {
-        userId: userDoc._id,
-        propertyId: userDoc.propertyId,
-        spotId: userDoc.spotId,
-        stripePaymentLinkId: userDoc.stripePaymentLinkId,
-      });
-
-      // Find property by name from metadata or use user's assigned property
-      let property = null;
-      if (paymentIntent.metadata?.propertyName) {
-        console.log(
-          `🏠 [${timestamp}] Looking for property by name:`,
-          paymentIntent.metadata.propertyName,
-        );
-        property = await Properties.findOne({
-          name: paymentIntent.metadata.propertyName,
-        });
-      }
-
-      if (!property) {
-        console.log(
-          `🏠 [${timestamp}] Looking for property by ID:`,
-          userDoc.propertyId,
-        );
-        property = await Properties.findById(userDoc.propertyId);
-      }
-
-      if (!property) {
-        console.error(`❌ [${timestamp}] Property not found for payment`);
-        throw new Error("Property not found for payment");
-      }
-
-      console.log(
-        `✅ [${timestamp}] Property found: ${property._id} (${property.name})`,
+      // Update the existing payment record with Stripe transaction details
+      const updatedPayment = await Payments.findByIdAndUpdate(
+        existingPayment._id,
+        {
+          status: "PAID",
+          paidDate: new Date(paymentIntent.created * 1000),
+          paymentMethod: "ONLINE",
+          transactionId: paymentIntent.id,
+          stripeTransactionId: paymentIntent.id,
+        },
+        { new: true },
       );
 
-      // Get lease details for validation
-      const { Leases } = await import("../leases/leases.schema");
-      const lease = await Leases.findOne({
-        tenantId: user._id,
-        leaseStatus: "ACTIVE",
-        isDeleted: false,
-      });
-
       console.log(
-        `📋 [${timestamp}] Lease found:`,
-        lease ? `Yes (${lease._id})` : "No",
+        `✅ [${timestamp}] Payment successful for receipt ${metadata.receiptNumber}: ${paymentIntent.id}`,
       );
-
-      // Create payment record
-      const paymentData = {
-        tenantId: user._id,
-        propertyId: property._id,
-        spotId: userDoc.spotId,
-        amount: paymentIntent.amount / 100, // Convert from cents
-        type: "RENT",
-        status: "PAID",
-        dueDate: lease?.leaseStart || new Date(),
-        paidDate: new Date(paymentIntent.created * 1000),
-        paymentMethod: "ONLINE",
-        transactionId: paymentIntent.id,
-        stripeTransactionId: paymentIntent.id,
-        stripePaymentLinkId: userDoc.stripePaymentLinkId,
-        receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        description: "Monthly Rent Payment",
-        totalAmount: paymentIntent.amount / 100,
-        createdBy: "SYSTEM",
-      };
-
-      console.log(`💾 [${timestamp}] Creating payment record:`, {
-        amount: paymentData.amount,
-        dueDate: paymentData.dueDate,
-        transactionId: paymentData.transactionId,
-      });
-
-      const payment = await Payments.create(paymentData);
-
       console.log(
-        `✅ [${timestamp}] Payment successful for user ${user._id}: ${paymentIntent.id}`,
+        `✅ [${timestamp}] Updated payment record: ${updatedPayment?._id}`,
       );
-      console.log(`✅ [${timestamp}] Created payment record: ${payment._id}`);
       console.log(
-        `💰 [${timestamp}] Amount: $${paymentData.amount.toFixed(2)}`,
+        `💰 [${timestamp}] Amount: $${(paymentIntent.amount / 100).toFixed(2)}`,
       );
     } catch (error: any) {
       console.error(`💥 [${timestamp}] Payment success handling error:`, error);
@@ -285,24 +242,16 @@ export class StripeController {
 
   static async handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
     try {
-      // Find user by payment link ID in metadata
-      let user: IUser | null = null;
-      if (paymentIntent.metadata?.paymentLinkId) {
-        user = await Users.findOne({
-          stripePaymentLinkId: paymentIntent.metadata.paymentLinkId,
-        });
-      }
+      const metadata = paymentIntent.metadata;
+      const receiptNumber = metadata.receiptNumber;
 
-      // If not found, try to find by customer ID
-      if (!user && paymentIntent.customer) {
-        user = await Users.findOne({
-          stripeCustomerId: paymentIntent.customer as string,
-        });
-      }
-
-      if (user) {
-        console.log(`Payment failed for user: ${user._id}`);
-        // Add notification logic here if needed
+      if (receiptNumber) {
+        // Update payment status to failed
+        await Payments.findOneAndUpdate(
+          { receiptNumber },
+          { status: "CANCELLED" },
+        );
+        console.log(`Payment failed for receipt: ${receiptNumber}`);
       }
     } catch (error: any) {
       console.error("Payment failure handling error:", error);
@@ -311,24 +260,16 @@ export class StripeController {
 
   static async handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
     try {
-      // Find user by payment link ID in metadata
-      let user: IUser | null = null;
-      if (paymentIntent.metadata?.paymentLinkId) {
-        user = await Users.findOne({
-          stripePaymentLinkId: paymentIntent.metadata.paymentLinkId,
-        });
-      }
+      const metadata = paymentIntent.metadata;
+      const receiptNumber = metadata.receiptNumber;
 
-      // If not found, try to find by customer ID
-      if (!user && paymentIntent.customer) {
-        user = await Users.findOne({
-          stripeCustomerId: paymentIntent.customer as string,
-        });
-      }
-
-      if (user) {
-        console.log(`Payment canceled for user: ${user._id}`);
-        // Add cancellation logic here if needed
+      if (receiptNumber) {
+        // Update payment status to cancelled
+        await Payments.findOneAndUpdate(
+          { receiptNumber },
+          { status: "CANCELLED" },
+        );
+        console.log(`Payment canceled for receipt: ${receiptNumber}`);
       }
     } catch (error: any) {
       console.error("Payment cancellation handling error:", error);
@@ -341,17 +282,54 @@ export class StripeController {
       const { userId } = req.params;
 
       const user = await Users.findById(userId);
-      if (!user || !user.stripePaymentLinkId) {
+      if (!user) {
         return sendResponse(res, {
           statusCode: httpStatus.NOT_FOUND,
           success: false,
-          message: "User or payment link not found",
+          message: "User not found",
+          data: null,
+        });
+      }
+
+      // Get user's active lease to find the property and Stripe account
+      const { Leases } = await import("../leases/leases.schema");
+      const activeLease = await Leases.findOne({
+        tenantId: userId,
+        leaseStatus: "ACTIVE",
+        isDeleted: false,
+      });
+
+      if (!activeLease) {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: "No active lease found for user",
+          data: null,
+        });
+      }
+
+      // Get the Stripe account for this property
+      const { StripeAccounts } = await import("./stripe-accounts.schema");
+      const stripeAccount = await StripeAccounts.findOne({
+        propertyId: activeLease.propertyId,
+        isActive: true,
+        isVerified: true,
+      });
+
+      if (!stripeAccount) {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: "No active Stripe account found for property",
           data: null,
         });
       }
 
       const stripeService = new StripeService();
-      await stripeService.syncStripePayments(user.stripePaymentLinkId, userId);
+      await stripeService.syncStripePayments(
+        stripeAccount.stripeAccountId,
+        userId,
+      );
 
       sendResponse(res, {
         statusCode: httpStatus.OK,

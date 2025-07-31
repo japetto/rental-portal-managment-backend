@@ -46,10 +46,8 @@ export interface IUser extends Document {
     removedAt?: Date;
     reason: string; // "LEASE_START", "LEASE_END", "TRANSFER", "CANCELLATION"
   }>;
-  // Stripe payment link fields
-  stripePaymentLinkId?: string; // Single payment link per tenant
-  stripePaymentLinkUrl?: string; // Payment link URL
-  stripeCustomerId?: string; // Stripe customer ID for webhook lookup
+  // Stripe customer ID for webhook lookup (kept for backward compatibility)
+  stripeCustomerId?: string;
   // Timestamp fields
   createdAt: Date;
   updatedAt: Date;

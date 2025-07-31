@@ -1,4 +1,4 @@
-import { Document } from "mongoose";
+import { Document, Types } from "mongoose";
 
 export interface IProperty extends Document {
   name: string;
@@ -13,7 +13,7 @@ export interface IProperty extends Document {
   amenities: string[];
   images: string[];
   rules: string[];
-  stripeAccountId?: string; // Stripe Connect account ID for this property
+  stripeAccountId?: Types.ObjectId; // Reference to StripeAccounts
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -52,5 +52,5 @@ export interface IUpdateProperty {
   amenities?: string[];
   images?: string[];
   rules?: string[];
-  stripeAccountId?: string; // Stripe Connect account ID
+  stripeAccountId?: string; // Stripe account ID reference
 }
