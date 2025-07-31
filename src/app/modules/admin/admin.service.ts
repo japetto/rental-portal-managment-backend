@@ -174,6 +174,21 @@ const createProperty = async (
     // Create the property
     const property = await Properties.create(propertyData);
 
+    // Auto-assign default Stripe account to the new property
+    try {
+      const { autoAssignPropertyToDefaultAccount } = await import(
+        "../stripe/stripe.service"
+      );
+      await autoAssignPropertyToDefaultAccount(property._id.toString());
+    } catch (stripeError) {
+      // Log the error but don't fail the property creation
+      console.error(
+        "Failed to auto-assign default Stripe account:",
+        stripeError,
+      );
+      // You might want to add this to a queue for retry later
+    }
+
     return property;
   } catch (error: any) {
     // Handle MongoDB duplicate key errors specifically

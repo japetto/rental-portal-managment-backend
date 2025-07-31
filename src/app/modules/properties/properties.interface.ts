@@ -13,7 +13,7 @@ export interface IProperty extends Document {
   amenities: string[];
   images: string[];
   rules: string[];
-  stripeAccountId?: Types.ObjectId; // Reference to StripeAccounts
+  stripeAccountId?: Types.ObjectId; // Reference to StripeAccounts (deprecated - now managed through StripeAccounts.propertyIds)
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;

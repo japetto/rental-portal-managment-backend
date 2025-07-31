@@ -7,12 +7,43 @@ export const createStripeAccountSchema = z.object({
     description: z.string().optional(),
     stripeAccountId: z.string().min(1, "Stripe Account ID is required"),
     isGlobalAccount: z.boolean().optional(),
+    isDefaultAccount: z.boolean().optional(),
     businessName: z.string().optional(),
     businessEmail: z.string().email("Invalid email format").optional(),
   }),
 });
 
-// Link Stripe Account to Property validation
+// Link Properties to Account validation
+export const linkPropertiesToAccountSchema = z.object({
+  body: z.object({
+    accountId: z.string().min(1, "Account ID is required"),
+    propertyIds: z
+      .array(z.string().min(1, "Property ID is required"))
+      .min(1, "At least one property ID is required"),
+  }),
+});
+
+// Unlink Properties from Account validation
+export const unlinkPropertiesFromAccountSchema = z.object({
+  body: z.object({
+    accountId: z.string().min(1, "Account ID is required"),
+    propertyIds: z
+      .array(z.string().min(1, "Property ID is required"))
+      .min(1, "At least one property ID is required"),
+  }),
+});
+
+// Set Default Account validation
+export const setDefaultAccountSchema = z.object({
+  body: z.object({
+    accountId: z.string().min(1, "Account ID is required"),
+  }),
+});
+
+// Get Default Account validation
+export const getDefaultAccountSchema = z.object({});
+
+// Link Stripe Account to Property validation (legacy - kept for backward compatibility)
 export const linkStripeAccountToPropertySchema = z.object({
   body: z.object({
     accountId: z.string().min(1, "Account ID is required"),
@@ -31,6 +62,7 @@ export const updateStripeAccountSchema = z.object({
     businessName: z.string().optional(),
     businessEmail: z.string().email("Invalid email format").optional(),
     isActive: z.boolean().optional(),
+    isDefaultAccount: z.boolean().optional(),
   }),
 });
 
@@ -41,7 +73,14 @@ export const getStripeAccountByIdSchema = z.object({
   }),
 });
 
-// Get Stripe Account by Property validation
+// Get Stripe Accounts by Property validation
+export const getStripeAccountsByPropertySchema = z.object({
+  params: z.object({
+    propertyId: z.string().min(1, "Property ID is required"),
+  }),
+});
+
+// Get Stripe Account by Property validation (legacy - kept for backward compatibility)
 export const getStripeAccountByPropertySchema = z.object({
   params: z.object({
     propertyId: z.string().min(1, "Property ID is required"),

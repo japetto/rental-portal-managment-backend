@@ -167,18 +167,4 @@ router.delete(
 // Test email endpoint for debugging
 router.get("/test-email", AdminController.testEmail);
 
-// Properties with Stripe details endpoints
-router.get(
-  "/properties-with-stripe-details",
-  AdminController.getAllPropertiesWithStripeDetails,
-);
-router.get(
-  "/properties-with-available-stripe-accounts",
-  AdminController.getPropertiesWithAvailableStripeAccounts,
-);
-router.get(
-  "/properties-without-stripe-accounts",
-  AdminController.getPropertiesWithoutStripeAccounts,
-);
-
 export const AdminRouter = router;

@@ -4,10 +4,24 @@ import Stripe from "stripe";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { Payments } from "../payments/payments.schema";
-import { Properties } from "../properties/properties.schema";
 import { Users } from "../users/users.schema";
-import { StripeAccounts } from "./stripe-accounts.schema";
-import { StripeService } from "./stripe.service";
+import {
+  createStripeAccount as createStripeAccountService,
+  deleteStripeAccount as deleteStripeAccountService,
+  getAllStripeAccounts as getAllStripeAccountsService,
+  getAssignablePropertiesForAccount as getAssignablePropertiesForAccountService,
+  getAvailableStripeAccounts as getAvailableStripeAccountsService,
+  getDefaultAccount as getDefaultAccountService,
+  getStripeAccountById as getStripeAccountByIdService,
+  getStripeAccountsByProperty as getStripeAccountsByPropertyService,
+  getUnassignedProperties as getUnassignedPropertiesService,
+  linkPropertiesToAccount as linkPropertiesToAccountService,
+  setDefaultAccount as setDefaultAccountService,
+  StripeService,
+  unlinkPropertiesFromAccount as unlinkPropertiesFromAccountService,
+  updateStripeAccount as updateStripeAccountService,
+  verifyStripeAccount as verifyStripeAccountService,
+} from "./stripe.service";
 
 // Create a new Stripe account for a property
 export const createStripeAccount = catchAsync(
@@ -19,154 +33,237 @@ export const createStripeAccount = catchAsync(
       businessName,
       businessEmail,
       isGlobalAccount = false,
+      isDefaultAccount = false,
       metadata,
     } = req.body;
 
-    // Check if Stripe account ID already exists
-    const existingAccount = await StripeAccounts.findOne({
-      stripeAccountId,
-      isDeleted: false,
-    });
-
-    if (existingAccount) {
-      return sendResponse(res, {
-        statusCode: httpStatus.CONFLICT,
-        success: false,
-        message: "Stripe account ID already exists",
-        data: null,
-      });
-    }
-
-    // Create new Stripe account
-    const stripeAccount = await StripeAccounts.create({
+    // Prepare account data with proper defaults
+    const accountData = {
       name,
-      description,
+      description: description || undefined,
       stripeAccountId,
-      businessName,
-      businessEmail,
+      businessName: businessName || undefined,
+      businessEmail: businessEmail || undefined,
       isActive: true,
       isVerified: false, // Will be verified through Stripe Connect onboarding
-      isGlobalAccount,
-      metadata,
-    });
+      isGlobalAccount: Boolean(isGlobalAccount),
+      isDefaultAccount: Boolean(isDefaultAccount),
+      propertyIds: [], // Start with empty property array
+      metadata: metadata || undefined,
+    };
 
-    sendResponse(res, {
-      statusCode: httpStatus.CREATED,
-      success: true,
-      message: "Stripe account created successfully",
-      data: stripeAccount,
-    });
+    try {
+      const stripeAccount = await createStripeAccountService(accountData);
+
+      sendResponse(res, {
+        statusCode: httpStatus.CREATED,
+        success: true,
+        message: "Stripe account created successfully",
+        data: stripeAccount,
+      });
+    } catch (error: any) {
+      if (error.message === "Stripe account ID already exists") {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (error.message === "Another account is already set as default") {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
+    }
   },
 );
 
-// Link Stripe account to a property
-export const linkStripeAccountToProperty = catchAsync(
+// Link multiple properties to a Stripe account
+export const linkPropertiesToAccount = catchAsync(
   async (req: Request, res: Response) => {
-    const { accountId, propertyId } = req.body;
+    const { accountId, propertyIds } = req.body;
 
-    // Validate that property exists
-    const property = await Properties.findById(propertyId);
+    try {
+      const updatedAccount = await linkPropertiesToAccountService(
+        accountId,
+        propertyIds,
+      );
 
-    if (!property) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Property not found",
-        data: null,
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Properties linked to Stripe account successfully",
+        data: updatedAccount,
       });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (error.message.includes("One or more properties not found")) {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (error.message.includes("already assigned to other accounts")) {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
     }
+  },
+);
 
-    // Validate that Stripe account exists
-    const stripeAccount = await StripeAccounts.findById(accountId);
+// Unlink properties from a Stripe account
+export const unlinkPropertiesFromAccount = catchAsync(
+  async (req: Request, res: Response) => {
+    const { accountId, propertyIds } = req.body;
 
-    if (!stripeAccount) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Stripe account not found",
-        data: null,
+    try {
+      const updatedAccount = await unlinkPropertiesFromAccountService(
+        accountId,
+        propertyIds,
+      );
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Properties unlinked from Stripe account successfully",
+        data: updatedAccount,
       });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
     }
+  },
+);
 
-    // Check if property already has a Stripe account
-    const existingPropertyAccount = await StripeAccounts.findOne({
-      propertyId,
-      isDeleted: false,
-    });
+// Set an account as default
+export const setDefaultAccount = catchAsync(
+  async (req: Request, res: Response) => {
+    const { accountId } = req.body;
 
-    if (existingPropertyAccount) {
-      return sendResponse(res, {
-        statusCode: httpStatus.CONFLICT,
-        success: false,
-        message: "Property already has a Stripe account",
-        data: null,
+    try {
+      const updatedAccount = await setDefaultAccountService(accountId);
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Default account set successfully",
+        data: updatedAccount,
       });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
     }
+  },
+);
 
-    // Update the Stripe account with property ID
-    const updatedAccount = await StripeAccounts.findByIdAndUpdate(
-      accountId,
-      { propertyId },
-      { new: true },
-    ).populate("propertyId", "name address");
+// Get default account
+export const getDefaultAccount = catchAsync(
+  async (req: Request, res: Response) => {
+    try {
+      const defaultAccount = await getDefaultAccountService();
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Default account retrieved successfully",
+        data: defaultAccount,
+      });
+    } catch (error: any) {
+      if (error.message === "No default account found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
+    }
+  },
+);
+
+// Get all Stripe accounts with comprehensive property information
+export const getAllStripeAccounts = catchAsync(
+  async (req: Request, res: Response) => {
+    const comprehensiveData = await getAllStripeAccountsService();
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Stripe account linked to property successfully",
-      data: updatedAccount,
+      message:
+        "Stripe accounts and property assignments retrieved successfully",
+      data: comprehensiveData,
     });
   },
 );
 
-// Get available Stripe accounts for a property
-export const getAvailableStripeAccounts = catchAsync(
+// Get Stripe account by ID
+export const getStripeAccountById = catchAsync(
+  async (req: Request, res: Response) => {
+    const { accountId } = req.params;
+
+    try {
+      const account = await getStripeAccountByIdService(accountId);
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Stripe account retrieved successfully",
+        data: account,
+      });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
+    }
+  },
+);
+
+// Get Stripe accounts by property ID
+export const getStripeAccountsByProperty = catchAsync(
   async (req: Request, res: Response) => {
     const { propertyId } = req.params;
 
-    // Validate that property exists
-    const property = await Properties.findById(propertyId);
-    if (!property) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Property not found",
-        data: null,
-      });
-    }
-
-    // Get property-specific account
-    const propertyAccount = await StripeAccounts.findOne({
-      propertyId,
-      isDeleted: false,
-    }).populate("propertyId", "name address");
-
-    // Get global accounts
-    const globalAccounts = await StripeAccounts.find({
-      isGlobalAccount: true,
-      isDeleted: false,
-    }).populate("propertyId", "name address");
-
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Available Stripe accounts retrieved successfully",
-      data: {
-        propertyAccount,
-        globalAccounts,
-        hasPropertyAccount: !!propertyAccount,
-        hasGlobalAccounts: globalAccounts.length > 0,
-      },
-    });
-  },
-);
-
-// Get all Stripe accounts
-export const getAllStripeAccounts = catchAsync(
-  async (req: Request, res: Response) => {
-    const accounts = await StripeAccounts.find({ isDeleted: false })
-      .populate("propertyId", "name address")
-      .sort({ createdAt: -1 });
+    const accounts = await getStripeAccountsByPropertyService(propertyId);
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -177,89 +274,40 @@ export const getAllStripeAccounts = catchAsync(
   },
 );
 
-// Get Stripe account by ID
-export const getStripeAccountById = catchAsync(
-  async (req: Request, res: Response) => {
-    const { accountId } = req.params;
-
-    const account = await StripeAccounts.findById(accountId).populate(
-      "propertyId",
-      "name address",
-    );
-
-    if (!account) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Stripe account not found",
-        data: null,
-      });
-    }
-
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Stripe account retrieved successfully",
-      data: account,
-    });
-  },
-);
-
-// Get Stripe account by property ID
-export const getStripeAccountByProperty = catchAsync(
-  async (req: Request, res: Response) => {
-    const { propertyId } = req.params;
-
-    const account = await StripeAccounts.findOne({
-      propertyId,
-      isDeleted: false,
-    }).populate("propertyId", "name address");
-
-    if (!account) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "No Stripe account found for this property",
-        data: null,
-      });
-    }
-
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Stripe account retrieved successfully",
-      data: account,
-    });
-  },
-);
-
 // Update Stripe account
 export const updateStripeAccount = catchAsync(
   async (req: Request, res: Response) => {
     const { accountId } = req.params;
     const updateData = req.body;
 
-    const account = await StripeAccounts.findByIdAndUpdate(
-      accountId,
-      updateData,
-      { new: true },
-    ).populate("propertyId", "name address");
+    try {
+      const account = await updateStripeAccountService(accountId, updateData);
 
-    if (!account) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Stripe account not found",
-        data: null,
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Stripe account updated successfully",
+        data: account,
       });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (error.message === "Another account is already set as default") {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
     }
-
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Stripe account updated successfully",
-      data: account,
-    });
   },
 );
 
@@ -268,27 +316,26 @@ export const deleteStripeAccount = catchAsync(
   async (req: Request, res: Response) => {
     const { accountId } = req.params;
 
-    const account = await StripeAccounts.findByIdAndUpdate(
-      accountId,
-      { isDeleted: true, deletedAt: new Date() },
-      { new: true },
-    );
+    try {
+      await deleteStripeAccountService(accountId);
 
-    if (!account) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Stripe account not found",
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Stripe account deleted successfully",
         data: null,
       });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
     }
-
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Stripe account deleted successfully",
-      data: null,
-    });
   },
 );
 
@@ -297,27 +344,97 @@ export const verifyStripeAccount = catchAsync(
   async (req: Request, res: Response) => {
     const { accountId } = req.params;
 
-    const account = await StripeAccounts.findByIdAndUpdate(
-      accountId,
-      { isVerified: true },
-      { new: true },
-    ).populate("propertyId", "name address");
+    try {
+      const account = await verifyStripeAccountService(accountId);
 
-    if (!account) {
-      return sendResponse(res, {
-        statusCode: httpStatus.NOT_FOUND,
-        success: false,
-        message: "Stripe account not found",
-        data: null,
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Stripe account verified successfully",
+        data: account,
       });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
     }
+  },
+);
+
+// Get available Stripe accounts for a property (including global and default)
+export const getAvailableStripeAccounts = catchAsync(
+  async (req: Request, res: Response) => {
+    const { propertyId } = req.params;
+
+    try {
+      const result = await getAvailableStripeAccountsService(propertyId);
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Available Stripe accounts retrieved successfully",
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === "Property not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
+    }
+  },
+);
+
+// Get unassigned properties (properties not linked to any Stripe account)
+export const getUnassignedProperties = catchAsync(
+  async (req: Request, res: Response) => {
+    const unassignedProperties = await getUnassignedPropertiesService();
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Stripe account verified successfully",
-      data: account,
+      message: "Unassigned properties retrieved successfully",
+      data: unassignedProperties,
     });
+  },
+);
+
+// Get properties that can be assigned to a specific Stripe account
+export const getAssignablePropertiesForAccount = catchAsync(
+  async (req: Request, res: Response) => {
+    const { accountId } = req.params;
+
+    try {
+      const assignableProperties =
+        await getAssignablePropertiesForAccountService(accountId);
+
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Assignable properties retrieved successfully",
+        data: assignableProperties,
+      });
+    } catch (error: any) {
+      if (error.message === "Stripe account not found") {
+        return sendResponse(res, {
+          statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      throw error;
+    }
   },
 );
 
@@ -550,7 +667,7 @@ export const syncPaymentHistory = catchAsync(
     // Get the Stripe account for this property
     const { StripeAccounts } = await import("./stripe-accounts.schema");
     const stripeAccount = await StripeAccounts.findOne({
-      propertyId: activeLease.propertyId,
+      propertyIds: activeLease.propertyId,
       isActive: true,
       isVerified: true,
     });

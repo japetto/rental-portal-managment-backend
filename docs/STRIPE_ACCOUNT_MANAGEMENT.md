@@ -1,359 +1,355 @@
-# Stripe Account Management System
+# Stripe Account Management API Documentation
 
 ## Overview
 
-The Stripe Account Management System allows properties to have their own dedicated Stripe Connect accounts for processing payments. This ensures proper fund separation and compliance with Stripe's Connect platform requirements.
+This document describes the Stripe Account Management API endpoints for managing Stripe Connect accounts, linking properties to accounts, and handling payment processing.
 
-## Architecture
+## Features
 
-### Database Models
+- **Multiple Properties per Account**: Each Stripe account can be linked to multiple properties
+- **Default Account**: Set one account as default for automatic property assignment
+- **Global Accounts**: Accounts that can be used across all properties
+- **Property-Specific Accounts**: Accounts dedicated to specific properties
+- **Duplicate Prevention**: Ensures properties are not assigned to multiple accounts
+- **Auto-Assignment**: New properties can be automatically assigned to the default account
 
-#### StripeAccounts Schema
-```typescript
-{
-  name: string;                    // Account name
-  description?: string;            // Optional description
-  propertyId: ObjectId;           // Reference to Property
-  stripeAccountId: string;        // Stripe Connect Account ID
-  isActive: boolean;              // Account status
-  isVerified: boolean;            // Verification status
-  businessName?: string;          // Business name
-  businessEmail?: string;         // Business email
-  metadata?: any;                 // Additional data
-  isDeleted: boolean;             // Soft delete flag
-  deletedAt?: Date;               // Deletion timestamp
-}
-```
+## Account Types
 
-### Key Features
-
-1. **Property-Specific Accounts**: Each property can have its own Stripe Connect account
-2. **Account Verification**: Track verification status for compliance
-3. **Soft Delete**: Maintain data integrity with soft deletion
-4. **Validation**: Comprehensive input validation and error handling
+1. **Default Account**: Only one account can be set as default. New properties are automatically assigned to this account.
+2. **Global Account**: Can be used for all properties regardless of specific assignments.
+3. **Property-Specific Account**: Dedicated to specific properties only.
 
 ## API Endpoints
 
-### Stripe Account Management
+### 1. Create Stripe Account
 
-#### 1. Create Stripe Account
-```http
-POST /api/v1.0/webhooks/accounts
-Authorization: Bearer <admin_token>
-Content-Type: application/json
+**POST** `/api/v1.0/stripe/accounts`
 
+Creates a new Stripe account with optional default or global settings.
+
+**Request Body:**
+```json
 {
-  "name": "Sunset RV Park Account",
-  "description": "Primary payment account for Sunset RV Park",
-  "propertyId": "507f1f77bcf86cd799439011",
+  "name": "Main Payment Account",
+  "description": "Primary payment processing account",
   "stripeAccountId": "acct_1234567890",
-  "businessName": "Sunset RV Park LLC",
-  "businessEmail": "payments@sunsetrvpark.com"
+  "businessName": "Rental Company LLC",
+  "businessEmail": "payments@rentalcompany.com",
+  "isGlobalAccount": false,
+  "isDefaultAccount": false,
+  "metadata": {
+    "region": "US",
+    "currency": "USD"
+  }
 }
 ```
 
 **Response:**
 ```json
 {
-  "statusCode": 201,
   "success": true,
+  "statusCode": 201,
   "message": "Stripe account created successfully",
   "data": {
-    "_id": "507f1f77bcf86cd799439012",
-    "name": "Sunset RV Park Account",
-    "propertyId": "507f1f77bcf86cd799439011",
+    "_id": "account_id",
+    "name": "Main Payment Account",
     "stripeAccountId": "acct_1234567890",
+    "isDefaultAccount": false,
+    "isGlobalAccount": false,
+    "propertyIds": [],
     "isActive": true,
-    "isVerified": false,
-    "businessName": "Sunset RV Park LLC",
-    "businessEmail": "payments@sunsetrvpark.com",
-    "createdAt": "2024-01-15T10:30:00.000Z",
-    "updatedAt": "2024-01-15T10:30:00.000Z"
+    "isVerified": false
   }
 }
 ```
 
-#### 2. Get All Stripe Accounts
-```http
-GET /api/v1/webhooks/accounts
-Authorization: Bearer <admin_token>
-```
+### 2. Link Properties to Account
 
-#### 3. Get Stripe Account by ID
-```http
-GET /api/v1/webhooks/accounts/:accountId
-Authorization: Bearer <admin_token>
-```
+**POST** `/api/v1.0/stripe/accounts/link-properties`
 
-#### 4. Get Stripe Account by Property
-```http
-GET /api/v1/webhooks/accounts/property/:propertyId
-Authorization: Bearer <admin_token>
-```
+Links multiple properties to a Stripe account. Prevents duplicate assignments.
 
-#### 5. Update Stripe Account
-```http
-PATCH /api/v1/webhooks/accounts/:accountId
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
+**Request Body:**
+```json
 {
-  "name": "Updated Account Name",
-  "businessEmail": "newemail@sunsetrvpark.com"
-}
-```
-
-#### 6. Delete Stripe Account (Soft Delete)
-```http
-DELETE /api/v1/webhooks/accounts/:accountId
-Authorization: Bearer <admin_token>
-```
-
-#### 7. Verify Stripe Account
-```http
-PATCH /api/v1/webhooks/accounts/:accountId/verify
-Authorization: Bearer <admin_token>
-```
-
-### Payment Link Management
-
-#### Create Payment with Link
-```http
-POST /api/v1/webhooks/create-payment-link
-Authorization: Bearer <admin_token>
-Content-Type: application/json
-
-{
-  "tenantId": "507f1f77bcf86cd799439013",
-  "propertyId": "507f1f77bcf86cd799439011",
-  "spotId": "507f1f77bcf86cd799439014",
-  "amount": 500.00,
-  "type": "RENT",
-  "dueDate": "2024-02-01T00:00:00.000Z",
-  "description": "Monthly Rent Payment",
-  "lateFeeAmount": 25.00
+  "accountId": "account_id",
+  "propertyIds": ["property_id_1", "property_id_2", "property_id_3"]
 }
 ```
 
 **Response:**
 ```json
 {
-  "statusCode": 201,
   "success": true,
-  "message": "Payment created with payment link successfully",
+  "statusCode": 200,
+  "message": "Properties linked to Stripe account successfully",
   "data": {
-    "payment": {
-      "_id": "507f1f77bcf86cd799439015",
-      "receiptNumber": "RCP-1705312200000-123",
-      "status": "PENDING",
-      "totalAmount": 525.00,
-      "stripeAccountId": "507f1f77bcf86cd799439012"
-    },
-    "paymentLink": {
-      "id": "plink_1234567890",
-      "url": "https://checkout.stripe.com/pay/...",
-      "expiresAt": 1705917000
-    }
+    "_id": "account_id",
+    "name": "Main Payment Account",
+    "propertyIds": [
+      {
+        "_id": "property_id_1",
+        "name": "Property A",
+        "address": "123 Main St"
+      },
+      {
+        "_id": "property_id_2", 
+        "name": "Property B",
+        "address": "456 Oak Ave"
+      }
+    ]
   }
 }
 ```
 
-## Workflow
+### 3. Unlink Properties from Account
 
-### 1. Setup Stripe Connect Account
+**POST** `/api/v1.0/stripe/accounts/unlink-properties`
 
-1. **Create Stripe Connect Account** in Stripe Dashboard
-2. **Add Account to Database** using the API
-3. **Complete Stripe Onboarding** for the Connect account
-4. **Verify Account** using the verify endpoint
+Removes properties from a Stripe account.
 
-### 2. Property Configuration
-
-1. **Link Property** to Stripe account during creation
-2. **Validate Account** is active and verified
-3. **Configure Fees** if needed
-
-### 3. Payment Processing
-
-1. **User Clicks Pay** → System validates lease and property
-2. **Find Stripe Account** → Gets property-specific account
-3. **Create Payment Link** → With rich metadata
-4. **Process Payment** → Through correct Stripe account
-5. **Update Records** → With transaction details
-
-## Validation Rules
-
-### Stripe Account Creation
-- ✅ **Name**: Required, non-empty string
-- ✅ **Property ID**: Required, valid ObjectId
-- ✅ **Stripe Account ID**: Required, non-empty string
-- ✅ **Business Email**: Optional, valid email format
-- ✅ **Application Fee**: Optional, 0-100 range
-
-### Payment Link Creation
-- ✅ **Tenant ID**: Required, valid ObjectId
-- ✅ **Property ID**: Required, valid ObjectId
-- ✅ **Spot ID**: Required, valid ObjectId
-- ✅ **Amount**: Required, positive number
-- ✅ **Type**: Required, non-empty string
-- ✅ **Due Date**: Required, valid date string
-- ✅ **Description**: Required, non-empty string
-- ✅ **Late Fee**: Optional, non-negative number
-
-## Error Handling
-
-### Common Error Responses
-
-#### Property Not Found
+**Request Body:**
 ```json
 {
-  "statusCode": 404,
-  "success": false,
-  "message": "Property not found",
-  "data": null
+  "accountId": "account_id",
+  "propertyIds": ["property_id_1", "property_id_2"]
 }
 ```
 
-#### Account Already Exists
+### 4. Set Default Account
+
+**POST** `/api/v1.0/stripe/accounts/set-default`
+
+Sets an account as the default account. Only one account can be default at a time.
+
+**Request Body:**
 ```json
 {
+  "accountId": "account_id"
+}
+```
+
+### 5. Get Default Account
+
+**GET** `/api/v1.0/stripe/accounts/default`
+
+Retrieves the current default account.
+
+**Response:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Default account retrieved successfully",
+  "data": {
+    "_id": "account_id",
+    "name": "Default Payment Account",
+    "isDefaultAccount": true,
+    "propertyIds": [...]
+  }
+}
+```
+
+### 6. Get All Stripe Accounts
+
+**GET** `/api/v1.0/stripe/accounts`
+
+Retrieves all Stripe accounts with their linked properties.
+
+**Response:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Stripe accounts retrieved successfully",
+  "data": [
+    {
+      "_id": "account_id_1",
+      "name": "Default Account",
+      "isDefaultAccount": true,
+      "isGlobalAccount": false,
+      "propertyIds": [...],
+      "isActive": true,
+      "isVerified": true
+    },
+    {
+      "_id": "account_id_2", 
+      "name": "Global Account",
+      "isDefaultAccount": false,
+      "isGlobalAccount": true,
+      "propertyIds": [...],
+      "isActive": true,
+      "isVerified": true
+    }
+  ]
+}
+```
+
+### 7. Get Available Accounts for Property
+
+**GET** `/api/v1.0/stripe/accounts/available/:propertyId`
+
+Retrieves all available Stripe accounts for a specific property.
+
+**Response:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Available Stripe accounts retrieved successfully",
+  "data": {
+    "propertyAccounts": [...],
+    "globalAccounts": [...],
+    "defaultAccount": {...},
+    "hasPropertyAccounts": true,
+    "hasGlobalAccounts": true,
+    "hasDefaultAccount": true
+  }
+}
+```
+
+### 8. Get Accounts by Property
+
+**GET** `/api/v1.0/stripe/accounts/property/:propertyId`
+
+Retrieves all Stripe accounts linked to a specific property.
+
+### 9. Update Stripe Account
+
+**PATCH** `/api/v1.0/stripe/accounts/:accountId`
+
+Updates a Stripe account's details.
+
+**Request Body:**
+```json
+{
+  "name": "Updated Account Name",
+  "description": "Updated description",
+  "isActive": true,
+  "isDefaultAccount": false
+}
+```
+
+### 10. Delete Stripe Account
+
+**DELETE** `/api/v1.0/stripe/accounts/:accountId`
+
+Soft deletes a Stripe account.
+
+### 11. Verify Stripe Account
+
+**PATCH** `/api/v1.0/stripe/accounts/:accountId/verify`
+
+Marks a Stripe account as verified.
+
+## Edge Cases and Error Handling
+
+### 1. Duplicate Property Assignment
+
+When linking properties to an account, the system checks if any of the properties are already assigned to other accounts:
+
+```json
+{
+  "success": false,
   "statusCode": 409,
-  "success": false,
-  "message": "Property already has a Stripe account",
-  "data": null
+  "message": "Some properties are already assigned to other accounts",
+  "data": {
+    "conflictingProperties": ["property_id_1", "property_id_2"]
+  }
 }
 ```
 
-#### No Active Lease
+### 2. Multiple Default Accounts
+
+Only one account can be set as default. Attempting to set another account as default will return:
+
 ```json
 {
-  "statusCode": 400,
   "success": false,
-  "message": "User does not have an active lease for this property",
+  "statusCode": 409,
+  "message": "Another account is already set as default",
   "data": null
 }
 ```
 
-#### No Stripe Account Found
+### 3. Invalid Property IDs
+
+When linking properties, if any property ID is invalid:
+
 ```json
 {
-  "statusCode": 400,
   "success": false,
-  "message": "No active Stripe account found for this property",
+  "statusCode": 404,
+  "message": "One or more properties not found",
   "data": null
 }
 ```
 
-## Security Considerations
+### 4. Account Not Found
 
-### Authentication
-- ✅ **Admin Only**: All account management requires admin authentication
-- ✅ **Property Validation**: Ensures accounts are linked to valid properties
-- ✅ **Soft Delete**: Maintains data integrity and audit trail
+When referencing a non-existent account:
 
-### Data Protection
-- ✅ **Stripe Account IDs**: Securely stored and validated
-- ✅ **Metadata Encryption**: Sensitive data encrypted in Stripe
-- ✅ **Webhook Verification**: All webhooks verified with Stripe signatures
+```json
+{
+  "success": false,
+  "statusCode": 404,
+  "message": "Stripe account not found",
+  "data": null
+}
+```
 
-## Integration with Existing Systems
+## Auto-Assignment Logic
 
-### Property Management
-- ✅ **Property Schema**: Updated with `stripeAccountId` field
-- ✅ **Validation**: Ensures properties have valid Stripe accounts
-- ✅ **Cascading**: Property deletion affects Stripe account status
+When a new property is created, the system automatically assigns it to the default account if:
 
-### Payment Processing
-- ✅ **Payment Schema**: Updated with `stripeAccountId` field
-- ✅ **Lease Validation**: Ensures payments are linked to active leases
-- ✅ **Metadata Tracking**: Rich metadata for payment tracking
+1. A default account exists
+2. The property is not already assigned to any account
+3. The default account is active
 
-### User Management
-- ✅ **User Permissions**: Admin-only access to account management
-- ✅ **Tenant Validation**: Ensures users have valid leases
-- ✅ **Payment History**: Links payments to correct Stripe accounts
+## Account Priority for Property Assignment
+
+When determining which account to use for a property, the system follows this priority:
+
+1. **Property-Specific Accounts**: Accounts directly linked to the property
+2. **Global Accounts**: Accounts marked as global
+3. **Default Account**: The account marked as default
+4. **No Account**: If no suitable account is found
+
+## Database Schema
+
+```typescript
+interface IStripeAccount {
+  name: string;
+  description?: string;
+  propertyIds: ObjectId[]; // Array of property IDs
+  stripeAccountId: string;
+  isActive: boolean;
+  isVerified: boolean;
+  isGlobalAccount: boolean;
+  isDefaultAccount: boolean;
+  businessName?: string;
+  businessEmail?: string;
+  metadata?: any;
+  isDeleted: boolean;
+  deletedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
 
 ## Best Practices
 
-### Account Management
-1. **Verify Accounts**: Always verify Stripe accounts before use
-2. **Monitor Status**: Regularly check account verification status
-3. **Backup Accounts**: Consider multiple accounts for redundancy
-4. **Fee Management**: Configure appropriate application fees
+1. **Set a Default Account**: Always set a default account for automatic property assignment
+2. **Use Global Accounts Sparingly**: Reserve global accounts for truly universal payment processing
+3. **Monitor Property Assignments**: Regularly check property assignments to ensure optimal distribution
+4. **Verify Accounts**: Mark accounts as verified only after Stripe Connect onboarding is complete
+5. **Handle Conflicts Gracefully**: Always check for existing assignments before linking properties
 
-### Payment Processing
-1. **Lease Validation**: Always validate active leases
-2. **Account Selection**: Use property-specific accounts
-3. **Metadata Tracking**: Include comprehensive metadata
-4. **Error Handling**: Graceful handling of missing accounts
+## Integration with Property Management
 
-### Security
-1. **Admin Access**: Restrict account management to admins
-2. **Validation**: Comprehensive input validation
-3. **Audit Trail**: Maintain complete audit logs
-4. **Webhook Security**: Verify all webhook signatures
+The Stripe account management system integrates with the property management system to:
 
-## Testing
-
-### API Testing
-```bash
-# Create Stripe Account
-curl -X POST http://localhost:3000/api/v1/webhooks/accounts \
-  -H "Authorization: Bearer <admin_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Test Account",
-    "propertyId": "507f1f77bcf86cd799439011",
-    "stripeAccountId": "acct_test123"
-  }'
-
-# Create Payment Link
-curl -X POST http://localhost:3000/api/v1/webhooks/create-payment-link \
-  -H "Authorization: Bearer <admin_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenantId": "507f1f77bcf86cd799439013",
-    "propertyId": "507f1f77bcf86cd799439011",
-    "spotId": "507f1f77bcf86cd799439014",
-    "amount": 500.00,
-    "type": "RENT",
-    "dueDate": "2024-02-01T00:00:00.000Z",
-    "description": "Monthly Rent Payment"
-  }'
-```
-
-### Webhook Testing
-```bash
-# Test webhook endpoint
-curl -X POST http://localhost:3000/api/v1/webhooks/webhook \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "payment_intent.succeeded",
-    "data": {
-      "object": {
-        "id": "pi_test123",
-        "amount": 5000,
-        "metadata": {
-          "tenantId": "507f1f77bcf86cd799439013",
-          "receiptNumber": "RCP-1705312200000-123"
-        }
-      }
-    }
-  }'
-```
-
-## Monitoring and Logging
-
-### Key Metrics
-- ✅ **Account Creation**: Track new account setups
-- ✅ **Verification Status**: Monitor account verification rates
-- ✅ **Payment Success**: Track successful payments per account
-- ✅ **Error Rates**: Monitor failed payment attempts
-
-### Logging
-- ✅ **Account Operations**: Log all account CRUD operations
-- ✅ **Payment Processing**: Log payment link creation and processing
-- ✅ **Webhook Events**: Log all webhook events and processing
-- ✅ **Error Tracking**: Comprehensive error logging
-
-This system ensures that each property has its own dedicated Stripe Connect account, providing proper fund separation, compliance, and detailed payment tracking. 🎯 
+- Automatically assign new properties to the default account
+- Provide account recommendations for property payments
+- Ensure payment processing continuity when accounts are updated
+- Maintain audit trails of property-account relationships 
