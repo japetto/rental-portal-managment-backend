@@ -2,6 +2,7 @@ import express from "express";
 import { AdminRouter } from "../modules/admin/admin.router";
 import { AnnouncementRouter } from "../modules/announcements/announcements.router";
 import { LeasesRoutes } from "../modules/leases/leases.router";
+import { paymentRoutes } from "../modules/payments/payments.router";
 import { ServiceRequestRouter } from "../modules/service-requests/service-requests.router";
 import { stripeRoutes } from "../modules/stripe/stripe.router";
 import { UserRouter } from "../modules/users/users.router";
@@ -32,6 +33,10 @@ const routes = [
   {
     path: "/stripe",
     route: stripeRoutes,
+  },
+  {
+    path: "/payments",
+    route: paymentRoutes,
   },
 ];
 

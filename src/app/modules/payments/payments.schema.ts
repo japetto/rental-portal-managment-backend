@@ -80,10 +80,10 @@ paymentsSchema.pre("save", async function (next) {
       isDeleted: false,
     });
 
-    if (lease && this.amount !== lease.rentAmount) {
+    if (lease && this.amount > lease.rentAmount) {
       return next(
         new Error(
-          `Rent payment amount (${this.amount}) must match lease rent amount (${lease.rentAmount})`,
+          `Rent payment amount (${this.amount}) cannot exceed lease rent amount (${lease.rentAmount})`,
         ),
       );
     }

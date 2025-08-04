@@ -2,7 +2,7 @@ import { PaymentStatus } from "../../../shared/enums/payment.enums";
 import { Leases } from "../leases/leases.schema";
 import { Properties } from "../properties/properties.schema";
 import { Spots } from "../spots/spots.schema";
-import { StripeService } from "../stripe/stripe.service";
+import { createPaymentLink } from "../stripe/stripe.service";
 import { Users } from "../users/users.schema";
 import { IRentSummaryResponse } from "./payments.interface";
 import { Payments } from "./payments.schema";
@@ -42,8 +42,7 @@ export const getPaymentHistory = async (tenantId: string) => {
   }
 
   // Get Stripe payments for each payment record that has a stripePaymentLinkId
-  const stripeService = new StripeService();
-  const stripePayments = [];
+  const stripePayments: any[] = [];
 
   for (const payment of dbPayments) {
     if (payment.stripePaymentLinkId) {
@@ -57,14 +56,14 @@ export const getPaymentHistory = async (tenantId: string) => {
         );
 
         if (stripeAccount && stripeAccount.stripeSecretKey) {
-          const stripePaymentData =
-            await stripeService.getPaymentLinkTransactions(
-              payment.stripePaymentLinkId,
-              stripeAccount.stripeSecretKey,
-            );
-          if (stripePaymentData.data) {
-            stripePayments.push(...stripePaymentData.data);
-          }
+          // Temporarily disabled Stripe payment link transactions
+          // const stripePaymentData = await getPaymentLinkTransactions(
+          //   payment.stripePaymentLinkId,
+          //   stripeAccount.stripeSecretKey,
+          // );
+          // if (stripePaymentData.data) {
+          //   stripePayments.push(...stripePaymentData.data);
+          // }
         }
       } catch (error) {
         console.error(
@@ -283,8 +282,7 @@ export const getRentSummary = async (
   let currentMonthPaymentLink = null;
   if (currentMonthPayment && currentMonthPayment.status === "PENDING") {
     try {
-      const stripeService = new StripeService();
-      currentMonthPaymentLink = await stripeService.createPaymentLink({
+      currentMonthPaymentLink = await createPaymentLink({
         tenantId: currentMonthPayment.tenantId.toString(),
         propertyId: currentMonthPayment.propertyId.toString(),
         spotId: currentMonthPayment.spotId.toString(),
