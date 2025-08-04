@@ -41,6 +41,16 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
     // Default account flag - newly added properties will use this account
     isDefaultAccount: { type: Boolean, required: true, default: false },
 
+    // Webhook information
+    webhookId: { type: String, required: false },
+    webhookUrl: { type: String, required: false },
+    webhookStatus: {
+      type: String,
+      enum: ["ACTIVE", "INACTIVE", "FAILED"],
+      default: "INACTIVE",
+    },
+    webhookCreatedAt: { type: Date },
+
     // Metadata
     metadata: { type: Schema.Types.Mixed },
     isDeleted: { type: Boolean, required: true, default: false },

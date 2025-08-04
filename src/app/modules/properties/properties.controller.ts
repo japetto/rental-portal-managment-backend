@@ -34,8 +34,6 @@ export class PropertiesController {
             stripeAccountId: account.stripeAccountId,
             isActive: account.isActive,
             isVerified: account.isVerified,
-            businessName: account.businessName,
-            businessEmail: account.businessEmail,
             isGlobalAccount: account.isGlobalAccount,
             isDefaultAccount: account.isDefaultAccount,
           });
@@ -91,7 +89,7 @@ export class PropertiesController {
       const stripeAccounts = await StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select(
-          "name description stripeAccountId isActive isVerified businessName businessEmail isGlobalAccount isDefaultAccount propertyIds",
+          "name description stripeAccountId isActive isVerified isGlobalAccount isDefaultAccount propertyIds",
         );
 
       // Get all global Stripe accounts
@@ -100,7 +98,7 @@ export class PropertiesController {
         isActive: true,
         isVerified: true,
         isDeleted: false,
-      }).select("name description stripeAccountId businessName businessEmail");
+      }).select("name description stripeAccountId");
 
       // Create a map of property ID to Stripe account
       const propertyToStripeMap = new Map();
@@ -113,8 +111,7 @@ export class PropertiesController {
             stripeAccountId: account.stripeAccountId,
             isActive: account.isActive,
             isVerified: account.isVerified,
-            businessName: account.businessName,
-            businessEmail: account.businessEmail,
+
             isGlobalAccount: account.isGlobalAccount,
             isDefaultAccount: account.isDefaultAccount,
             accountType: "PROPERTY_SPECIFIC",
@@ -151,8 +148,7 @@ export class PropertiesController {
               name: account.name,
               description: account.description,
               stripeAccountId: account.stripeAccountId,
-              businessName: account.businessName,
-              businessEmail: account.businessEmail,
+
               accountType: "GLOBAL",
             })),
             hasPropertySpecific: !!propertyStripeAccount,

@@ -39,6 +39,8 @@ router.get("/me", userAuth_1.userAuth, users_controller_1.UserController.getMyPr
 router.get("/payment-history", userAuth_1.userAuth, users_controller_1.UserController.getPaymentHistory);
 // Get user's rent summary
 router.get("/rent-summary", userAuth_1.userAuth, users_controller_1.UserController.getRentSummary);
+// Create payment link for a specific payment
+router.post("/payments/:paymentId/create-payment-link", userAuth_1.userAuth, users_controller_1.UserController.createPaymentLink);
 // Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth_1.adminAuth, users_controller_1.UserController.getUserById);
 // Update user info route

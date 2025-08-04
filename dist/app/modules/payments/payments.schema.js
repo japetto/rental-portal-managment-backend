@@ -65,7 +65,6 @@ exports.paymentsSchema = new mongoose_1.Schema({
         required: true,
         default: payment_enums_1.PaymentStatus.PENDING,
     },
-    dueDate: { type: Date, required: true },
     paidDate: { type: Date },
     paymentMethod: {
         type: String,
@@ -81,6 +80,7 @@ exports.paymentsSchema = new mongoose_1.Schema({
     // Stripe transaction fields
     stripeTransactionId: { type: String }, // From Stripe webhook
     stripePaymentLinkId: { type: String }, // Payment link ID from Stripe
+    stripeAccountId: { type: mongoose_1.Schema.Types.ObjectId, ref: "StripeAccounts" }, // Stripe account used for this payment
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },
@@ -113,8 +113,8 @@ exports.paymentsSchema.pre("save", function (next) {
                 leaseStatus: "ACTIVE",
                 isDeleted: false,
             });
-            if (lease && this.amount !== lease.rentAmount) {
-                return next(new Error(`Rent payment amount (${this.amount}) must match lease rent amount (${lease.rentAmount})`));
+            if (lease && this.amount > lease.rentAmount) {
+                return next(new Error(`Rent payment amount (${this.amount}) cannot exceed lease rent amount (${lease.rentAmount})`));
             }
         }
         // Validate payment amount against lease for deposit payments
@@ -226,25 +226,5 @@ exports.paymentsSchema.pre("save", function (next) {
         this.receiptNumber = `RCP-${timestamp}-${random}`;
     }
     next();
-});
-// Indexes for efficient queries
-exports.paymentsSchema.index({ tenantId: 1, status: 1 });
-exports.paymentsSchema.index({ propertyId: 1, status: 1 });
-exports.paymentsSchema.index({ dueDate: 1, status: 1 });
-exports.paymentsSchema.index({ paidDate: 1 });
-exports.paymentsSchema.index({ transactionId: 1 });
-exports.paymentsSchema.index({ type: 1, status: 1 });
-// Virtual to check if payment is overdue
-exports.paymentsSchema.virtual("isOverdue").get(function () {
-    if (this.status === payment_enums_1.PaymentStatus.PAID)
-        return false;
-    return new Date() > this.dueDate;
-});
-// Virtual to calculate days overdue
-exports.paymentsSchema.virtual("daysOverdue").get(function () {
-    if (this.status === payment_enums_1.PaymentStatus.PAID || new Date() <= this.dueDate)
-        return 0;
-    const diffTime = Math.abs(new Date().getTime() - this.dueDate.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 exports.Payments = (0, mongoose_1.model)("Payments", exports.paymentsSchema);

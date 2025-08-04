@@ -16,6 +16,12 @@ export interface IStripeAccount extends Document {
   // Default account flag - newly added properties will use this account
   isDefaultAccount: boolean;
 
+  // Webhook information
+  webhookId?: string;
+  webhookUrl?: string;
+  webhookStatus?: "ACTIVE" | "INACTIVE" | "FAILED";
+  webhookCreatedAt?: Date;
+
   // Metadata
   metadata?: any;
   isDeleted: boolean;

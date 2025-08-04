@@ -39,4 +39,11 @@ exports.propertiesSchema.virtual("availableSpots", {
     count: true,
     match: { status: "AVAILABLE", isActive: true },
 });
+// Virtual to get assigned Stripe account
+exports.propertiesSchema.virtual("stripeAccount", {
+    ref: "StripeAccounts",
+    localField: "_id",
+    foreignField: "propertyIds",
+    justOne: true,
+});
 exports.Properties = (0, mongoose_1.model)("Properties", exports.propertiesSchema);

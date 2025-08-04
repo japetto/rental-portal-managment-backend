@@ -65,8 +65,7 @@ exports.leasesSchema = new mongoose_1.Schema({
     leaseStatus: {
         type: String,
         enum: Object.values(payment_enums_1.LeaseStatus),
-        required: true,
-        default: payment_enums_1.LeaseStatus.PENDING,
+        required: false,
     },
     occupants: { type: Number, required: true, min: 1 },
     pets: {
@@ -81,9 +80,9 @@ exports.leasesSchema = new mongoose_1.Schema({
         ],
     },
     emergencyContact: {
-        name: { type: String, required: true },
-        phone: { type: String, required: true },
-        relationship: { type: String, required: true },
+        name: { type: String, required: false },
+        phone: { type: String, required: false },
+        relationship: { type: String, required: false },
     },
     specialRequests: [{ type: String }],
     documents: [{ type: String }], // URLs for PDF/DOC files

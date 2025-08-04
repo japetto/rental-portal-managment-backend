@@ -151,14 +151,12 @@ exports.updateTenantDataValidationSchema = zod_1.z.object({
             name: zod_1.z.string().optional(),
             phoneNumber: zod_1.z.string().optional(),
             email: zod_1.z.string().email("Invalid email format").optional(),
-            stripePaymentLinkId: zod_1.z.string().optional(),
-            stripePaymentLinkUrl: zod_1.z.string().optional(),
             rvInfo: zod_1.z
                 .object({
                 make: zod_1.z.string().optional(),
                 model: zod_1.z.string().optional(),
-                year: zod_1.z.number().optional(),
-                length: zod_1.z.number().optional(),
+                year: zod_1.z.number().optional().nullable(),
+                length: zod_1.z.number().optional().nullable(),
                 licensePlate: zod_1.z.string().optional(),
             })
                 .optional(),

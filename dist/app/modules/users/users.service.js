@@ -181,6 +181,7 @@ const updateUserInfo = (userId, payload, adminId) => __awaiter(void 0, void 0, v
 });
 //* Update Tenant Data (Admin only)
 const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
     console.log("🚀 ~ payload:", payload);
     const user = yield users_schema_1.Users.findById(userId);
     if (!user) {
@@ -206,12 +207,31 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                 userUpdateData.phoneNumber = payload.user.phoneNumber;
             if (payload.user.email)
                 userUpdateData.email = payload.user.email;
-            if (payload.user.stripePaymentLinkId)
-                userUpdateData.stripePaymentLinkId = payload.user.stripePaymentLinkId;
-            if (payload.user.stripePaymentLinkUrl)
-                userUpdateData.stripePaymentLinkUrl = payload.user.stripePaymentLinkUrl;
-            if (payload.user.rvInfo)
-                userUpdateData.rvInfo = payload.user.rvInfo;
+            if (payload.user.rvInfo) {
+                // Filter out invalid values for rvInfo
+                const filteredRvInfo = {};
+                if (payload.user.rvInfo.make)
+                    filteredRvInfo.make = payload.user.rvInfo.make;
+                if (payload.user.rvInfo.model)
+                    filteredRvInfo.model = payload.user.rvInfo.model;
+                if (payload.user.rvInfo.licensePlate)
+                    filteredRvInfo.licensePlate = payload.user.rvInfo.licensePlate;
+                // Only include year and length if they are valid (greater than minimum values)
+                if (payload.user.rvInfo.year !== undefined &&
+                    payload.user.rvInfo.year !== null &&
+                    payload.user.rvInfo.year >= 1900) {
+                    filteredRvInfo.year = payload.user.rvInfo.year;
+                }
+                if (payload.user.rvInfo.length !== undefined &&
+                    payload.user.rvInfo.length !== null &&
+                    payload.user.rvInfo.length >= 1) {
+                    filteredRvInfo.length = payload.user.rvInfo.length;
+                }
+                // Only set rvInfo if it has valid data
+                if (Object.keys(filteredRvInfo).length > 0) {
+                    userUpdateData.rvInfo = filteredRvInfo;
+                }
+            }
             // Check for phone number uniqueness if being updated
             if (payload.user.phoneNumber &&
                 payload.user.phoneNumber !== user.phoneNumber) {
@@ -250,19 +270,37 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
             if (user.leaseId) {
                 // Update existing lease
                 console.log("📝 Updating existing lease...");
-                // Convert date strings to Date objects
-                const leaseUpdateData = Object.assign({}, payload.lease);
-                if (leaseUpdateData.leaseStart &&
-                    typeof leaseUpdateData.leaseStart === "string") {
-                    leaseUpdateData.leaseStart = new Date(leaseUpdateData.leaseStart);
+                // First check if the lease actually exists
+                const existingLease = yield Leases.findById(user.leaseId);
+                if (!existingLease) {
+                    console.log("⚠️ Lease not found, creating new lease instead...");
+                    // If lease doesn't exist, create a new one
+                    const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
+                        // Add default values for required fields
+                        leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, pets: {
+                            hasPets: ((_a = payload.lease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) || false,
+                            petDetails: ((_b = payload.lease.pets) === null || _b === void 0 ? void 0 : _b.petDetails) || [],
+                        } });
+                    updatedLease = yield Leases.create([newLeaseData], { session });
+                    updatedLease = updatedLease[0];
+                    // Update user's leaseId
+                    yield users_schema_1.Users.findByIdAndUpdate(userId, { leaseId: updatedLease._id }, { session });
                 }
-                if (leaseUpdateData.leaseEnd &&
-                    typeof leaseUpdateData.leaseEnd === "string") {
-                    leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
-                }
-                updatedLease = yield Leases.findByIdAndUpdate(user.leaseId, leaseUpdateData, { new: true, runValidators: false, session });
-                if (!updatedLease) {
-                    throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
+                else {
+                    // Convert date strings to Date objects
+                    const leaseUpdateData = Object.assign({}, payload.lease);
+                    if (leaseUpdateData.leaseStart &&
+                        typeof leaseUpdateData.leaseStart === "string") {
+                        leaseUpdateData.leaseStart = new Date(leaseUpdateData.leaseStart);
+                    }
+                    if (leaseUpdateData.leaseEnd &&
+                        typeof leaseUpdateData.leaseEnd === "string") {
+                        leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
+                    }
+                    updatedLease = yield Leases.findByIdAndUpdate(user.leaseId, leaseUpdateData, { new: true, runValidators: false, session });
+                    if (!updatedLease) {
+                        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
+                    }
                 }
             }
             else {
@@ -270,10 +308,9 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                 console.log("🆕 Creating new lease...");
                 const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
                     // Add default values for required fields
-                    leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, emergencyContact: payload.lease.emergencyContact || {
-                        name: "Emergency Contact",
-                        phone: "000-000-0000",
-                        relationship: "Other",
+                    leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, pets: {
+                        hasPets: ((_c = payload.lease.pets) === null || _c === void 0 ? void 0 : _c.hasPets) || false,
+                        petDetails: ((_d = payload.lease.pets) === null || _d === void 0 ? void 0 : _d.petDetails) || [],
                     } });
                 updatedLease = yield Leases.create([newLeaseData], { session });
                 updatedLease = updatedLease[0];

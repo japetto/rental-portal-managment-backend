@@ -179,7 +179,9 @@ const createProperty = async (
       const { autoAssignPropertyToDefaultAccount } = await import(
         "../stripe/stripe.service"
       );
-      await autoAssignPropertyToDefaultAccount(property._id.toString());
+      await autoAssignPropertyToDefaultAccount(
+        (property as any)._id.toString(),
+      );
     } catch (stripeError) {
       // Log the error but don't fail the property creation
       console.error(

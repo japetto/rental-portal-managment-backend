@@ -61,6 +61,8 @@ const http_status_1 = __importDefault(require("http-status"));
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const payment_history_service_1 = require("../payments/payment-history.service");
+const payments_schema_1 = require("../payments/payments.schema");
+const stripe_service_1 = require("../stripe/stripe.service");
 const users_service_1 = require("./users.service");
 // User Register
 const userRegister = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -450,7 +452,7 @@ const getPaymentHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void
             data: null,
         });
     }
-    const result = yield payment_history_service_1.PaymentHistoryService.getPaymentHistory(userId);
+    const result = yield (0, payment_history_service_1.getPaymentHistory)(userId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -470,8 +472,7 @@ const getRentSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
             data: null,
         });
     }
-    const result = yield payment_history_service_1.PaymentHistoryService.getRentSummary(userId);
-    console.log("🚀 ~ result:", result);
+    const result = yield (0, payment_history_service_1.getRentSummary)(userId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -480,6 +481,72 @@ const getRentSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
             : "No active lease found",
         data: result,
     });
+}));
+// Create payment link for a specific payment
+const createPaymentLink = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    const { paymentId } = req.params;
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    // Find the payment and verify it belongs to the user
+    const payment = yield payments_schema_1.Payments.findOne({
+        _id: paymentId,
+        tenantId: userId,
+        status: { $in: ["PENDING", "OVERDUE"] },
+        isDeleted: false,
+    });
+    if (!payment) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.NOT_FOUND,
+            success: false,
+            message: "Payment not found or not eligible for payment",
+            data: null,
+        });
+    }
+    try {
+        const paymentLink = yield (0, stripe_service_1.createPaymentLink)({
+            tenantId: payment.tenantId.toString(),
+            propertyId: payment.propertyId.toString(),
+            spotId: payment.spotId.toString(),
+            amount: payment.amount,
+            type: payment.type,
+            dueDate: payment.dueDate,
+            description: payment.description,
+            lateFeeAmount: payment.lateFeeAmount,
+            receiptNumber: payment.receiptNumber,
+        });
+        // Update payment record with the new payment link
+        yield payments_schema_1.Payments.findByIdAndUpdate(payment._id, {
+            stripePaymentLinkId: paymentLink.id,
+        });
+        (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.OK,
+            success: true,
+            message: "Payment link created successfully",
+            data: {
+                paymentId: payment._id,
+                paymentLink: {
+                    id: paymentLink.id,
+                    url: paymentLink.url,
+                },
+            },
+        });
+    }
+    catch (error) {
+        (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.INTERNAL_SERVER_ERROR,
+            success: false,
+            message: "Failed to create payment link",
+            data: null,
+        });
+    }
 }));
 exports.UserController = {
     userRegister,
@@ -499,5 +566,6 @@ exports.UserController = {
     markAnnouncementAsRead,
     getMyProfile,
     getPaymentHistory,
-    getRentSummary, // Add this
+    getRentSummary,
+    createPaymentLink,
 };

@@ -5,7 +5,10 @@ import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
   createPaymentWithLink,
   createStripeAccount,
+  createWebhook,
+  createWebhooksForAllAccounts,
   deleteStripeAccount,
+  deleteWebhook,
   getAccountStatistics,
   getAllStripeAccounts,
   getAssignablePropertiesForAccount,
@@ -16,13 +19,16 @@ import {
   getStripeAccountsByProperty,
   getTenantPaymentStatus,
   getUnassignedProperties,
+  getWebhook,
   handleWebhook,
   linkPropertiesToAccount,
+  listWebhooks,
   setDefaultAccount,
   syncPaymentHistory,
   unlinkPropertiesFromAccount,
   updateStripeAccount,
   updateStripeAccountSecretKey,
+  updateWebhook,
   verifyStripeAccount,
   webhookStatus,
 } from "./stripe.controller";
@@ -171,7 +177,21 @@ router.get(
 
 // Webhook Routes (No auth required for Stripe webhooks)
 router.post("/webhook", handleWebhook);
+
+// Webhook status check endpoint
 router.get("/webhook/status", webhookStatus);
+
+// Webhook Management Routes (Admin only)
+router.post("/webhooks/:accountId", adminAuth, createWebhook);
+router.post(
+  "/webhooks/create-by-type",
+  adminAuth,
+  createWebhooksForAllAccounts,
+);
+router.get("/webhooks/:accountId", adminAuth, listWebhooks);
+router.get("/webhooks/:accountId/:webhookId", adminAuth, getWebhook);
+router.patch("/webhooks/:accountId/:webhookId", adminAuth, updateWebhook);
+router.delete("/webhooks/:accountId/:webhookId", adminAuth, deleteWebhook);
 
 // Payment History Sync (Admin only)
 router.post(

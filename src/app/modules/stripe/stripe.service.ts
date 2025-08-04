@@ -121,29 +121,6 @@ export const verifyStripeAccountId = async (
   }
 };
 
-// Validate account for payments
-export const validateAccountForPayments = async (
-  stripeAccountId: string,
-  secretKey: string,
-) => {
-  try {
-    const stripe = createStripeInstance(secretKey);
-    const account = await stripe.accounts.retrieve(stripeAccountId);
-
-    if (!account.charges_enabled) {
-      throw new Error("Account is not enabled for charges");
-    }
-
-    return {
-      isValid: true,
-      account,
-      message: "Account is valid for payments",
-    };
-  } catch (error: any) {
-    throw new Error(`Account validation failed: ${error.message}`);
-  }
-};
-
 // Verify only the secret key (without account ID)
 export const verifySecretKey = async (secretKey: string) => {
   try {
@@ -172,32 +149,6 @@ export const verifySecretKey = async (secretKey: string) => {
       );
     }
     throw new Error(`Secret key verification failed: ${error.message}`);
-  }
-};
-
-// Get account details from secret key
-export const getAccountDetailsFromSecretKey = async (secretKey: string) => {
-  try {
-    const stripe = createStripeInstance(secretKey);
-
-    // Get account details
-    const account = await stripe.accounts.retrieve();
-
-    return {
-      accountId: account.id,
-      accountType: account.object,
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
-      country: account.country,
-      businessType: account.business_type,
-      capabilities: account.capabilities,
-      detailsSubmitted: account.details_submitted,
-    };
-  } catch (error: any) {
-    if (error.code === "authentication_error") {
-      throw new Error("Invalid Stripe secret key");
-    }
-    throw new Error(`Failed to get account details: ${error.message}`);
   }
 };
 
@@ -318,6 +269,15 @@ export const createPaymentLink = async (paymentData: {
     }
 
     const totalAmount = paymentData.amount + (paymentData.lateFeeAmount || 0);
+
+    // Debug logging for payment link creation
+    console.log("🔗 Creating payment link with metadata:", {
+      tenantId: paymentData.tenantId,
+      receiptNumber: paymentData.receiptNumber,
+      amount: totalAmount,
+      type: paymentData.type,
+      dueDate: paymentData.dueDate,
+    });
 
     // Create Stripe instance with account-specific secret key
     const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
@@ -565,19 +525,7 @@ export const createPaymentWithLink = async (paymentData: {
         propertyIds: (activeLease.propertyId as any)._id,
         isActive: true,
         isVerified: true,
-      });
-    }
-
-    console.log("stripeAccount", stripeAccount);
-    if (stripeAccount) {
-      console.log(
-        "stripeAccount.stripeSecretKey exists:",
-        !!stripeAccount.stripeSecretKey,
-      );
-      console.log(
-        "stripeAccount.stripeSecretKey length:",
-        stripeAccount.stripeSecretKey?.length,
-      );
+      }).select("+stripeSecretKey");
     }
 
     if (!stripeAccount) {
@@ -589,28 +537,30 @@ export const createPaymentWithLink = async (paymentData: {
     }
 
     // Create payment record
-    const payment = await Payments.create({
+    const paymentDataToSave = {
       ...paymentData,
       receiptNumber,
       status: "PENDING",
       totalAmount: paymentData.amount + (paymentData.lateFeeAmount || 0),
       stripeAccountId: stripeAccount._id,
-    });
+    };
 
-    // Create unique payment link
+    // Create unique payment link first
     const paymentLink = await createPaymentLink({
       ...paymentData,
       receiptNumber,
     });
 
-    // Update payment record with payment link info
-    await Payments.findByIdAndUpdate(payment._id, {
-      stripePaymentLinkId: paymentLink.id,
+    console.log("✅ Payment link created successfully:", {
+      id: paymentLink.id,
+      url: paymentLink.url,
+      receiptNumber,
     });
 
     return {
-      payment,
+      payment: null, // No payment record created yet
       paymentLink,
+      receiptNumber, // Pass receipt number for webhook to use
     };
   } catch (error) {
     console.error("Error creating payment with link:", error);
@@ -678,6 +628,13 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
 
       // Check if lease started mid-month and adjust amount if needed
       const leaseStartDay = leaseStart.getDate();
+      console.log("🔍 Lease start analysis:", {
+        leaseStart: leaseStart.toISOString(),
+        leaseStartDay,
+        rentAmount,
+        isFirstTimePayment,
+      });
+
       if (leaseStartDay > 1) {
         // Pro-rate the first month's rent
         const daysInMonth = new Date(
@@ -688,6 +645,18 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
         const remainingDays = daysInMonth - leaseStartDay + 1;
         paymentAmount = Math.round((rentAmount / daysInMonth) * remainingDays);
         paymentDescription = `Pro-rated First Month Rent (${remainingDays} days)`;
+
+        console.log("📊 Pro-rated calculation:", {
+          daysInMonth,
+          remainingDays,
+          originalAmount: rentAmount,
+          proRatedAmount: paymentAmount,
+        });
+      } else {
+        // If lease starts on the 1st of the month, charge full rent
+        paymentAmount = rentAmount;
+        paymentDescription = "First Month Rent Payment";
+        console.log("💰 Full rent charged:", { amount: paymentAmount });
       }
     } else {
       // Not first-time payment - use current month's 1st day
@@ -723,8 +692,14 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
       }
 
       paymentDueDate = currentMonth;
+      // Always charge full rent amount for regular monthly payments
       paymentAmount = rentAmount;
       paymentDescription = "Monthly Rent Payment";
+
+      console.log("💰 Regular monthly payment - full rent charged:", {
+        amount: paymentAmount,
+        dueDate: paymentDueDate.toISOString(),
+      });
     }
 
     // Check if payment already exists for the calculated month
@@ -789,7 +764,7 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
       throw new Error("Spot ID is required for payment creation");
     }
 
-    const result = await createPaymentWithLink({
+    const paymentDataForCreation = {
       tenantId: paymentData.tenantId,
       propertyId,
       spotId,
@@ -799,7 +774,14 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
       description: paymentDescription,
       lateFeeAmount: 0,
       createdBy: paymentData.createdBy,
-    });
+    };
+
+    console.log(
+      "🎯 Creating payment with calculated values:",
+      paymentDataForCreation,
+    );
+
+    const result = await createPaymentWithLink(paymentDataForCreation);
 
     return {
       ...result,
@@ -1296,6 +1278,15 @@ export const autoAssignPropertyToDefaultAccount = async (
 
 export const createStripeAccount = async (accountData: any) => {
   try {
+    // Check if client_url is configured before proceeding
+    if (!config.client_url) {
+      throw new Error(
+        "Client URL is not configured. Please set CLIENT_URL in environment variables before creating Stripe accounts.",
+      );
+    }
+
+    console.log("🔧 Checking client URL configuration:", config.client_url);
+
     // Check if account with same name already exists
     const existingAccountByName = await StripeAccounts.findOne({
       name: accountData.name,
@@ -1376,11 +1367,54 @@ export const createStripeAccount = async (accountData: any) => {
 
     const createdAccount = await StripeAccounts.create(accountWithVerification);
 
-    // Return the created account with verification status
+    // Automatically create webhook for this account after successful creation
+    let webhookResult = null;
+    try {
+      const webhookUrl = `${config.client_url}/api/stripe/webhook`;
+
+      console.log(
+        `🔗 Creating webhook for new account: ${createdAccount.name}`,
+      );
+
+      const webhook = await createWebhookEndpoint(
+        (createdAccount as any)._id.toString(),
+        webhookUrl,
+      );
+
+      // Update the account with webhook information
+      await StripeAccounts.findByIdAndUpdate((createdAccount as any)._id, {
+        webhookId: webhook.id,
+        webhookUrl: webhook.url,
+        webhookStatus: "ACTIVE",
+        webhookCreatedAt: new Date(),
+      });
+
+      webhookResult = {
+        success: true,
+        webhookId: webhook.id,
+        webhookUrl: webhook.url,
+        message: "Webhook created successfully",
+      };
+
+      console.log(`✅ Webhook created for new account: ${webhook.id}`);
+    } catch (webhookError: any) {
+      console.error(
+        `❌ Failed to create webhook for new account:`,
+        webhookError.message,
+      );
+      webhookResult = {
+        success: false,
+        error: webhookError.message,
+        message: "Account created but webhook creation failed",
+      };
+    }
+
+    // Return the created account with verification status and webhook info
     return {
       ...createdAccount.toObject(),
       verificationStatus: "VERIFIED",
-      message: "Stripe account created and verified successfully",
+      webhook: webhookResult,
+      message: "Stripe account created, verified, and webhook configured",
     };
   } catch (error: any) {
     // Handle MongoDB duplicate key errors
@@ -1864,5 +1898,269 @@ export const updateStripeAccountSecretKey = async (
     };
   } catch (error: any) {
     throw new Error(`Failed to update secret key: ${error.message}`);
+  }
+};
+
+// Create webhook endpoint for a Stripe account
+export const createWebhookEndpoint = async (
+  accountId: string,
+  webhookUrl: string,
+) => {
+  try {
+    // Get the Stripe account with secret key
+    const stripeAccount =
+      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
+
+    if (!stripeAccount) {
+      throw new Error("Stripe account not found");
+    }
+
+    if (!stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe secret key is missing for this account");
+    }
+
+    // Create Stripe instance with account-specific secret key
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+
+    // Create webhook endpoint
+    const webhook = await stripe.webhookEndpoints.create({
+      url: webhookUrl,
+      enabled_events: [
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "payment_intent.canceled",
+        "payment_link.created",
+        "payment_link.updated",
+      ],
+      metadata: {
+        accountId: accountId,
+        accountName: stripeAccount.name,
+        propertyIds: stripeAccount.propertyIds.join(","),
+      },
+    });
+
+    console.log(`✅ Webhook created for account ${stripeAccount.name}:`, {
+      webhookId: webhook.id,
+      url: webhook.url,
+      status: webhook.status,
+    });
+
+    // Update the account with webhook information
+    await StripeAccounts.findByIdAndUpdate(accountId, {
+      webhookId: webhook.id,
+      webhookUrl: webhook.url,
+      webhookStatus: "ACTIVE",
+      webhookCreatedAt: new Date(),
+    });
+
+    return webhook;
+  } catch (error: any) {
+    console.error("Error creating webhook endpoint:", error);
+    throw new Error(`Failed to create webhook: ${error.message}`);
+  }
+};
+
+// Create webhooks based on account type
+export const createWebhooksByAccountType = async (webhookUrl: string) => {
+  try {
+    // Get all active and verified Stripe accounts
+    const stripeAccounts = await StripeAccounts.find({
+      isActive: true,
+      isVerified: true,
+      isDeleted: false,
+    }).select("+stripeSecretKey");
+
+    const results = [];
+    let accountsToProcess = [];
+
+    // Determine which accounts to process based on account types
+    const connectAccounts = stripeAccounts.filter(
+      account => account.accountType === "CONNECT",
+    );
+    const standardAccounts = stripeAccounts.filter(
+      account => account.accountType === "STANDARD",
+    );
+
+    console.log(`📊 Account analysis:`, {
+      totalAccounts: stripeAccounts.length,
+      connectAccounts: connectAccounts.length,
+      standardAccounts: standardAccounts.length,
+    });
+
+    // If there are CONNECT accounts, only process CONNECT accounts
+    if (connectAccounts.length > 0) {
+      accountsToProcess = connectAccounts;
+      console.log(
+        `🔗 Processing CONNECT accounts only: ${connectAccounts.length} accounts`,
+      );
+    } else {
+      // If no CONNECT accounts, process all STANDARD accounts
+      accountsToProcess = standardAccounts;
+      console.log(
+        `🏢 Processing all STANDARD accounts: ${standardAccounts.length} accounts`,
+      );
+    }
+
+    for (const account of accountsToProcess) {
+      try {
+        if (!account.stripeSecretKey) {
+          console.warn(`⚠️ Skipping account ${account.name} - no secret key`);
+          continue;
+        }
+
+        const webhook = await createWebhookEndpoint(
+          (account as any)._id.toString(),
+          webhookUrl,
+        );
+        results.push({
+          accountId: account._id,
+          accountName: account.name,
+          accountType: account.accountType,
+          success: true,
+          webhookId: webhook.id,
+          webhookUrl: webhook.url,
+        });
+      } catch (error: any) {
+        console.error(
+          `❌ Failed to create webhook for account ${account.name}:`,
+          error.message,
+        );
+        results.push({
+          accountId: account._id,
+          accountName: account.name,
+          accountType: account.accountType,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      totalAccounts: stripeAccounts.length,
+      connectAccounts: connectAccounts.length,
+      standardAccounts: standardAccounts.length,
+      processedAccounts: accountsToProcess.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      accountTypeProcessed: connectAccounts.length > 0 ? "CONNECT" : "STANDARD",
+      results,
+    };
+  } catch (error: any) {
+    console.error("Error creating webhooks by account type:", error);
+    throw error;
+  }
+};
+
+// List webhook endpoints for a Stripe account
+export const listWebhookEndpoints = async (accountId: string) => {
+  try {
+    const stripeAccount =
+      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
+
+    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe account not found or missing secret key");
+    }
+
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+    const webhooks = await stripe.webhookEndpoints.list();
+
+    return webhooks.data.map(webhook => ({
+      id: webhook.id,
+      url: webhook.url,
+      status: webhook.status,
+      enabled_events: webhook.enabled_events,
+      metadata: webhook.metadata,
+      created: webhook.created,
+    }));
+  } catch (error: any) {
+    console.error("Error listing webhook endpoints:", error);
+    throw error;
+  }
+};
+
+// Delete webhook endpoint
+export const deleteWebhookEndpoint = async (
+  accountId: string,
+  webhookId: string,
+) => {
+  try {
+    const stripeAccount =
+      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
+
+    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe account not found or missing secret key");
+    }
+
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+    const deletedWebhook = await stripe.webhookEndpoints.del(webhookId);
+
+    console.log(`✅ Webhook deleted: ${webhookId}`);
+    return deletedWebhook;
+  } catch (error: any) {
+    console.error("Error deleting webhook endpoint:", error);
+    throw error;
+  }
+};
+
+// Update webhook endpoint
+export const updateWebhookEndpoint = async (
+  accountId: string,
+  webhookId: string,
+  updateData: {
+    url?: string;
+    enabled_events?: Stripe.WebhookEndpointUpdateParams.EnabledEvent[];
+    metadata?: Record<string, string>;
+  },
+) => {
+  try {
+    const stripeAccount =
+      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
+
+    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe account not found or missing secret key");
+    }
+
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+    const updatedWebhook = await stripe.webhookEndpoints.update(
+      webhookId,
+      updateData,
+    );
+
+    console.log(`✅ Webhook updated: ${webhookId}`);
+    return updatedWebhook;
+  } catch (error: any) {
+    console.error("Error updating webhook endpoint:", error);
+    throw error;
+  }
+};
+
+// Get webhook endpoint details
+export const getWebhookEndpoint = async (
+  accountId: string,
+  webhookId: string,
+) => {
+  try {
+    const stripeAccount =
+      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
+
+    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe account not found or missing secret key");
+    }
+
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+    const webhook = await stripe.webhookEndpoints.retrieve(webhookId);
+
+    return {
+      id: webhook.id,
+      url: webhook.url,
+      status: webhook.status,
+      enabled_events: webhook.enabled_events,
+      metadata: webhook.metadata,
+      created: webhook.created,
+      api_version: webhook.api_version,
+    };
+  } catch (error: any) {
+    console.error("Error getting webhook endpoint:", error);
+    throw error;
   }
 };

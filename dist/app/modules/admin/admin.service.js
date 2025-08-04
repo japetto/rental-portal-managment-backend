@@ -152,6 +152,16 @@ const createProperty = (propertyData) => __awaiter(void 0, void 0, void 0, funct
         }
         // Create the property
         const property = yield properties_schema_1.Properties.create(propertyData);
+        // Auto-assign default Stripe account to the new property
+        try {
+            const { autoAssignPropertyToDefaultAccount } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
+            yield autoAssignPropertyToDefaultAccount(property._id.toString());
+        }
+        catch (stripeError) {
+            // Log the error but don't fail the property creation
+            console.error("Failed to auto-assign default Stripe account:", stripeError);
+            // You might want to add this to a queue for retry later
+        }
         return property;
     }
     catch (error) {

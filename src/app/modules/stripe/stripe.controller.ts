@@ -9,7 +9,10 @@ import {
   constructWebhookEvent,
   createPaymentWithLinkEnhanced,
   createStripeAccount as createStripeAccountService,
+  createWebhookEndpoint,
+  createWebhooksByAccountType as createWebhooksByAccountTypeService,
   deleteStripeAccount as deleteStripeAccountService,
+  deleteWebhookEndpoint,
   getAccountStatistics as getAccountStatisticsService,
   getAllStripeAccounts as getAllStripeAccountsService,
   getAssignablePropertiesForAccount as getAssignablePropertiesForAccountService,
@@ -20,12 +23,15 @@ import {
   getStripeAccountsByProperty as getStripeAccountsByPropertyService,
   getTenantPaymentStatusEnhanced,
   getUnassignedProperties as getUnassignedPropertiesService,
+  getWebhookEndpoint,
   linkPropertiesToAccount as linkPropertiesToAccountService,
+  listWebhookEndpoints,
   setDefaultAccount as setDefaultAccountService,
   syncStripePayments as syncStripePaymentsService,
   unlinkPropertiesFromAccount as unlinkPropertiesFromAccountService,
   updateStripeAccountSecretKey as updateStripeAccountSecretKeyService,
   updateStripeAccount as updateStripeAccountService,
+  updateWebhookEndpoint,
   verifyStripeAccount as verifyStripeAccountService,
 } from "./stripe.service";
 
@@ -65,7 +71,7 @@ export const createStripeAccount = catchAsync(
         success: true,
         message:
           stripeAccount.message ||
-          "Stripe account created and verified successfully",
+          "Stripe account created, verified, and webhook configured",
         data: stripeAccount,
       });
     } catch (error: any) {
@@ -509,11 +515,11 @@ export const createPaymentWithLink = catchAsync(
         ? "First-time rent payment link created successfully"
         : "Rent payment link created successfully",
       data: {
-        payment: result.payment,
         paymentLink: {
           id: result.paymentLink.id,
           url: result.paymentLink.url,
         },
+        receiptNumber: result.receiptNumber,
         lease: result.lease,
         paymentInfo: result.paymentInfo,
       },
@@ -583,7 +589,8 @@ export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
     // Get the raw body for signature verification
     const payload = req.body;
 
-    // Verify the signature
+    // For multi-account setup, we need to verify with the correct account's webhook secret
+    // Since we don't know which account this is for, we'll try the default one first
     try {
       event = constructWebhookEvent(payload, sig);
     } catch (err: any) {
@@ -625,43 +632,71 @@ export async function handlePaymentSuccess(
   paymentIntent: Stripe.PaymentIntent,
 ) {
   try {
+    console.log("💰 Processing payment success webhook:", {
+      paymentIntentId: paymentIntent.id,
+      metadata: paymentIntent.metadata,
+      amount: paymentIntent.amount,
+      status: paymentIntent.status,
+    });
+
     // Extract metadata from the unique payment link
     const metadata = paymentIntent.metadata;
 
     if (!metadata.tenantId || !metadata.receiptNumber) {
+      console.error("❌ Missing required payment metadata:", metadata);
       throw new Error("Missing required payment metadata");
     }
 
-    // Find the existing payment record by receipt number
-    const existingPayment = await Payments.findOne({
-      receiptNumber: metadata.receiptNumber,
-    });
-
-    if (!existingPayment) {
-      throw new Error("Payment record not found");
-    }
-
-    // Check if payment already exists
+    // Check if payment already exists to prevent duplicates
     const duplicatePayment = await Payments.findOne({
       stripeTransactionId: paymentIntent.id,
     });
 
     if (duplicatePayment) {
+      console.log("⚠️ Payment already processed, skipping...");
       return;
     }
 
-    // Update the existing payment record with Stripe transaction details
-    await Payments.findByIdAndUpdate(
-      existingPayment._id,
-      {
-        status: "PAID",
-        paidDate: new Date(paymentIntent.created * 1000),
-        paymentMethod: "ONLINE",
-        transactionId: paymentIntent.id,
-        stripeTransactionId: paymentIntent.id,
-      },
-      { new: true },
-    );
+    // Create new payment record with PAID status
+    console.log("💾 Creating payment record with PAID status...");
+
+    // Extract payment details from metadata
+    const paymentData = {
+      tenantId: metadata.tenantId,
+      propertyId: metadata.propertyId,
+      spotId: metadata.spotId,
+      amount: paymentIntent.amount / 100, // Convert from cents
+      type: metadata.paymentType || "RENT",
+      status: "PAID",
+      dueDate: new Date(metadata.dueDate),
+      paidDate: new Date(paymentIntent.created * 1000),
+      paymentMethod: "ONLINE",
+      transactionId: paymentIntent.id,
+      stripeTransactionId: paymentIntent.id,
+      stripePaymentLinkId: metadata.paymentLinkId || paymentIntent.id,
+      receiptNumber: metadata.receiptNumber,
+      description: metadata.paymentDescription || "Rent Payment",
+      totalAmount: paymentIntent.amount / 100,
+      lateFeeAmount: parseInt(metadata.lateFeeAmount || "0"),
+      createdBy: "SYSTEM",
+    };
+
+    console.log("📝 Creating payment with data:", paymentData);
+
+    const newPayment = await Payments.create(paymentData);
+
+    if (newPayment) {
+      console.log("✅ Payment created successfully:", {
+        id: newPayment._id,
+        status: newPayment.status,
+        amount: newPayment.amount,
+        paidDate: newPayment.paidDate,
+        transactionId: newPayment.transactionId,
+        receiptNumber: newPayment.receiptNumber,
+      });
+    } else {
+      console.error("❌ Failed to create payment");
+    }
   } catch (error: any) {
     console.error("Payment success handling error:", error);
     throw error;
@@ -840,3 +875,119 @@ export const updateStripeAccountSecretKey = catchAsync(
     }
   },
 );
+
+// Create webhook for a specific Stripe account
+export const createWebhook = catchAsync(async (req: Request, res: Response) => {
+  const { accountId } = req.params;
+  const { webhookUrl } = req.body;
+
+  if (!webhookUrl) {
+    return sendResponse(res, {
+      statusCode: httpStatus.BAD_REQUEST,
+      success: false,
+      message: "Webhook URL is required",
+      data: null,
+    });
+  }
+
+  const webhook = await createWebhookEndpoint(accountId, webhookUrl);
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Webhook created successfully",
+    data: {
+      id: webhook.id,
+      url: webhook.url,
+      status: webhook.status,
+      enabled_events: webhook.enabled_events,
+    },
+  });
+});
+
+// Create webhooks for all active accounts
+export const createWebhooksForAllAccounts = catchAsync(
+  async (req: Request, res: Response) => {
+    const { webhookUrl } = req.body;
+
+    if (!webhookUrl) {
+      return sendResponse(res, {
+        statusCode: httpStatus.BAD_REQUEST,
+        success: false,
+        message: "Webhook URL is required",
+        data: null,
+      });
+    }
+
+    const result = await createWebhooksByAccountTypeService(webhookUrl);
+
+    sendResponse(res, {
+      statusCode: httpStatus.CREATED,
+      success: true,
+      message: `Webhooks created for ${result.successful}/${result.processedAccounts} ${result.accountTypeProcessed} accounts`,
+      data: result,
+    });
+  },
+);
+
+// List webhooks for a Stripe account
+export const listWebhooks = catchAsync(async (req: Request, res: Response) => {
+  const { accountId } = req.params;
+
+  const webhooks = await listWebhookEndpoints(accountId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Webhooks retrieved successfully",
+    data: webhooks,
+  });
+});
+
+// Get webhook details
+export const getWebhook = catchAsync(async (req: Request, res: Response) => {
+  const { accountId, webhookId } = req.params;
+
+  const webhook = await getWebhookEndpoint(accountId, webhookId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Webhook details retrieved successfully",
+    data: webhook,
+  });
+});
+
+// Update webhook
+export const updateWebhook = catchAsync(async (req: Request, res: Response) => {
+  const { accountId, webhookId } = req.params;
+  const updateData = req.body;
+
+  const webhook = await updateWebhookEndpoint(accountId, webhookId, updateData);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Webhook updated successfully",
+    data: {
+      id: webhook.id,
+      url: webhook.url,
+      status: webhook.status,
+      enabled_events: webhook.enabled_events,
+    },
+  });
+});
+
+// Delete webhook
+export const deleteWebhook = catchAsync(async (req: Request, res: Response) => {
+  const { accountId, webhookId } = req.params;
+
+  await deleteWebhookEndpoint(accountId, webhookId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Webhook deleted successfully",
+    data: null,
+  });
+});
