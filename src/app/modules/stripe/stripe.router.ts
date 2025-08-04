@@ -22,6 +22,7 @@ import {
   syncPaymentHistory,
   unlinkPropertiesFromAccount,
   updateStripeAccount,
+  updateStripeAccountSecretKey,
   verifyStripeAccount,
   webhookStatus,
 } from "./stripe.controller";
@@ -118,6 +119,13 @@ router.patch(
   adminAuth,
   zodValidationRequest(updateStripeAccountSchema),
   updateStripeAccount,
+);
+
+// Update stripe account secret key (for debugging)
+router.patch(
+  "/accounts/:accountId/secret-key",
+  adminAuth,
+  updateStripeAccountSecretKey,
 );
 
 // Delete stripe account

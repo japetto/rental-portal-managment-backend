@@ -7,7 +7,7 @@ import {
   getRentSummary as getRentSummaryService,
 } from "../payments/payment-history.service";
 import { Payments } from "../payments/payments.schema";
-import { StripeService } from "../stripe/stripe.service";
+import { createPaymentLink as createPaymentLinkService } from "../stripe/stripe.service";
 import { UserService } from "./users.service";
 
 // User Register
@@ -541,7 +541,6 @@ const getRentSummary = catchAsync(async (req: Request, res: Response) => {
   }
 
   const result = await getRentSummaryService(userId);
-  console.log("🚀 ~ result:", result);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -585,8 +584,7 @@ const createPaymentLink = catchAsync(async (req: Request, res: Response) => {
   }
 
   try {
-    const stripeService = new StripeService();
-    const paymentLink = await stripeService.createPaymentLink({
+    const paymentLink = await createPaymentLinkService({
       tenantId: payment.tenantId.toString(),
       propertyId: payment.propertyId.toString(),
       spotId: payment.spotId.toString(),
