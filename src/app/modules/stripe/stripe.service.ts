@@ -350,7 +350,7 @@ export const createPaymentLink = async (paymentData: {
         type: "redirect",
         redirect: {
           url: getValidRedirectUrl(
-            `/payment-success?receipt=${paymentData.receiptNumber}`,
+            `/payments/success?receipt=${paymentData.receiptNumber}&amount=${paymentData.amount}&type=${paymentData.type}`,
           ),
         },
       },
@@ -1278,14 +1278,14 @@ export const autoAssignPropertyToDefaultAccount = async (
 
 export const createStripeAccount = async (accountData: any) => {
   try {
-    // Check if client_url is configured before proceeding
-    if (!config.client_url) {
+    // Check if backend_url is configured before proceeding
+    if (!config.backend_url) {
       throw new Error(
-        "Client URL is not configured. Please set CLIENT_URL in environment variables before creating Stripe accounts.",
+        "Backend URL is not configured. Please set BACKEND_URL in environment variables before creating Stripe accounts.",
       );
     }
 
-    console.log("🔧 Checking client URL configuration:", config.client_url);
+    console.log("🔧 Checking backend URL configuration:", config.backend_url);
 
     // Check if account with same name already exists
     const existingAccountByName = await StripeAccounts.findOne({
@@ -1370,7 +1370,7 @@ export const createStripeAccount = async (accountData: any) => {
     // Automatically create webhook for this account after successful creation
     let webhookResult = null;
     try {
-      const webhookUrl = `${config.client_url}/api/stripe/webhook`;
+      const webhookUrl = `${config.backend_url}/api/stripe/webhook`;
 
       console.log(
         `🔗 Creating webhook for new account: ${createdAccount.name}`,
