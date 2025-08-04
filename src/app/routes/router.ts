@@ -30,7 +30,7 @@ const routes = [
     route: ServiceRequestRouter,
   },
   {
-    path: "/webhooks",
+    path: "/stripe",
     route: stripeRoutes,
   },
 ];

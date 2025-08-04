@@ -5,6 +5,7 @@ import {
   createPaymentWithLink,
   createStripeAccount,
   deleteStripeAccount,
+  getAccountStatistics,
   getAllStripeAccounts,
   getAssignablePropertiesForAccount,
   getAvailableStripeAccounts,
@@ -72,6 +73,9 @@ router.get("/accounts/default", adminAuth, getDefaultAccount);
 
 // Account listing and details
 router.get("/accounts", adminAuth, getAllStripeAccounts);
+
+// Get account statistics for debugging
+router.get("/accounts/statistics", adminAuth, getAccountStatistics);
 
 // Get all properties with stripe details
 router.get(

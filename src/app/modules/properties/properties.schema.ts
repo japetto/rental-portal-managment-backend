@@ -15,14 +15,6 @@ export const propertiesSchema = new Schema<IProperty>(
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],
     rules: [{ type: String }],
-    // Stripe account reference (deprecated - now managed through StripeAccounts.propertyIds)
-    // This field is kept for backward compatibility but should not be used
-    stripeAccountId: {
-      type: Schema.Types.ObjectId,
-      ref: "StripeAccounts",
-      required: false,
-      select: false, // Hide this field by default
-    },
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },
@@ -50,6 +42,14 @@ propertiesSchema.virtual("availableSpots", {
   foreignField: "propertyId",
   count: true,
   match: { status: "AVAILABLE", isActive: true },
+});
+
+// Virtual to get assigned Stripe account
+propertiesSchema.virtual("stripeAccount", {
+  ref: "StripeAccounts",
+  localField: "_id",
+  foreignField: "propertyIds",
+  justOne: true,
 });
 
 export const Properties = model<IProperty>("Properties", propertiesSchema);

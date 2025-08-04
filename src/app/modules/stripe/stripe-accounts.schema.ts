@@ -3,7 +3,7 @@ import { IStripeAccount } from "./stripe-accounts.interface";
 
 export const stripeAccountsSchema = new Schema<IStripeAccount>(
   {
-    name: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true, unique: true },
     description: { type: String, required: false },
     propertyIds: [
       {
@@ -12,8 +12,27 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
         required: false, // Optional - can be linked later
       },
     ],
-    // Stripe Connect account details
-    stripeAccountId: { type: String, required: true, unique: true },
+    // Stripe account details
+    stripeAccountId: {
+      type: String,
+      required: false,
+      unique: true,
+      sparse: true,
+    },
+    // Stripe secret key for this account (encrypted)
+    stripeSecretKey: {
+      type: String,
+      required: true,
+      select: false,
+      unique: true,
+    }, // Hidden by default for security
+    // Account type: STANDARD = user's own account, CONNECT = platform account
+    accountType: {
+      type: String,
+      enum: ["STANDARD", "CONNECT"],
+      default: "STANDARD",
+      required: true,
+    },
     // Account status
     isActive: { type: Boolean, required: true, default: true },
     isVerified: { type: Boolean, required: true, default: false },
@@ -21,9 +40,7 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
     isGlobalAccount: { type: Boolean, required: true, default: false },
     // Default account flag - newly added properties will use this account
     isDefaultAccount: { type: Boolean, required: true, default: false },
-    // Business information (minimal)
-    businessName: { type: String, required: false },
-    businessEmail: { type: String, required: false },
+
     // Metadata
     metadata: { type: Schema.Types.Mixed },
     isDeleted: { type: Boolean, required: true, default: false },

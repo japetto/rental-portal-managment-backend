@@ -8,6 +8,7 @@ import { Users } from "../users/users.schema";
 import {
   createStripeAccount as createStripeAccountService,
   deleteStripeAccount as deleteStripeAccountService,
+  getAccountStatistics as getAccountStatisticsService,
   getAllStripeAccounts as getAllStripeAccountsService,
   getAssignablePropertiesForAccount as getAssignablePropertiesForAccountService,
   getAvailableStripeAccounts as getAvailableStripeAccountsService,
@@ -30,8 +31,8 @@ export const createStripeAccount = catchAsync(
       name,
       description,
       stripeAccountId,
-      businessName,
-      businessEmail,
+      stripeSecretKey,
+      accountType = "STANDARD",
       isGlobalAccount = false,
       isDefaultAccount = false,
       metadata,
@@ -42,10 +43,9 @@ export const createStripeAccount = catchAsync(
       name,
       description: description || undefined,
       stripeAccountId,
-      businessName: businessName || undefined,
-      businessEmail: businessEmail || undefined,
-      isActive: true,
-      isVerified: false, // Will be verified through Stripe Connect onboarding
+      stripeSecretKey,
+      accountType,
+
       isGlobalAccount: Boolean(isGlobalAccount),
       isDefaultAccount: Boolean(isDefaultAccount),
       propertyIds: [], // Start with empty property array
@@ -58,7 +58,9 @@ export const createStripeAccount = catchAsync(
       sendResponse(res, {
         statusCode: httpStatus.CREATED,
         success: true,
-        message: "Stripe account created successfully",
+        message:
+          stripeAccount.message ||
+          "Stripe account created and verified successfully",
         data: stripeAccount,
       });
     } catch (error: any) {
@@ -70,9 +72,47 @@ export const createStripeAccount = catchAsync(
           data: null,
         });
       }
+      if (error.message === "Stripe account with this name already exists") {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (
+        error.message ===
+        "Stripe secret key is already in use by another account"
+      ) {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
       if (error.message === "Another account is already set as default") {
         return sendResponse(res, {
           statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (error.message === "Duplicate account entry") {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: "Account with these details already exists",
+          data: null,
+        });
+      }
+      if (
+        error.message &&
+        error.message.includes("Account verification failed")
+      ) {
+        return sendResponse(res, {
+          statusCode: httpStatus.BAD_REQUEST,
           success: false,
           message: error.message,
           data: null,
@@ -339,7 +379,7 @@ export const deleteStripeAccount = catchAsync(
   },
 );
 
-// Verify Stripe account (mark as verified)
+// Verify Stripe account with Stripe API
 export const verifyStripeAccount = catchAsync(
   async (req: Request, res: Response) => {
     const { accountId } = req.params;
@@ -350,13 +390,21 @@ export const verifyStripeAccount = catchAsync(
       sendResponse(res, {
         statusCode: httpStatus.OK,
         success: true,
-        message: "Stripe account verified successfully",
+        message: account.message || "Stripe account verified successfully",
         data: account,
       });
     } catch (error: any) {
       if (error.message === "Stripe account not found") {
         return sendResponse(res, {
           statusCode: httpStatus.NOT_FOUND,
+          success: false,
+          message: error.message,
+          data: null,
+        });
+      }
+      if (error.message.includes("Account verification failed")) {
+        return sendResponse(res, {
+          statusCode: httpStatus.BAD_REQUEST,
           success: false,
           message: error.message,
           data: null,
@@ -487,9 +535,26 @@ export const getPaymentLinkDetails = catchAsync(
   async (req: Request, res: Response) => {
     const { paymentLinkId } = req.params;
 
+    // Get the payment to find the associated Stripe account
+    const { Payments } = await import("../payments/payments.schema");
+    const payment = await Payments.findOne({
+      stripePaymentLinkId: paymentLinkId,
+    }).populate("stripeAccountId");
+
+    if (!payment) {
+      return sendResponse(res, {
+        statusCode: httpStatus.NOT_FOUND,
+        success: false,
+        message: "Payment link not found",
+        data: null,
+      });
+    }
+
     const stripeService = new StripeService();
-    const paymentLink =
-      await stripeService.getPaymentLinkDetails(paymentLinkId);
+    const paymentLink = await stripeService.getPaymentLinkDetails(
+      paymentLinkId,
+      (payment.stripeAccountId as any).stripeSecretKey,
+    );
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -683,8 +748,9 @@ export const syncPaymentHistory = catchAsync(
 
     const stripeService = new StripeService();
     await stripeService.syncStripePayments(
-      stripeAccount.stripeAccountId,
+      stripeAccount.stripeAccountId || "",
       userId,
+      stripeAccount.stripeSecretKey,
     );
 
     sendResponse(res, {
@@ -712,3 +778,17 @@ export const webhookStatus = catchAsync(async (req: Request, res: Response) => {
     },
   });
 });
+
+// Get account statistics for debugging
+export const getAccountStatistics = catchAsync(
+  async (req: Request, res: Response) => {
+    const statistics = await getAccountStatisticsService();
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Account statistics retrieved successfully",
+      data: statistics,
+    });
+  },
+);

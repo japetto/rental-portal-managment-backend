@@ -3,13 +3,16 @@ import { z } from "zod";
 // Create Stripe Account validation
 export const createStripeAccountSchema = z.object({
   body: z.object({
-    name: z.string().min(1, "Name is required"),
+    name: z
+      .string()
+      .min(1, "Name is required")
+      .max(100, "Name must be less than 100 characters"),
     description: z.string().optional(),
-    stripeAccountId: z.string().min(1, "Stripe Account ID is required"),
+    stripeAccountId: z.string().optional(),
+    stripeSecretKey: z.string().min(1, "Stripe Secret Key is required"),
+    accountType: z.enum(["STANDARD", "CONNECT"]).optional().default("STANDARD"),
     isGlobalAccount: z.boolean().optional(),
     isDefaultAccount: z.boolean().optional(),
-    businessName: z.string().optional(),
-    businessEmail: z.string().email("Invalid email format").optional(),
   }),
 });
 
@@ -59,8 +62,11 @@ export const updateStripeAccountSchema = z.object({
   body: z.object({
     name: z.string().min(1, "Name is required").optional(),
     description: z.string().optional(),
-    businessName: z.string().optional(),
-    businessEmail: z.string().email("Invalid email format").optional(),
+    stripeSecretKey: z
+      .string()
+      .min(1, "Stripe Secret Key is required")
+      .optional(),
+    accountType: z.enum(["STANDARD", "CONNECT"]).optional(),
     isActive: z.boolean().optional(),
     isDefaultAccount: z.boolean().optional(),
   }),

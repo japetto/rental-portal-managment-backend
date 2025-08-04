@@ -4,8 +4,10 @@ export interface IStripeAccount extends Document {
   name: string;
   description?: string;
   propertyIds: Types.ObjectId[]; // Array of property IDs - supports multiple properties
-  // Stripe Connect account details
-  stripeAccountId: string;
+  // Stripe account details
+  stripeAccountId?: string; // Optional for STANDARD accounts
+  stripeSecretKey: string; // Secret key for this Stripe account
+  accountType: "STANDARD" | "CONNECT"; // STANDARD = user's own account, CONNECT = platform account
   // Account status
   isActive: boolean;
   isVerified: boolean;
@@ -13,9 +15,7 @@ export interface IStripeAccount extends Document {
   isGlobalAccount: boolean;
   // Default account flag - newly added properties will use this account
   isDefaultAccount: boolean;
-  // Business information (minimal)
-  businessName?: string;
-  businessEmail?: string;
+
   // Metadata
   metadata?: any;
   isDeleted: boolean;
@@ -27,21 +27,21 @@ export interface IStripeAccount extends Document {
 export interface ICreateStripeAccount {
   name: string;
   description?: string;
-  stripeAccountId: string;
+  stripeAccountId?: string; // Optional for STANDARD, required for CONNECT
+  stripeSecretKey: string; // Required when creating account
+  accountType?: "STANDARD" | "CONNECT"; // Defaults to STANDARD if not specified
   isGlobalAccount?: boolean;
   isDefaultAccount?: boolean;
-  businessName?: string;
-  businessEmail?: string;
   metadata?: any;
 }
 
 export interface IUpdateStripeAccount {
   name?: string;
   description?: string;
+  stripeSecretKey?: string; // Optional when updating
+  accountType?: "STANDARD" | "CONNECT"; // Can be updated
   isActive?: boolean;
   isDefaultAccount?: boolean;
-  businessName?: string;
-  businessEmail?: string;
   metadata?: any;
 }
 

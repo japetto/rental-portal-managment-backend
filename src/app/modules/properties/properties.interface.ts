@@ -1,4 +1,4 @@
-import { Document, Types } from "mongoose";
+import { Document } from "mongoose";
 
 export interface IProperty extends Document {
   name: string;
@@ -13,7 +13,6 @@ export interface IProperty extends Document {
   amenities: string[];
   images: string[];
   rules: string[];
-  stripeAccountId?: Types.ObjectId; // Reference to StripeAccounts (deprecated - now managed through StripeAccounts.propertyIds)
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -22,6 +21,7 @@ export interface IProperty extends Document {
   // Virtual properties
   totalSpots: number;
   availableSpots: number;
+  stripeAccount?: any; // Virtual field for assigned Stripe account
 }
 
 export interface ICreateProperty {
@@ -52,5 +52,4 @@ export interface IUpdateProperty {
   amenities?: string[];
   images?: string[];
   rules?: string[];
-  stripeAccountId?: string; // Stripe account ID reference
 }

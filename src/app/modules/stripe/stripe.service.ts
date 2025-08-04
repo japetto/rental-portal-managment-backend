@@ -6,11 +6,122 @@ import { Properties } from "../properties/properties.schema";
 import { Users } from "../users/users.schema";
 import { StripeAccounts } from "./stripe-accounts.schema";
 
-export class StripeService {
-  private stripe: Stripe;
+// Centralized Stripe verification service
+class StripeVerificationService {
+  // Create Stripe instance with account-specific secret key
+  createStripeInstance(secretKey: string): Stripe {
+    return new Stripe(secretKey, {
+      apiVersion: "2025-06-30.basil",
+    });
+  }
 
-  constructor() {
-    this.stripe = new Stripe(config.stripe_secret_key, {
+  // Verify Stripe account ID and secret key with Stripe API
+  async verifyStripeAccountId(
+    stripeAccountId: string | undefined,
+    secretKey: string,
+    accountType: "STANDARD" | "CONNECT",
+  ) {
+    try {
+      // For CONNECT accounts, validate account ID
+      if (accountType === "CONNECT") {
+        if (!stripeAccountId) {
+          throw new Error("Stripe Account ID is required for CONNECT accounts");
+        }
+
+        if (!stripeAccountId.startsWith("acct_")) {
+          throw new Error(
+            "Invalid Stripe account ID format. Must start with 'acct_'",
+          );
+        }
+      }
+
+      // Validate the secret key format
+      if (!secretKey.startsWith("sk_")) {
+        throw new Error(
+          "Invalid Stripe secret key format. Must start with 'sk_'",
+        );
+      }
+
+      // Create Stripe instance with account-specific secret key
+      const stripe = this.createStripeInstance(secretKey);
+
+      // For CONNECT accounts, verify the account exists
+      if (accountType === "CONNECT" && stripeAccountId) {
+        // Try to retrieve the account from Stripe
+        const account = await stripe.accounts.retrieve(stripeAccountId);
+
+        // Check if account is valid and active
+        if (!account || account.object !== "account") {
+          throw new Error("Invalid Stripe account ID");
+        }
+
+        // Check account status
+        if (account.charges_enabled === false) {
+          throw new Error("Stripe account is not enabled for charges");
+        }
+      }
+
+      // Verify the secret key belongs to this account by making a test API call
+      try {
+        // Try to list payment links to verify the secret key works
+        await stripe.paymentLinks.list({ limit: 1 });
+      } catch (secretError: any) {
+        if (secretError.code === "authentication_error") {
+          throw new Error(
+            "Invalid Stripe secret key. Please check your credentials",
+          );
+        }
+        // If it's not an auth error, the secret key is valid
+      }
+      return {
+        isValid: true,
+        account:
+          accountType === "CONNECT"
+            ? { id: stripeAccountId }
+            : { id: "STANDARD_ACCOUNT" },
+        message: `${accountType} account and secret key verified successfully`,
+      };
+    } catch (error: any) {
+      if (error.code === "resource_missing") {
+        throw new Error(
+          "Stripe account not found. Please check the account ID",
+        );
+      }
+      if (error.code === "invalid_request_error") {
+        throw new Error("Invalid Stripe account ID format");
+      }
+      if (error.code === "authentication_error") {
+        throw new Error(
+          "Invalid Stripe secret key. Please check your credentials",
+        );
+      }
+      throw new Error(`Stripe account verification failed: ${error.message}`);
+    }
+  }
+
+  // Validate that a Stripe account can be used for payments
+  async validateAccountForPayments(stripeAccountId: string, secretKey: string) {
+    const verification = await this.verifyStripeAccountId(
+      stripeAccountId,
+      secretKey,
+      "CONNECT",
+    );
+
+    if (!verification.isValid) {
+      throw new Error("Stripe account is not valid for payments");
+    }
+
+    return verification;
+  }
+}
+
+// Create a singleton instance
+export const stripeVerificationService = new StripeVerificationService();
+
+export class StripeService {
+  // Create Stripe instance with account-specific secret key
+  createStripeInstance(secretKey: string): Stripe {
+    return new Stripe(secretKey, {
       apiVersion: "2025-06-30.basil",
     });
   }
@@ -49,70 +160,10 @@ export class StripeService {
 
       // Get the Stripe account for this property
       const stripeAccount = await StripeAccounts.findOne({
-        propertyId: paymentData.propertyId,
+        propertyIds: paymentData.propertyId,
         isActive: true,
         isVerified: true,
       });
-
-      // If no property-specific account, try to find a global account
-      if (!stripeAccount) {
-        const globalAccount = await StripeAccounts.findOne({
-          isGlobalAccount: true,
-          isActive: true,
-          isVerified: true,
-        });
-
-        if (!globalAccount) {
-          throw new Error(
-            "No active Stripe account found for this property or globally",
-          );
-        }
-
-        // Use global account
-        const totalAmount =
-          paymentData.amount + (paymentData.lateFeeAmount || 0);
-
-        // Create payment link with unique metadata using global Stripe account
-        const paymentLink = await this.stripe.paymentLinks.create({
-          line_items: [
-            {
-              price_data: {
-                currency: "usd",
-                product_data: {
-                  name: paymentData.description,
-                  description: `Payment for ${property.name} - ${paymentData.type}`,
-                },
-                unit_amount: Math.round(totalAmount * 100), // Convert to cents
-              },
-              quantity: 1,
-            },
-          ] as any,
-          metadata: {
-            tenantId: paymentData.tenantId,
-            propertyId: paymentData.propertyId,
-            spotId: paymentData.spotId,
-            leaseId: (activeLease as any)._id.toString(),
-            paymentType: paymentData.type,
-            dueDate: paymentData.dueDate.toISOString(),
-            receiptNumber: paymentData.receiptNumber,
-            propertyName: property.name,
-            tenantName: user.name,
-            amount: totalAmount.toString(),
-            lateFeeAmount: (paymentData.lateFeeAmount || 0).toString(),
-            stripeAccountId: globalAccount.stripeAccountId,
-            isGlobalAccount: "true",
-          },
-          after_completion: {
-            type: "redirect",
-            redirect: {
-              url: `${config.client_url}/payment-success?receipt=${paymentData.receiptNumber}`,
-            },
-          },
-          expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days from now
-        } as any);
-
-        return paymentLink;
-      }
 
       if (!stripeAccount) {
         throw new Error("No active Stripe account found for this property");
@@ -120,8 +171,11 @@ export class StripeService {
 
       const totalAmount = paymentData.amount + (paymentData.lateFeeAmount || 0);
 
-      // Create payment link with unique metadata using property-specific Stripe account
-      const paymentLink = await this.stripe.paymentLinks.create({
+      // Create Stripe instance with account-specific secret key
+      const stripe = this.createStripeInstance(stripeAccount.stripeSecretKey);
+
+      // Create payment link with unique metadata
+      const paymentLink = await stripe.paymentLinks.create({
         line_items: [
           {
             price_data: {
@@ -148,6 +202,7 @@ export class StripeService {
           amount: totalAmount.toString(),
           lateFeeAmount: (paymentData.lateFeeAmount || 0).toString(),
           stripeAccountId: stripeAccount.stripeAccountId,
+          isGlobalAccount: stripeAccount.isGlobalAccount ? "true" : "false",
         },
         after_completion: {
           type: "redirect",
@@ -195,56 +250,16 @@ export class StripeService {
 
       // Get the Stripe account for this property
       const stripeAccount = await StripeAccounts.findOne({
-        propertyId: paymentData.propertyId,
+        propertyIds: paymentData.propertyId,
         isActive: true,
         isVerified: true,
       });
-
-      // If no property-specific account, try to find a global account
-      if (!stripeAccount) {
-        const globalAccount = await StripeAccounts.findOne({
-          isGlobalAccount: true,
-          isActive: true,
-          isVerified: true,
-        });
-
-        if (!globalAccount) {
-          throw new Error(
-            "No active Stripe account found for this property or globally",
-          );
-        }
-
-        // Create payment record with global account
-        const payment = await Payments.create({
-          ...paymentData,
-          receiptNumber,
-          status: "PENDING",
-          totalAmount: paymentData.amount + (paymentData.lateFeeAmount || 0),
-          stripeAccountId: globalAccount._id,
-        });
-
-        // Create unique payment link
-        const paymentLink = await this.createPaymentLink({
-          ...paymentData,
-          receiptNumber,
-        });
-
-        // Update payment record with payment link info
-        await Payments.findByIdAndUpdate(payment._id, {
-          stripePaymentLinkId: paymentLink.id,
-        });
-
-        return {
-          payment,
-          paymentLink,
-        };
-      }
 
       if (!stripeAccount) {
         throw new Error("No active Stripe account found for this property");
       }
 
-      // Create payment record first
+      // Create payment record
       const payment = await Payments.create({
         ...paymentData,
         receiptNumber,
@@ -275,10 +290,13 @@ export class StripeService {
   }
 
   // Validate payment link exists in Stripe
-  async validatePaymentLink(paymentLinkId: string): Promise<boolean> {
+  async validatePaymentLink(
+    paymentLinkId: string,
+    secretKey: string,
+  ): Promise<boolean> {
     try {
-      const paymentLink =
-        await this.stripe.paymentLinks.retrieve(paymentLinkId);
+      const stripe = this.createStripeInstance(secretKey);
+      const paymentLink = await stripe.paymentLinks.retrieve(paymentLinkId);
       return paymentLink.active;
     } catch (error) {
       return false;
@@ -286,25 +304,35 @@ export class StripeService {
   }
 
   // Get payment link details
-  async getPaymentLinkDetails(paymentLinkId: string) {
-    return this.stripe.paymentLinks.retrieve(paymentLinkId);
+  async getPaymentLinkDetails(paymentLinkId: string, secretKey: string) {
+    const stripe = this.createStripeInstance(secretKey);
+    return await stripe.paymentLinks.retrieve(paymentLinkId);
   }
 
   // Get transaction history for a payment link
-  async getPaymentLinkTransactions(paymentLinkId: string) {
-    return this.stripe.paymentIntents.list({
+  async getPaymentLinkTransactions(paymentLinkId: string, secretKey: string) {
+    const stripe = this.createStripeInstance(secretKey);
+    return await stripe.paymentIntents.list({
       limit: 100,
     });
   }
 
   // Cancel payment intent (for error handling)
-  async cancelPaymentIntent(paymentIntentId: string) {
-    return this.stripe.paymentIntents.cancel(paymentIntentId);
+  async cancelPaymentIntent(paymentIntentId: string, secretKey: string) {
+    const stripe = this.createStripeInstance(secretKey);
+    return await stripe.paymentIntents.cancel(paymentIntentId);
   }
 
   // Sync existing payments from Stripe to database
-  async syncStripePayments(paymentLinkId: string, tenantId: string) {
-    const payments = await this.getPaymentLinkTransactions(paymentLinkId);
+  async syncStripePayments(
+    paymentLinkId: string,
+    tenantId: string,
+    secretKey: string,
+  ) {
+    const payments = await this.getPaymentLinkTransactions(
+      paymentLinkId,
+      secretKey,
+    );
     console.log("🚀 ~ payments:", payments.data);
 
     for (const payment of payments.data) {
@@ -336,13 +364,14 @@ export class StripeService {
     const property = await Properties.findOne({ name: propertyName });
     if (!property) {
       // Cancel payment if property not found
-      await this.cancelPaymentIntent(stripePayment.id);
+      // Note: We need the secret key to cancel, but we don't have it here
+      // This is a limitation - we'll need to handle this differently
       throw new Error(`Property not found: ${propertyName}`);
     }
 
     // Get the Stripe account for this property
     const stripeAccount = await StripeAccounts.findOne({
-      propertyId: property._id,
+      propertyIds: (property as any)._id,
       isActive: true,
       isVerified: true,
     });
@@ -384,6 +413,34 @@ export class StripeService {
     );
   }
 }
+
+// Check if account exists by name or ID
+export const checkAccountExists = async (
+  name: string,
+  stripeAccountId?: string,
+) => {
+  const existingByName = await StripeAccounts.findOne({
+    name,
+    isDeleted: false,
+  });
+
+  if (existingByName) {
+    return { exists: true, type: "name", account: existingByName };
+  }
+
+  if (stripeAccountId) {
+    const existingById = await StripeAccounts.findOne({
+      stripeAccountId,
+      isDeleted: false,
+    });
+
+    if (existingById) {
+      return { exists: true, type: "id", account: existingById };
+    }
+  }
+
+  return { exists: false };
+};
 
 // Auto-assign property to default account
 export const autoAssignPropertyToDefaultAccount = async (
@@ -432,76 +489,105 @@ export const autoAssignPropertyToDefaultAccount = async (
   }
 };
 
-// Get the best available account for a property
-export const getBestAvailableAccountForProperty = async (
-  propertyId: string,
-) => {
-  try {
-    // First, check for property-specific accounts
-    const propertyAccounts = await StripeAccounts.find({
-      propertyIds: propertyId,
-      isDeleted: false,
-      isActive: true,
-    }).populate("propertyIds", "name address");
-
-    if (propertyAccounts.length > 0) {
-      return propertyAccounts[0]; // Return the first property-specific account
-    }
-
-    // Check for global accounts
-    const globalAccounts = await StripeAccounts.find({
-      isGlobalAccount: true,
-      isDeleted: false,
-      isActive: true,
-    }).populate("propertyIds", "name address");
-
-    if (globalAccounts.length > 0) {
-      return globalAccounts[0]; // Return the first global account
-    }
-
-    // Check for default account
-    const defaultAccount = await StripeAccounts.findOne({
-      isDefaultAccount: true,
-      isDeleted: false,
-      isActive: true,
-    }).populate("propertyIds", "name address");
-
-    if (defaultAccount) {
-      return defaultAccount;
-    }
-
-    // If no suitable account found, return null
-    return null;
-  } catch (error) {
-    console.error("Error getting best available account for property:", error);
-    return null;
-  }
-};
-
 // Stripe Account Management Functions
+
 export const createStripeAccount = async (accountData: any) => {
-  const existingAccount = await StripeAccounts.findOne({
-    stripeAccountId: accountData.stripeAccountId,
-    isDeleted: false,
-  });
-
-  if (existingAccount) {
-    throw new Error("Stripe account ID already exists");
-  }
-
-  // If setting as default, ensure no other default exists
-  if (accountData.isDefaultAccount) {
-    const existingDefault = await StripeAccounts.findOne({
-      isDefaultAccount: true,
+  try {
+    // Check if account with same name already exists
+    const existingAccountByName = await StripeAccounts.findOne({
+      name: accountData.name,
       isDeleted: false,
     });
 
-    if (existingDefault) {
-      throw new Error("Another account is already set as default");
+    if (existingAccountByName) {
+      throw new Error("Stripe account with this name already exists");
     }
-  }
 
-  return await StripeAccounts.create(accountData);
+    // Check if account with same secret key already exists
+    const existingAccountBySecretKey = await StripeAccounts.findOne({
+      stripeSecretKey: accountData.stripeSecretKey,
+      isDeleted: false,
+    });
+
+    if (existingAccountBySecretKey) {
+      throw new Error("Stripe secret key is already in use by another account");
+    }
+
+    // Check if account with same ID already exists (for CONNECT accounts)
+    if (accountData.stripeAccountId) {
+      const existingAccount = await StripeAccounts.findOne({
+        stripeAccountId: accountData.stripeAccountId,
+        isDeleted: false,
+      });
+
+      if (existingAccount) {
+        throw new Error("Stripe account ID already exists");
+      }
+    }
+
+    // Verify the Stripe account ID with Stripe API
+    try {
+      await stripeVerificationService.verifyStripeAccountId(
+        accountData.stripeAccountId,
+        accountData.stripeSecretKey,
+        accountData.accountType || "STANDARD",
+      );
+    } catch (error: any) {
+      throw new Error(`Account verification failed: ${error.message}`);
+    }
+
+    // If setting as default, ensure no other default exists
+    if (accountData.isDefaultAccount) {
+      const existingDefault = await StripeAccounts.findOne({
+        isDefaultAccount: true,
+        isDeleted: false,
+      });
+
+      if (existingDefault) {
+        throw new Error("Another account is already set as default");
+      }
+    }
+
+    // Prepare account data for database
+    const accountWithVerification = {
+      ...accountData,
+      isVerified: true, // Automatically verify the account
+      isActive: true, // Automatically activate the account
+    };
+
+    // For STANDARD accounts, don't include stripeAccountId at all
+    if (accountData.accountType === "STANDARD") {
+      delete accountWithVerification.stripeAccountId;
+    }
+
+    const createdAccount = await StripeAccounts.create(accountWithVerification);
+
+    // Return the created account with verification status
+    return {
+      ...createdAccount.toObject(),
+      verificationStatus: "VERIFIED",
+      message: "Stripe account created and verified successfully",
+    };
+  } catch (error: any) {
+    // Handle MongoDB duplicate key errors
+    if (error.code === 11000) {
+      if (error.keyPattern?.stripeAccountId) {
+        throw new Error("Stripe account ID already exists");
+      }
+      if (error.keyPattern?.name) {
+        throw new Error("Stripe account with this name already exists");
+      }
+      if (error.keyPattern?.stripeSecretKey) {
+        throw new Error(
+          "Stripe secret key is already in use by another account",
+        );
+      }
+      throw new Error("Duplicate account entry");
+    }
+
+    // Re-throw other errors
+    throw error;
+  }
 };
 
 // Get all Stripe accounts with comprehensive property information
@@ -552,8 +638,7 @@ export const getAllStripeAccounts = async () => {
       name: account.name,
       description: account.description,
       stripeAccountId: account.stripeAccountId,
-      businessName: account.businessName,
-      businessEmail: account.businessEmail,
+
       isActive: account.isActive,
       isVerified: account.isVerified,
       isGlobalAccount: account.isGlobalAccount,
@@ -761,20 +846,6 @@ export const deleteStripeAccount = async (accountId: string) => {
   return account;
 };
 
-export const verifyStripeAccount = async (accountId: string) => {
-  const account = await StripeAccounts.findByIdAndUpdate(
-    accountId,
-    { isVerified: true },
-    { new: true },
-  ).populate("propertyIds", "name address");
-
-  if (!account) {
-    throw new Error("Stripe account not found");
-  }
-
-  return account;
-};
-
 export const getAvailableStripeAccounts = async (propertyId: string) => {
   // Validate that property exists
   const { Properties } = await import("../properties/properties.schema");
@@ -838,6 +909,42 @@ export const getUnassignedProperties = async () => {
   return unassignedProperties;
 };
 
+// Get account statistics for debugging
+export const getAccountStatistics = async () => {
+  const totalAccounts = await StripeAccounts.countDocuments({
+    isDeleted: false,
+  });
+  const activeAccounts = await StripeAccounts.countDocuments({
+    isDeleted: false,
+    isActive: true,
+  });
+  const verifiedAccounts = await StripeAccounts.countDocuments({
+    isDeleted: false,
+    isVerified: true,
+  });
+  const defaultAccounts = await StripeAccounts.countDocuments({
+    isDeleted: false,
+    isDefaultAccount: true,
+  });
+  const standardAccounts = await StripeAccounts.countDocuments({
+    isDeleted: false,
+    accountType: "STANDARD",
+  });
+  const connectAccounts = await StripeAccounts.countDocuments({
+    isDeleted: false,
+    accountType: "CONNECT",
+  });
+
+  return {
+    totalAccounts,
+    activeAccounts,
+    verifiedAccounts,
+    defaultAccounts,
+    standardAccounts,
+    connectAccounts,
+  };
+};
+
 // Get properties that can be assigned to a specific Stripe account
 export const getAssignablePropertiesForAccount = async (accountId: string) => {
   // Validate that Stripe account exists
@@ -874,4 +981,40 @@ export const getAssignablePropertiesForAccount = async (accountId: string) => {
   });
 
   return assignableProperties;
+};
+
+export const verifyStripeAccount = async (accountId: string) => {
+  const account = await StripeAccounts.findById(accountId);
+
+  if (!account) {
+    throw new Error("Stripe account not found");
+  }
+
+  // Verify the account with Stripe API
+  try {
+    await stripeVerificationService.verifyStripeAccountId(
+      account.stripeAccountId,
+      account.stripeSecretKey,
+      account.accountType || "STANDARD",
+    );
+
+    // Update the account as verified
+    const updatedAccount = await StripeAccounts.findByIdAndUpdate(
+      accountId,
+      { isVerified: true },
+      { new: true },
+    ).populate("propertyIds", "name address");
+
+    if (!updatedAccount) {
+      throw new Error("Failed to update account verification status");
+    }
+
+    return {
+      ...(updatedAccount as any).toObject(),
+      verificationStatus: "VERIFIED",
+      message: "Stripe account verified successfully",
+    };
+  } catch (error: any) {
+    throw new Error(`Account verification failed: ${error.message}`);
+  }
 };
