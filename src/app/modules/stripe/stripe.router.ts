@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
+import { userAuth } from "../../../middlewares/userAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
   createPaymentWithLink,
@@ -13,6 +14,7 @@ import {
   getPaymentLinkDetails,
   getStripeAccountById,
   getStripeAccountsByProperty,
+  getTenantPaymentStatus,
   getUnassignedProperties,
   handleWebhook,
   linkPropertiesToAccount,
@@ -139,7 +141,7 @@ router.patch(
 // Create payment link
 router.post(
   "/create-payment-link",
-  adminAuth,
+  userAuth,
   zodValidationRequest(createPaymentWithLinkSchema),
   createPaymentWithLink,
 );
@@ -147,9 +149,16 @@ router.post(
 // Get payment link details
 router.get(
   "/payment-link/:paymentLinkId",
-  adminAuth,
+  userAuth,
   zodValidationRequest(getPaymentLinkDetailsSchema),
   getPaymentLinkDetails,
+);
+
+// Get comprehensive tenant payment status with automatic payment creation
+router.get(
+  "/tenant-payment-status/:tenantId",
+  userAuth,
+  getTenantPaymentStatus,
 );
 
 // Webhook Routes (No auth required for Stripe webhooks)
@@ -159,7 +168,7 @@ router.get("/webhook/status", webhookStatus);
 // Payment History Sync (Admin only)
 router.post(
   "/sync-payment-history/:userId",
-  adminAuth,
+  userAuth,
   zodValidationRequest(syncPaymentHistorySchema),
   syncPaymentHistory,
 );

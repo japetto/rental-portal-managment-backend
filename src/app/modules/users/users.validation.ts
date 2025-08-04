@@ -160,14 +160,12 @@ export const updateTenantDataValidationSchema = z.object({
         name: z.string().optional(),
         phoneNumber: z.string().optional(),
         email: z.string().email("Invalid email format").optional(),
-        stripePaymentLinkId: z.string().optional(),
-        stripePaymentLinkUrl: z.string().optional(),
         rvInfo: z
           .object({
             make: z.string().optional(),
             model: z.string().optional(),
-            year: z.number().optional(),
-            length: z.number().optional(),
+            year: z.number().optional().nullable(),
+            length: z.number().optional().nullable(),
             licensePlate: z.string().optional(),
           })
           .optional(),

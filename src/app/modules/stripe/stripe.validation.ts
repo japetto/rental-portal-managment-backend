@@ -107,17 +107,12 @@ export const verifyStripeAccountSchema = z.object({
   }),
 });
 
-// Create Payment with Link validation
+// Create Payment with Link validation - Simplified for rent payments
 export const createPaymentWithLinkSchema = z.object({
   body: z.object({
     tenantId: z.string().min(1, "Tenant ID is required"),
-    propertyId: z.string().min(1, "Property ID is required"),
-    spotId: z.string().min(1, "Spot ID is required"),
-    amount: z.number().positive("Amount must be positive"),
-    type: z.string().min(1, "Payment type is required"),
-    dueDate: z.string().min(1, "Due date is required"),
-    description: z.string().min(1, "Description is required"),
-    lateFeeAmount: z.number().min(0).optional(),
+    // Optional: current date for payment calculation (defaults to current date)
+    currentDate: z.string().optional(),
   }),
 });
 

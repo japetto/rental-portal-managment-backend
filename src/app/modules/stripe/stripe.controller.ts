@@ -486,44 +486,184 @@ export const getAssignablePropertiesForAccount = catchAsync(
   },
 );
 
-// Create a new payment with unique payment link
+// Create a new payment with unique payment link - Enhanced for first-time payments
 export const createPaymentWithLink = catchAsync(
   async (req: Request, res: Response) => {
-    const {
-      tenantId,
-      propertyId,
-      spotId,
-      amount,
-      type,
-      dueDate,
-      description,
-      lateFeeAmount,
-    } = req.body;
+    const { tenantId, currentDate } = req.body;
 
     const stripeService = new StripeService();
 
+    // Get active lease for the tenant
+    const { Leases } = await import("../leases/leases.schema");
+    const activeLease = await Leases.findOne({
+      tenantId,
+      leaseStatus: "ACTIVE",
+      isDeleted: false,
+    }).populate("propertyId spotId");
+
+    if (!activeLease) {
+      return sendResponse(res, {
+        statusCode: httpStatus.NOT_FOUND,
+        success: false,
+        message: "No active lease found for this tenant",
+        data: null,
+      });
+    }
+
+    // Get payment history to determine if this is a first-time payment
+    const { Payments } = await import("../payments/payments.schema");
+    const paymentHistory = await Payments.find({
+      tenantId,
+      type: "RENT",
+      status: { $in: ["PAID", "PENDING", "OVERDUE"] },
+      isDeleted: false,
+    }).sort({ dueDate: 1 });
+
+    // Calculate appropriate due date based on lease start and current date
+    const effectiveCurrentDate = currentDate
+      ? new Date(currentDate)
+      : new Date();
+    let paymentDueDate: Date;
+    let paymentAmount: number;
+    let isFirstTimePayment = false;
+    let paymentDescription: string;
+
+    // Determine payment based on lease start and payment history
+    if (paymentHistory.length === 0) {
+      // First-time payment - use lease start date as due date
+      isFirstTimePayment = true;
+      paymentDueDate = new Date(activeLease.leaseStart);
+      paymentAmount = activeLease.rentAmount;
+      paymentDescription = "First Month Rent Payment";
+
+      // Check if lease started mid-month and adjust amount if needed
+      const leaseStartDay = activeLease.leaseStart.getDate();
+      if (leaseStartDay > 1) {
+        // Pro-rate the first month's rent
+        const daysInMonth = new Date(
+          activeLease.leaseStart.getFullYear(),
+          activeLease.leaseStart.getMonth() + 1,
+          0,
+        ).getDate();
+        const remainingDays = daysInMonth - leaseStartDay + 1;
+        paymentAmount = Math.round(
+          (activeLease.rentAmount / daysInMonth) * remainingDays,
+        );
+        paymentDescription = `Pro-rated First Month Rent (${remainingDays} days)`;
+      }
+    } else {
+      // Not first-time payment - use current month's 1st day
+      const currentMonth = new Date(
+        effectiveCurrentDate.getFullYear(),
+        effectiveCurrentDate.getMonth(),
+        1,
+      );
+
+      // Check if we already have a payment for current month
+      const existingCurrentMonthPayment = paymentHistory.find(payment => {
+        const paymentMonth = new Date(
+          payment.dueDate.getFullYear(),
+          payment.dueDate.getMonth(),
+          1,
+        );
+        return paymentMonth.getTime() === currentMonth.getTime();
+      });
+
+      if (existingCurrentMonthPayment) {
+        return sendResponse(res, {
+          statusCode: httpStatus.CONFLICT,
+          success: false,
+          message: "Rent payment for current month already exists",
+          data: {
+            existingPayment: {
+              id: existingCurrentMonthPayment._id,
+              receiptNumber: existingCurrentMonthPayment.receiptNumber,
+              status: existingCurrentMonthPayment.status,
+              stripePaymentLinkId:
+                existingCurrentMonthPayment.stripePaymentLinkId,
+            },
+          },
+        });
+      }
+
+      paymentDueDate = currentMonth;
+      paymentAmount = activeLease.rentAmount;
+      paymentDescription = "Monthly Rent Payment";
+    }
+
+    // Check if payment already exists for the calculated month
+    const existingPayment = await Payments.findOne({
+      tenantId,
+      type: "RENT",
+      dueDate: {
+        $gte: new Date(
+          paymentDueDate.getFullYear(),
+          paymentDueDate.getMonth(),
+          1,
+        ),
+        $lt: new Date(
+          paymentDueDate.getFullYear(),
+          paymentDueDate.getMonth() + 1,
+          1,
+        ),
+      },
+      isDeleted: false,
+    });
+
+    if (existingPayment) {
+      return sendResponse(res, {
+        statusCode: httpStatus.CONFLICT,
+        success: false,
+        message: "Rent payment for this month already exists",
+        data: {
+          existingPayment: {
+            id: existingPayment._id,
+            receiptNumber: existingPayment.receiptNumber,
+            status: existingPayment.status,
+            stripePaymentLinkId: existingPayment.stripePaymentLinkId,
+          },
+        },
+      });
+    }
+
     const result = await stripeService.createPaymentWithLink({
       tenantId,
-      propertyId,
-      spotId,
-      amount,
-      type,
-      dueDate: new Date(dueDate),
-      description,
-      lateFeeAmount,
+      propertyId: (activeLease.propertyId as any)._id.toString(),
+      spotId: (activeLease.spotId as any)._id.toString(),
+      amount: paymentAmount,
+      type: "RENT",
+      dueDate: paymentDueDate,
+      description: paymentDescription,
+      lateFeeAmount: 0,
       createdBy: req.user?.id || "SYSTEM",
     });
 
     sendResponse(res, {
       statusCode: httpStatus.CREATED,
       success: true,
-      message: "Payment created with payment link successfully",
+      message: isFirstTimePayment
+        ? "First-time rent payment link created successfully"
+        : "Rent payment link created successfully",
       data: {
         payment: result.payment,
         paymentLink: {
           id: result.paymentLink.id,
           url: result.paymentLink.url,
           expiresAt: (result.paymentLink as any).expires_at,
+        },
+        lease: {
+          id: activeLease._id,
+          rentAmount: activeLease.rentAmount,
+          leaseType: activeLease.leaseType,
+          leaseStatus: activeLease.leaseStatus,
+          leaseStart: activeLease.leaseStart,
+        },
+        paymentInfo: {
+          isFirstTimePayment,
+          calculatedAmount: paymentAmount,
+          originalRentAmount: activeLease.rentAmount,
+          dueDate: paymentDueDate,
+          description: paymentDescription,
         },
       },
     });
@@ -561,6 +701,286 @@ export const getPaymentLinkDetails = catchAsync(
       success: true,
       message: "Payment link details retrieved successfully",
       data: paymentLink,
+    });
+  },
+);
+
+// Get comprehensive tenant payment status with automatic payment creation
+export const getTenantPaymentStatus = catchAsync(
+  async (req: Request, res: Response) => {
+    const { tenantId } = req.params;
+
+    // Get active lease for the tenant
+    const { Leases } = await import("../leases/leases.schema");
+    const activeLease = await Leases.findOne({
+      tenantId,
+      leaseStatus: "ACTIVE",
+      isDeleted: false,
+    }).populate("propertyId spotId");
+
+    if (!activeLease) {
+      return sendResponse(res, {
+        statusCode: httpStatus.NOT_FOUND,
+        success: false,
+        message: "No active lease found for this tenant",
+        data: null,
+      });
+    }
+
+    // Get payment history to determine if this is a first-time payment
+    const { Payments } = await import("../payments/payments.schema");
+    const paymentHistory = await Payments.find({
+      tenantId,
+      type: "RENT",
+      status: { $in: ["PAID", "PENDING", "OVERDUE"] },
+      isDeleted: false,
+    }).sort({ dueDate: 1 });
+
+    // Get current month's payment status
+    const currentDate = new Date();
+    const currentMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    );
+
+    // Check if payment exists for current month
+    const currentMonthPayment = await Payments.findOne({
+      tenantId,
+      type: "RENT",
+      dueDate: {
+        $gte: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1),
+        $lt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
+      },
+      isDeleted: false,
+    });
+
+    // Get all pending/overdue payments
+    const pendingPayments = await Payments.find({
+      tenantId,
+      type: "RENT",
+      status: { $in: ["PENDING", "OVERDUE"] },
+      isDeleted: false,
+    }).sort({ dueDate: 1 });
+
+    // Calculate overdue amounts
+    const overduePayments = pendingPayments.filter(
+      payment => payment.status === "OVERDUE",
+    );
+    const totalOverdueAmount = overduePayments.reduce(
+      (sum, payment) => sum + payment.totalAmount,
+      0,
+    );
+
+    // Calculate days overdue for current payment
+    const daysOverdue =
+      currentMonthPayment && currentMonthPayment.status === "OVERDUE"
+        ? Math.floor(
+            (currentDate.getTime() - currentMonthPayment.dueDate.getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : 0;
+
+    // Determine if we need to create a new payment
+    let paymentAction = "NONE";
+    let paymentLink = null;
+    let newPayment = null;
+    let isFirstTimePayment = false;
+
+    if (!currentMonthPayment) {
+      // Check if this is a first-time payment
+      if (paymentHistory.length === 0) {
+        // First-time payment - use lease start date as due date
+        isFirstTimePayment = true;
+        const paymentDueDate = new Date(activeLease.leaseStart);
+        let paymentAmount = activeLease.rentAmount;
+        let paymentDescription = "First Month Rent Payment";
+
+        // Check if lease started mid-month and adjust amount if needed
+        const leaseStartDay = activeLease.leaseStart.getDate();
+        if (leaseStartDay > 1) {
+          // Pro-rate the first month's rent
+          const daysInMonth = new Date(
+            activeLease.leaseStart.getFullYear(),
+            activeLease.leaseStart.getMonth() + 1,
+            0,
+          ).getDate();
+          const remainingDays = daysInMonth - leaseStartDay + 1;
+          paymentAmount = Math.round(
+            (activeLease.rentAmount / daysInMonth) * remainingDays,
+          );
+          paymentDescription = `Pro-rated First Month Rent (${remainingDays} days)`;
+        }
+
+        paymentAction = "CREATE_FIRST_TIME";
+
+        const stripeService = new StripeService();
+        try {
+          newPayment = await stripeService.createPaymentWithLink({
+            tenantId,
+            propertyId: (activeLease.propertyId as any)._id.toString(),
+            spotId: (activeLease.spotId as any)._id.toString(),
+            amount: paymentAmount,
+            type: "RENT",
+            dueDate: paymentDueDate,
+            description: paymentDescription,
+            lateFeeAmount: 0,
+            createdBy: req.user?.id || "SYSTEM",
+          });
+
+          paymentLink = {
+            id: newPayment.paymentLink.id,
+            url: newPayment.paymentLink.url,
+            expiresAt: (newPayment.paymentLink as any).expires_at,
+          };
+        } catch (error) {
+          console.error("Error creating first-time payment:", error);
+          paymentAction = "ERROR";
+        }
+      } else {
+        // Not first-time payment - create for current month
+        paymentAction = "CREATE_NEW";
+
+        const stripeService = new StripeService();
+        try {
+          newPayment = await stripeService.createPaymentWithLink({
+            tenantId,
+            propertyId: (activeLease.propertyId as any)._id.toString(),
+            spotId: (activeLease.spotId as any)._id.toString(),
+            amount: activeLease.rentAmount,
+            type: "RENT",
+            dueDate: currentMonth,
+            description: "Monthly Rent Payment",
+            lateFeeAmount: 0,
+            createdBy: req.user?.id || "SYSTEM",
+          });
+
+          paymentLink = {
+            id: newPayment.paymentLink.id,
+            url: newPayment.paymentLink.url,
+            expiresAt: (newPayment.paymentLink as any).expires_at,
+          };
+        } catch (error) {
+          console.error("Error creating payment:", error);
+          paymentAction = "ERROR";
+        }
+      }
+    } else if (currentMonthPayment.status === "PENDING") {
+      // Payment exists but is pending - check if payment link exists
+      paymentAction = "PENDING";
+
+      if (currentMonthPayment.stripePaymentLinkId) {
+        // Get existing payment link details
+        const stripeService = new StripeService();
+        try {
+          const { StripeAccounts } = await import(
+            "../stripe/stripe-accounts.schema"
+          );
+          const stripeAccount = await StripeAccounts.findOne({
+            _id: currentMonthPayment.stripeAccountId,
+            isActive: true,
+          });
+
+          if (stripeAccount) {
+            const paymentLinkDetails =
+              await stripeService.getPaymentLinkDetails(
+                currentMonthPayment.stripePaymentLinkId,
+                stripeAccount.stripeSecretKey,
+              );
+
+            paymentLink = {
+              id: paymentLinkDetails.id,
+              url: paymentLinkDetails.url,
+              expiresAt: (paymentLinkDetails as any).expires_at,
+            };
+          }
+        } catch (error) {
+          console.error("Error getting payment link details:", error);
+        }
+      }
+    } else if (currentMonthPayment.status === "OVERDUE") {
+      paymentAction = "OVERDUE";
+    } else if (currentMonthPayment.status === "PAID") {
+      paymentAction = "PAID";
+    }
+
+    // Get recent payment history
+    const recentPayments = await Payments.find({
+      tenantId,
+      type: "RENT",
+      status: "PAID",
+      isDeleted: false,
+    })
+      .sort({ dueDate: -1 })
+      .limit(6);
+
+    const response = {
+      tenantId,
+      lease: {
+        id: activeLease._id,
+        rentAmount: activeLease.rentAmount,
+        leaseType: activeLease.leaseType,
+        leaseStatus: activeLease.leaseStatus,
+        leaseStart: activeLease.leaseStart,
+      },
+      currentMonth: {
+        dueDate: currentMonthPayment?.dueDate || currentMonth,
+        rentAmount: activeLease.rentAmount,
+        status: currentMonthPayment?.status || "PENDING",
+        paidDate: currentMonthPayment?.paidDate,
+        daysOverdue: daysOverdue,
+        lateFeeAmount: currentMonthPayment?.lateFeeAmount || 0,
+        totalAmount: currentMonthPayment?.totalAmount || activeLease.rentAmount,
+        receiptNumber: currentMonthPayment?.receiptNumber,
+      },
+      paymentAction,
+      paymentLink,
+      isFirstTimePayment,
+      summary: {
+        totalOverdueAmount,
+        overdueCount: overduePayments.length,
+        pendingCount: pendingPayments.length,
+        totalPaidAmount: recentPayments.reduce(
+          (sum, payment) => sum + payment.totalAmount,
+          0,
+        ),
+        averagePaymentAmount:
+          recentPayments.length > 0
+            ? recentPayments.reduce(
+                (sum, payment) => sum + payment.totalAmount,
+                0,
+              ) / recentPayments.length
+            : 0,
+      },
+      recentPayments: recentPayments.map(payment => ({
+        id: payment._id,
+        dueDate: payment.dueDate,
+        paidDate: payment.paidDate,
+        amount: payment.totalAmount,
+        paymentMethod: payment.paymentMethod,
+        receiptNumber: payment.receiptNumber,
+        status: payment.status,
+      })),
+      pendingPayments: pendingPayments.map(payment => ({
+        id: payment._id,
+        dueDate: payment.dueDate,
+        amount: payment.totalAmount,
+        status: payment.status,
+        daysOverdue:
+          payment.status === "OVERDUE"
+            ? Math.floor(
+                (currentDate.getTime() - payment.dueDate.getTime()) /
+                  (1000 * 60 * 60 * 24),
+              )
+            : 0,
+      })),
+    };
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Tenant payment status retrieved successfully",
+      data: response,
     });
   },
 );

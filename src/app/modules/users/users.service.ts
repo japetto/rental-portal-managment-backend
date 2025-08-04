@@ -278,11 +278,37 @@ const updateTenantData = async (
       if (payload.user.phoneNumber)
         userUpdateData.phoneNumber = payload.user.phoneNumber;
       if (payload.user.email) userUpdateData.email = payload.user.email;
-      if (payload.user.stripePaymentLinkId)
-        userUpdateData.stripePaymentLinkId = payload.user.stripePaymentLinkId;
-      if (payload.user.stripePaymentLinkUrl)
-        userUpdateData.stripePaymentLinkUrl = payload.user.stripePaymentLinkUrl;
-      if (payload.user.rvInfo) userUpdateData.rvInfo = payload.user.rvInfo;
+      if (payload.user.rvInfo) {
+        // Filter out invalid values for rvInfo
+        const filteredRvInfo: any = {};
+        if (payload.user.rvInfo.make)
+          filteredRvInfo.make = payload.user.rvInfo.make;
+        if (payload.user.rvInfo.model)
+          filteredRvInfo.model = payload.user.rvInfo.model;
+        if (payload.user.rvInfo.licensePlate)
+          filteredRvInfo.licensePlate = payload.user.rvInfo.licensePlate;
+
+        // Only include year and length if they are valid (greater than minimum values)
+        if (
+          payload.user.rvInfo.year !== undefined &&
+          payload.user.rvInfo.year !== null &&
+          payload.user.rvInfo.year >= 1900
+        ) {
+          filteredRvInfo.year = payload.user.rvInfo.year;
+        }
+        if (
+          payload.user.rvInfo.length !== undefined &&
+          payload.user.rvInfo.length !== null &&
+          payload.user.rvInfo.length >= 1
+        ) {
+          filteredRvInfo.length = payload.user.rvInfo.length;
+        }
+
+        // Only set rvInfo if it has valid data
+        if (Object.keys(filteredRvInfo).length > 0) {
+          userUpdateData.rvInfo = filteredRvInfo;
+        }
+      }
 
       // Check for phone number uniqueness if being updated
       if (
@@ -341,29 +367,61 @@ const updateTenantData = async (
         // Update existing lease
         console.log("📝 Updating existing lease...");
 
-        // Convert date strings to Date objects
-        const leaseUpdateData = { ...payload.lease };
-        if (
-          leaseUpdateData.leaseStart &&
-          typeof leaseUpdateData.leaseStart === "string"
-        ) {
-          leaseUpdateData.leaseStart = new Date(leaseUpdateData.leaseStart);
-        }
-        if (
-          leaseUpdateData.leaseEnd &&
-          typeof leaseUpdateData.leaseEnd === "string"
-        ) {
-          leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
-        }
+        // First check if the lease actually exists
+        const existingLease = await Leases.findById(user.leaseId);
+        if (!existingLease) {
+          console.log("⚠️ Lease not found, creating new lease instead...");
+          // If lease doesn't exist, create a new one
+          const newLeaseData = {
+            ...payload.lease,
+            tenantId: userId,
+            propertyId: user.propertyId,
+            spotId: user.spotId,
+            // Add default values for required fields
+            leaseStart: payload.lease.leaseStart || new Date(),
+            occupants: payload.lease.occupants || 1,
+            rentAmount: payload.lease.rentAmount || 0,
+            depositAmount: payload.lease.depositAmount || 0,
+            pets: {
+              hasPets: payload.lease.pets?.hasPets || false,
+              petDetails: payload.lease.pets?.petDetails || [],
+            },
+          };
 
-        updatedLease = await Leases.findByIdAndUpdate(
-          user.leaseId,
-          leaseUpdateData,
-          { new: true, runValidators: false, session }, // Disable validators for partial updates
-        );
+          updatedLease = await Leases.create([newLeaseData], { session });
+          updatedLease = updatedLease[0];
 
-        if (!updatedLease) {
-          throw new ApiError(httpStatus.NOT_FOUND, "Lease not found");
+          // Update user's leaseId
+          await Users.findByIdAndUpdate(
+            userId,
+            { leaseId: updatedLease._id },
+            { session },
+          );
+        } else {
+          // Convert date strings to Date objects
+          const leaseUpdateData = { ...payload.lease };
+          if (
+            leaseUpdateData.leaseStart &&
+            typeof leaseUpdateData.leaseStart === "string"
+          ) {
+            leaseUpdateData.leaseStart = new Date(leaseUpdateData.leaseStart);
+          }
+          if (
+            leaseUpdateData.leaseEnd &&
+            typeof leaseUpdateData.leaseEnd === "string"
+          ) {
+            leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
+          }
+
+          updatedLease = await Leases.findByIdAndUpdate(
+            user.leaseId,
+            leaseUpdateData,
+            { new: true, runValidators: false, session }, // Disable validators for partial updates
+          );
+
+          if (!updatedLease) {
+            throw new ApiError(httpStatus.NOT_FOUND, "Lease not found");
+          }
         }
       } else {
         // Create new lease

@@ -120,8 +120,6 @@ export interface IUpdateTenantData {
     name?: string;
     phoneNumber?: string;
     email?: string;
-    stripePaymentLinkId?: string;
-    stripePaymentLinkUrl?: string;
     rvInfo?: {
       make: string;
       model: string;

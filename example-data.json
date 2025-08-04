@@ -288,6 +288,27 @@
         "preferredLocation": "Lakeside View"
       }
     },
+    "createPaymentLink": {
+      "method": "POST",
+      "endpoint": "/api/v1.0/stripe/create-payment-link",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer <admin-jwt-token>"
+      },
+      "body": {
+        "tenantId": "507f1f77bcf86cd799439011",
+        "currentDate": "2024-01-15T00:00:00.000Z"
+      },
+      "notes": "Simplified API that only requires tenantId. System automatically determines payment details from lease information and payment history. Handles first-time payments with pro-rated amounts for mid-month lease starts."
+    },
+    "getTenantPaymentStatus": {
+      "method": "GET",
+      "endpoint": "/api/v1.0/stripe/tenant-payment-status/:tenantId",
+      "headers": {
+        "Authorization": "Bearer <admin-jwt-token>"
+      },
+      "notes": "Comprehensive endpoint that checks tenant payment status, automatically creates payment links for missing payments, and handles first-time payments with proper due date calculation based on lease start date."
+    },
     "inviteTenant": {
       "method": "POST",
       "endpoint": "/api/v1.0/admin/invite-tenant",
@@ -319,6 +340,8 @@
   "curlExamples": {
     "createAdmin": "curl -X POST http://localhost:5000/api/v1.0/users/register \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"John Smith\",\n    \"email\": \"john.smith@rvpark.com\",\n    \"password\": \"admin123456\",\n    \"confirmPassword\": \"admin123456\",\n    \"phoneNumber\": \"+1-555-0101\",\n    \"role\": \"SUPER_ADMIN\",\n    \"preferredLocation\": \"Main Office\"\n  }'",
     "createTenant": "curl -X POST http://localhost:5000/api/v1.0/users/register \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"Robert Wilson\",\n    \"email\": \"robert.wilson@email.com\",\n    \"password\": \"tenant123456\",\n    \"confirmPassword\": \"tenant123456\",\n    \"phoneNumber\": \"+1-555-0201\",\n    \"role\": \"TENANT\",\n    \"preferredLocation\": \"Lakeside View\"\n  }'",
+    "createPaymentLink": "curl -X POST http://localhost:5000/api/v1.0/stripe/create-payment-link \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer <admin-jwt-token>\" \\\n  -d '{\n    \"tenantId\": \"507f1f77bcf86cd799439011\",\n    \"currentDate\": \"2024-01-15T00:00:00.000Z\"\n  }'",
+    "getTenantPaymentStatus": "curl -X GET http://localhost:5000/api/v1.0/stripe/tenant-payment-status/507f1f77bcf86cd799439011 \\\n  -H \"Authorization: Bearer <admin-jwt-token>\"",
     "login": "curl -X POST http://localhost:5000/api/v1.0/users/login \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"email\": \"john.smith@rvpark.com\",\n    \"password\": \"admin123456\"\n  }'"
   },
   "notes": {

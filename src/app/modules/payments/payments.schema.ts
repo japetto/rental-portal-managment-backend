@@ -27,7 +27,6 @@ export const paymentsSchema = new Schema<IPayment>(
       required: true,
       default: PaymentStatus.PENDING,
     },
-    dueDate: { type: Date, required: true },
     paidDate: { type: Date },
     paymentMethod: {
       type: String,
@@ -223,28 +222,6 @@ paymentsSchema.pre("save", function (next) {
     this.receiptNumber = `RCP-${timestamp}-${random}`;
   }
   next();
-});
-
-// Indexes for efficient queries
-paymentsSchema.index({ tenantId: 1, status: 1 });
-paymentsSchema.index({ propertyId: 1, status: 1 });
-paymentsSchema.index({ dueDate: 1, status: 1 });
-paymentsSchema.index({ paidDate: 1 });
-paymentsSchema.index({ transactionId: 1 });
-paymentsSchema.index({ type: 1, status: 1 });
-
-// Virtual to check if payment is overdue
-paymentsSchema.virtual("isOverdue").get(function (this: IPayment) {
-  if (this.status === PaymentStatus.PAID) return false;
-  return new Date() > this.dueDate;
-});
-
-// Virtual to calculate days overdue
-paymentsSchema.virtual("daysOverdue").get(function (this: IPayment) {
-  if (this.status === PaymentStatus.PAID || new Date() <= this.dueDate)
-    return 0;
-  const diffTime = Math.abs(new Date().getTime() - this.dueDate.getTime());
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 
 export const Payments = model<IPayment>("Payments", paymentsSchema);

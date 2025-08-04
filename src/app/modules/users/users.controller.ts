@@ -2,7 +2,10 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
-import { PaymentHistoryService } from "../payments/payment-history.service";
+import {
+  getPaymentHistory as getPaymentHistoryService,
+  getRentSummary as getRentSummaryService,
+} from "../payments/payment-history.service";
 import { Payments } from "../payments/payments.schema";
 import { StripeService } from "../stripe/stripe.service";
 import { UserService } from "./users.service";
@@ -514,7 +517,7 @@ const getPaymentHistory = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await PaymentHistoryService.getPaymentHistory(userId);
+  const result = await getPaymentHistoryService(userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -537,7 +540,7 @@ const getRentSummary = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await PaymentHistoryService.getRentSummary(userId);
+  const result = await getRentSummaryService(userId);
   console.log("🚀 ~ result:", result);
 
   sendResponse(res, {
