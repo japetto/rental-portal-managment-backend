@@ -6,117 +6,195 @@ import { Properties } from "../properties/properties.schema";
 import { Users } from "../users/users.schema";
 import { StripeAccounts } from "./stripe-accounts.schema";
 
-// Centralized Stripe verification service
-class StripeVerificationService {
-  // Create Stripe instance with account-specific secret key
-  createStripeInstance(secretKey: string): Stripe {
-    return new Stripe(secretKey, {
-      apiVersion: "2025-06-30.basil",
-    });
-  }
+// Create Stripe instance with account-specific secret key
+const createStripeInstance = (secretKey: string): Stripe => {
+  return new Stripe(secretKey, {
+    apiVersion: "2025-06-30.basil",
+  });
+};
 
-  // Verify Stripe account ID and secret key with Stripe API
-  async verifyStripeAccountId(
-    stripeAccountId: string | undefined,
-    secretKey: string,
-    accountType: "STANDARD" | "CONNECT",
-  ) {
-    try {
-      // For CONNECT accounts, validate account ID
-      if (accountType === "CONNECT") {
-        if (!stripeAccountId) {
-          throw new Error("Stripe Account ID is required for CONNECT accounts");
-        }
-
-        if (!stripeAccountId.startsWith("acct_")) {
-          throw new Error(
-            "Invalid Stripe account ID format. Must start with 'acct_'",
-          );
-        }
+// Verify Stripe account ID and secret key with Stripe API
+export const verifyStripeAccountId = async (
+  stripeAccountId: string | undefined,
+  secretKey: string,
+  accountType: "STANDARD" | "CONNECT",
+) => {
+  try {
+    // For CONNECT accounts, validate account ID
+    if (accountType === "CONNECT") {
+      if (!stripeAccountId) {
+        throw new Error("Stripe Account ID is required for CONNECT accounts");
       }
 
-      // Validate the secret key format
-      if (!secretKey.startsWith("sk_")) {
+      if (!stripeAccountId.startsWith("acct_")) {
         throw new Error(
-          "Invalid Stripe secret key format. Must start with 'sk_'",
+          "Invalid Stripe account ID format. Must start with 'acct_'",
         );
       }
-
-      // Create Stripe instance with account-specific secret key
-      const stripe = this.createStripeInstance(secretKey);
-
-      // For CONNECT accounts, verify the account exists
-      if (accountType === "CONNECT" && stripeAccountId) {
-        // Try to retrieve the account from Stripe
-        const account = await stripe.accounts.retrieve(stripeAccountId);
-
-        // Check if account is valid and active
-        if (!account || account.object !== "account") {
-          throw new Error("Invalid Stripe account ID");
-        }
-
-        // Check account status
-        if (account.charges_enabled === false) {
-          throw new Error("Stripe account is not enabled for charges");
-        }
-      }
-
-      // Verify the secret key belongs to this account by making a test API call
-      try {
-        // Try to list payment links to verify the secret key works
-        await stripe.paymentLinks.list({ limit: 1 });
-      } catch (secretError: any) {
-        if (secretError.code === "authentication_error") {
-          throw new Error(
-            "Invalid Stripe secret key. Please check your credentials",
-          );
-        }
-        // If it's not an auth error, the secret key is valid
-      }
-      return {
-        isValid: true,
-        account:
-          accountType === "CONNECT"
-            ? { id: stripeAccountId }
-            : { id: "STANDARD_ACCOUNT" },
-        message: `${accountType} account and secret key verified successfully`,
-      };
-    } catch (error: any) {
-      if (error.code === "resource_missing") {
-        throw new Error(
-          "Stripe account not found. Please check the account ID",
-        );
-      }
-      if (error.code === "invalid_request_error") {
-        throw new Error("Invalid Stripe account ID format");
-      }
-      if (error.code === "authentication_error") {
-        throw new Error(
-          "Invalid Stripe secret key. Please check your credentials",
-        );
-      }
-      throw new Error(`Stripe account verification failed: ${error.message}`);
-    }
-  }
-
-  // Validate that a Stripe account can be used for payments
-  async validateAccountForPayments(stripeAccountId: string, secretKey: string) {
-    const verification = await this.verifyStripeAccountId(
-      stripeAccountId,
-      secretKey,
-      "CONNECT",
-    );
-
-    if (!verification.isValid) {
-      throw new Error("Stripe account is not valid for payments");
     }
 
-    return verification;
-  }
-}
+    // Validate the secret key format
+    if (!secretKey.startsWith("sk_")) {
+      throw new Error(
+        "Invalid Stripe secret key format. Must start with 'sk_'",
+      );
+    }
 
-// Create a singleton instance
-export const stripeVerificationService = new StripeVerificationService();
+    // Create Stripe instance with account-specific secret key
+    const stripe = createStripeInstance(secretKey);
+
+    // For CONNECT accounts, verify the account exists
+    if (accountType === "CONNECT" && stripeAccountId) {
+      // Try to retrieve the account from Stripe
+      const account = await stripe.accounts.retrieve(stripeAccountId);
+
+      // Check if account is valid and active
+      if (!account || account.object !== "account") {
+        throw new Error("Invalid Stripe account ID");
+      }
+
+      // Check account status
+      if (account.charges_enabled === false) {
+        throw new Error("Stripe account is not enabled for charges");
+      }
+    }
+
+    // Verify the secret key belongs to this account by making a test API call
+    // Using balance.retrieve() is more reliable than paymentLinks.list()
+    await stripe.balance.retrieve();
+    return {
+      isValid: true,
+      account:
+        accountType === "CONNECT"
+          ? { id: stripeAccountId }
+          : { id: "STANDARD_ACCOUNT" },
+      message: `${accountType} account and secret key verified successfully`,
+    };
+  } catch (error: any) {
+    if (error.code === "resource_missing") {
+      throw new Error("Stripe account not found. Please check the account ID");
+    }
+    if (error.code === "invalid_request_error") {
+      throw new Error("Invalid Stripe account ID format");
+    }
+    if (error.code === "authentication_error") {
+      throw new Error(
+        "Invalid Stripe secret key. Please check your credentials",
+      );
+    }
+    throw new Error(`Stripe account verification failed: ${error.message}`);
+  }
+};
+
+// Validate account for payments
+export const validateAccountForPayments = async (
+  stripeAccountId: string,
+  secretKey: string,
+) => {
+  try {
+    const stripe = createStripeInstance(secretKey);
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+
+    if (!account.charges_enabled) {
+      throw new Error("Account is not enabled for charges");
+    }
+
+    return {
+      isValid: true,
+      account,
+      message: "Account is valid for payments",
+    };
+  } catch (error: any) {
+    throw new Error(`Account validation failed: ${error.message}`);
+  }
+};
+
+// Verify only the secret key (without account ID)
+export const verifySecretKey = async (secretKey: string) => {
+  try {
+    // Validate the secret key format
+    if (!secretKey.startsWith("sk_")) {
+      throw new Error(
+        "Invalid Stripe secret key format. Must start with 'sk_'",
+      );
+    }
+
+    // Create Stripe instance with the secret key
+    const stripe = createStripeInstance(secretKey);
+
+    // Test the secret key by making a simple API call to balance
+    // This is more reliable than paymentLinks.list()
+    await stripe.balance.retrieve();
+
+    return {
+      isValid: true,
+      message: "Stripe secret key is valid",
+    };
+  } catch (error: any) {
+    if (error.code === "authentication_error") {
+      throw new Error(
+        "Invalid Stripe secret key. Please check your credentials",
+      );
+    }
+    throw new Error(`Secret key verification failed: ${error.message}`);
+  }
+};
+
+// Get account details from secret key
+export const getAccountDetailsFromSecretKey = async (secretKey: string) => {
+  try {
+    const stripe = createStripeInstance(secretKey);
+
+    // Get account details
+    const account = await stripe.accounts.retrieve();
+
+    return {
+      accountId: account.id,
+      accountType: account.object,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      country: account.country,
+      businessType: account.business_type,
+      capabilities: account.capabilities,
+      detailsSubmitted: account.details_submitted,
+    };
+  } catch (error: any) {
+    if (error.code === "authentication_error") {
+      throw new Error("Invalid Stripe secret key");
+    }
+    throw new Error(`Failed to get account details: ${error.message}`);
+  }
+};
+
+// Verify secret key and get account details for STANDARD accounts
+export const verifySecretKeyAndGetAccount = async (secretKey: string) => {
+  try {
+    const stripe = createStripeInstance(secretKey);
+
+    // For STANDARD accounts, we can retrieve the account details directly
+    const account = await stripe.accounts.retrieve();
+
+    return {
+      isValid: true,
+      accountId: account.id,
+      accountType: account.object,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      country: account.country,
+      businessType: account.business_type,
+      capabilities: account.capabilities,
+      detailsSubmitted: account.details_submitted,
+      message: "Stripe secret key is valid",
+    };
+  } catch (error: any) {
+    if (error.code === "authentication_error") {
+      throw new Error(
+        "Invalid Stripe secret key. Please check your credentials",
+      );
+    }
+    throw new Error(`Secret key verification failed: ${error.message}`);
+  }
+};
 
 export class StripeService {
   // Create Stripe instance with account-specific secret key
@@ -525,13 +603,24 @@ export const createStripeAccount = async (accountData: any) => {
       }
     }
 
-    // Verify the Stripe account ID with Stripe API
+    // Verify the Stripe secret key with Stripe API
     try {
-      await stripeVerificationService.verifyStripeAccountId(
-        accountData.stripeAccountId,
-        accountData.stripeSecretKey,
-        accountData.accountType || "STANDARD",
-      );
+      if (accountData.accountType === "STANDARD") {
+        // For STANDARD accounts, verify the secret key and get account details
+        const verification = await verifySecretKeyAndGetAccount(
+          accountData.stripeSecretKey,
+        );
+
+        // Update account data with the retrieved account ID
+        accountData.stripeAccountId = verification.accountId;
+      } else {
+        // For CONNECT accounts, verify with account ID
+        await verifyStripeAccountId(
+          accountData.stripeAccountId,
+          accountData.stripeSecretKey,
+          accountData.accountType || "STANDARD",
+        );
+      }
     } catch (error: any) {
       throw new Error(`Account verification failed: ${error.message}`);
     }
@@ -992,7 +1081,7 @@ export const verifyStripeAccount = async (accountId: string) => {
 
   // Verify the account with Stripe API
   try {
-    await stripeVerificationService.verifyStripeAccountId(
+    await verifyStripeAccountId(
       account.stripeAccountId,
       account.stripeSecretKey,
       account.accountType || "STANDARD",
