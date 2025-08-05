@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import mongoose from "mongoose";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
+import { LeaseStatus } from "../../../shared/enums/payment.enums";
 import { Spots } from "../spots/spots.schema";
 import {
   IAuthUser,
@@ -248,7 +249,6 @@ const updateTenantData = async (
   payload: IUpdateTenantData,
   adminId: string,
 ): Promise<{ user: IUser; lease?: any }> => {
-  console.log("🚀 ~ payload:", payload);
   const user = await Users.findById(userId);
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
@@ -382,6 +382,7 @@ const updateTenantData = async (
             occupants: payload.lease.occupants || 1,
             rentAmount: payload.lease.rentAmount || 0,
             depositAmount: payload.lease.depositAmount || 0,
+            leaseStatus: LeaseStatus.ACTIVE, // Explicitly set lease status to ACTIVE
             pets: {
               hasPets: payload.lease.pets?.hasPets || false,
               petDetails: payload.lease.pets?.petDetails || [],
@@ -416,7 +417,7 @@ const updateTenantData = async (
           updatedLease = await Leases.findByIdAndUpdate(
             user.leaseId,
             leaseUpdateData,
-            { new: true, runValidators: false, session }, // Disable validators for partial updates
+            { new: true, runValidators: true, session }, // Enable validators to trigger pre-save middleware
           );
 
           if (!updatedLease) {
@@ -436,6 +437,7 @@ const updateTenantData = async (
           occupants: payload.lease.occupants || 1,
           rentAmount: payload.lease.rentAmount || 0,
           depositAmount: payload.lease.depositAmount || 0,
+          leaseStatus: LeaseStatus.ACTIVE, // Explicitly set lease status to ACTIVE
           pets: {
             hasPets: payload.lease.pets?.hasPets || false,
             petDetails: payload.lease.pets?.petDetails || [],

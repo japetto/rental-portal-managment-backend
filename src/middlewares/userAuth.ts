@@ -32,11 +32,20 @@ export const userAuth = async (
 
     // Verify token
     const verifiedToken = jwtHelpers.jwtVerify(token, config.jwt_secret);
+    console.log("🚀 ~ verifiedToken.id:", verifiedToken.id);
 
-    // Check if user exists
-    const user = await Users.findById(verifiedToken.id);
+    // Check if user exists and is active
+    const user = await Users.findOne({
+      _id: verifiedToken.id,
+      isDeleted: false,
+      isActive: true,
+    });
+    console.log("🚀 ~ user:", user);
     if (!user) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "User not found");
+      throw new ApiError(
+        httpStatus.UNAUTHORIZED,
+        "User not found or account is deactivated",
+      );
     }
 
     // Check if user is verified (for non-invited users)

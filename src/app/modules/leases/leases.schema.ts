@@ -87,12 +87,8 @@ leasesSchema.pre("save", function (next) {
     return next(new Error("Pet details are required when hasPets is true"));
   }
 
-  // Set default lease status based on start date
-  const now = new Date();
-  if (!this.leaseStatus || this.leaseStatus === LeaseStatus.PENDING) {
-    this.leaseStatus =
-      this.leaseStart <= now ? LeaseStatus.ACTIVE : LeaseStatus.PENDING;
-  }
+  // Set lease status to ACTIVE when saving lease data
+  this.leaseStatus = LeaseStatus.ACTIVE;
 
   next();
 });

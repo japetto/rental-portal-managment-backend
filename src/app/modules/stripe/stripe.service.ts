@@ -196,8 +196,12 @@ export const createPaymentLink = async (paymentData: {
 }) => {
   try {
     // Get user details for metadata
-    const user = await Users.findById(paymentData.tenantId);
-    if (!user) throw new Error("User not found");
+    const user = await Users.findOne({
+      _id: paymentData.tenantId,
+      isDeleted: false,
+      isActive: true,
+    });
+    if (!user) throw new Error("User not found or account is deactivated");
 
     let property;
     let activeLease;
@@ -876,8 +880,12 @@ export const createPaymentFromStripe = async (
   stripePayment: Stripe.PaymentIntent,
   tenantId: string,
 ) => {
-  const user = await Users.findById(tenantId);
-  if (!user) throw new Error("User not found");
+  const user = await Users.findOne({
+    _id: tenantId,
+    isDeleted: false,
+    isActive: true,
+  });
+  if (!user) throw new Error("User not found or account is deactivated");
 
   // Find property by name from metadata
   const propertyName = stripePayment.metadata?.propertyName;

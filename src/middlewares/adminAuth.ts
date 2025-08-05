@@ -37,10 +37,14 @@ export const adminAuth = async (
     const verifiedToken = jwtHelpers.jwtVerify(token, config.jwt_secret);
     // console.log("🚀 ~ verifiedToken:", verifiedToken);
 
-    // Check if user exists
-    const user = await Users.findById(verifiedToken.id).select("+password");
+    // Check if user exists and is active
+    const user = await Users.findOne({ 
+      _id: verifiedToken.id,
+      isDeleted: false,
+      isActive: true 
+    }).select("+password");
     if (!user) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "User not found");
+      throw new ApiError(httpStatus.UNAUTHORIZED, "User not found or account is deactivated");
     }
 
     // Check if user is admin

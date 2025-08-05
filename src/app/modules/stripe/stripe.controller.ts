@@ -744,12 +744,16 @@ export const syncPaymentHistory = catchAsync(
   async (req: Request, res: Response) => {
     const { userId } = req.params;
 
-    const user = await Users.findById(userId);
+    const user = await Users.findOne({ 
+      _id: userId,
+      isDeleted: false,
+      isActive: true 
+    });
     if (!user) {
       return sendResponse(res, {
         statusCode: httpStatus.NOT_FOUND,
         success: false,
-        message: "User not found",
+        message: "User not found or account is deactivated",
         data: null,
       });
     }

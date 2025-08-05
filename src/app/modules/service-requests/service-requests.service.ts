@@ -23,9 +23,13 @@ const createServiceRequest = async (
   }
 
   // Get user details to verify they're a tenant and get their property/spot info
-  const user = await Users.findById(userId);
+  const user = await Users.findOne({ 
+    _id: userId,
+    isDeleted: false,
+    isActive: true 
+  });
   if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found or account is deactivated");
   }
 
   if (user.role !== "TENANT") {

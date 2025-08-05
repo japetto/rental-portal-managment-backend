@@ -8,7 +8,11 @@ import { IRentSummaryResponse } from "./payments.interface";
 import { Payments } from "./payments.schema";
 
 export const getPaymentHistory = async (tenantId: string) => {
-  const user = await Users.findById(tenantId);
+  const user = await Users.findOne({
+    _id: tenantId,
+    isDeleted: false,
+    isActive: true,
+  });
 
   if (!user) {
     return {
@@ -154,7 +158,11 @@ export const calculateSummary = (payments: any[]) => {
 };
 
 export const getPaymentSummary = async (tenantId: string) => {
-  const user = await Users.findById(tenantId);
+  const user = await Users.findOne({
+    _id: tenantId,
+    isDeleted: false,
+    isActive: true,
+  });
 
   if (!user) {
     return {
@@ -182,9 +190,13 @@ export const getPaymentSummary = async (tenantId: string) => {
 export const getRentSummary = async (
   tenantId: string,
 ): Promise<IRentSummaryResponse> => {
-  const user = await Users.findById(tenantId);
+  const user = await Users.findOne({
+    _id: tenantId,
+    isDeleted: false,
+    isActive: true,
+  });
   if (!user) {
-    throw new Error("User not found");
+    throw new Error("User not found or account is deactivated");
   }
 
   console.log("Looking for lease for tenant:", tenantId);
@@ -291,7 +303,9 @@ export const getRentSummary = async (
         dueDate: currentMonthPayment.dueDate,
         description: currentMonthPayment.description,
         lateFeeAmount: currentMonthPayment.lateFeeAmount,
-        receiptNumber: currentMonthPayment.receiptNumber,
+        receiptNumber:
+          currentMonthPayment.receiptNumber ||
+          `RENT-${currentMonthPayment._id}`,
       });
     } catch (error) {
       console.error("Error creating payment link for current month:", error);
