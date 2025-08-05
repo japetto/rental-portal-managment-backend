@@ -647,55 +647,53 @@ export async function handlePaymentSuccess(
       throw new Error("Missing required payment metadata");
     }
 
-    // Check if payment already exists to prevent duplicates
-    const duplicatePayment = await Payments.findOne({
-      stripeTransactionId: paymentIntent.id,
+    // Find existing payment record by receipt number
+    const existingPayment = await Payments.findOne({
+      receiptNumber: metadata.receiptNumber,
     });
 
-    if (duplicatePayment) {
+    if (!existingPayment) {
+      console.error(
+        "❌ No payment record found for receipt:",
+        metadata.receiptNumber,
+      );
+      return;
+    }
+
+    // Check if payment already processed to prevent duplicates
+    if (existingPayment.status === "PAID") {
       console.log("⚠️ Payment already processed, skipping...");
       return;
     }
 
-    // Create new payment record with PAID status
-    console.log("💾 Creating payment record with PAID status...");
+    // Update existing payment record with PAID status
+    console.log("💾 Updating payment record with PAID status...");
 
-    // Extract payment details from metadata
-    const paymentData = {
-      tenantId: metadata.tenantId,
-      propertyId: metadata.propertyId,
-      spotId: metadata.spotId,
-      amount: paymentIntent.amount / 100, // Convert from cents
-      type: metadata.paymentType || "RENT",
-      status: "PAID",
-      dueDate: new Date(metadata.dueDate),
-      paidDate: new Date(paymentIntent.created * 1000),
-      paymentMethod: "ONLINE",
-      transactionId: paymentIntent.id,
-      stripeTransactionId: paymentIntent.id,
-      stripePaymentLinkId: metadata.paymentLinkId || paymentIntent.id,
-      receiptNumber: metadata.receiptNumber,
-      description: metadata.paymentDescription || "Rent Payment",
-      totalAmount: paymentIntent.amount / 100,
-      lateFeeAmount: parseInt(metadata.lateFeeAmount || "0"),
-      createdBy: "SYSTEM",
-    };
+    const updatedPayment = await Payments.findByIdAndUpdate(
+      existingPayment._id,
+      {
+        status: "PAID",
+        paidDate: new Date(paymentIntent.created * 1000),
+        paymentMethod: "ONLINE",
+        transactionId: paymentIntent.id,
+        stripeTransactionId: paymentIntent.id,
+        amount: paymentIntent.amount / 100, // Update with actual amount paid
+        totalAmount: paymentIntent.amount / 100,
+      },
+      { new: true },
+    );
 
-    console.log("📝 Creating payment with data:", paymentData);
-
-    const newPayment = await Payments.create(paymentData);
-
-    if (newPayment) {
-      console.log("✅ Payment created successfully:", {
-        id: newPayment._id,
-        status: newPayment.status,
-        amount: newPayment.amount,
-        paidDate: newPayment.paidDate,
-        transactionId: newPayment.transactionId,
-        receiptNumber: newPayment.receiptNumber,
+    if (updatedPayment) {
+      console.log("✅ Payment updated successfully:", {
+        id: updatedPayment._id,
+        status: updatedPayment.status,
+        amount: updatedPayment.amount,
+        paidDate: updatedPayment.paidDate,
+        transactionId: updatedPayment.transactionId,
+        receiptNumber: updatedPayment.receiptNumber,
       });
     } else {
-      console.error("❌ Failed to create payment");
+      console.error("❌ Failed to update payment");
     }
   } catch (error: any) {
     console.error("Payment success handling error:", error);
