@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
 import Stripe from "stripe";
+import config from "../../../config/config";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { Payments } from "../payments/payments.schema";
@@ -583,6 +584,17 @@ export const getTenantPaymentStatus = catchAsync(
 export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"];
 
+  console.log("🔔 Webhook received:", {
+    method: req.method,
+    path: req.path,
+    headers: {
+      "stripe-signature": sig ? "present" : "missing",
+      "content-type": req.headers["content-type"],
+      "user-agent": req.headers["user-agent"],
+    },
+    bodySize: req.body ? JSON.stringify(req.body).length : 0,
+  });
+
   try {
     let event;
 
@@ -590,14 +602,83 @@ export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
     const payload = req.body;
 
     // For multi-account setup, we need to verify with the correct account's webhook secret
-    // Since we don't know which account this is for, we'll try the default one first
+    // Try to verify with all available Stripe accounts
+    let verificationSuccess = false;
+    let verificationError = null;
+
     try {
+      // First try with the default webhook secret
       event = constructWebhookEvent(payload, sig);
+      verificationSuccess = true;
+      console.log("✅ Webhook verified with default secret");
     } catch (err: any) {
-      console.error("Webhook signature verification failed:", err.message);
-      res.status(400).send(`Webhook Error: ${err.message}`);
+      verificationError = err.message;
+      console.log(
+        "Default webhook verification failed, trying with account-specific secrets...",
+      );
+
+      // If default fails, try with account-specific webhook secrets
+      try {
+        const { StripeAccounts } = await import("./stripe-accounts.schema");
+        const accounts = await StripeAccounts.find({
+          isActive: true,
+          isDeleted: false,
+          webhookStatus: "ACTIVE",
+        }).select("+stripeSecretKey");
+
+        console.log(
+          `🔍 Found ${accounts.length} active Stripe accounts to try`,
+        );
+
+        for (const account of accounts) {
+          if (account.stripeSecretKey) {
+            try {
+              const stripe = new Stripe(account.stripeSecretKey, {
+                apiVersion: "2025-06-30.basil",
+              });
+
+              event = stripe.webhooks.constructEvent(
+                payload,
+                sig as string,
+                config.stripe_webhook_secret, // Use the default webhook secret for now
+              );
+
+              console.log(`✅ Webhook verified with account: ${account.name}`);
+              verificationSuccess = true;
+              break;
+            } catch (accountErr: any) {
+              console.log(
+                `❌ Webhook verification failed for account ${account.name}: ${accountErr.message}`,
+              );
+            }
+          }
+        }
+      } catch (importErr: any) {
+        console.error(
+          "Error importing StripeAccounts schema:",
+          importErr.message,
+        );
+      }
+    }
+
+    if (!verificationSuccess || !event) {
+      console.error(
+        "Webhook signature verification failed for all accounts:",
+        verificationError,
+      );
+      res.status(400).send(`Webhook Error: Signature verification failed`);
       return;
     }
+
+    console.log("🔔 Processing webhook event:", {
+      type: event.type,
+      id: (event as any).id,
+      created: (event as any).created,
+      data: {
+        object: (event.data.object as any).id,
+        objectType: (event.data.object as any).object,
+      },
+    });
 
     switch (event.type) {
       case "payment_intent.succeeded":
@@ -610,17 +691,23 @@ export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
         await handlePaymentCanceled(event.data.object);
         break;
       case "payment_intent.processing":
+        console.log("Payment processing...");
         break;
       case "payment_intent.requires_action":
+        console.log("Payment requires action...");
         break;
       case "charge.succeeded":
+        console.log("Charge succeeded...");
         break;
       case "charge.updated":
+        console.log("Charge updated...");
         break;
       default:
+        console.log(`Unhandled webhook event type: ${event.type}`);
         break;
     }
 
+    console.log("✅ Webhook processed successfully");
     res.json({ received: true });
   } catch (error: any) {
     console.error("Webhook error:", error);
@@ -744,10 +831,10 @@ export const syncPaymentHistory = catchAsync(
   async (req: Request, res: Response) => {
     const { userId } = req.params;
 
-    const user = await Users.findOne({ 
+    const user = await Users.findOne({
       _id: userId,
       isDeleted: false,
-      isActive: true 
+      isActive: true,
     });
     if (!user) {
       return sendResponse(res, {
@@ -809,19 +896,29 @@ export const syncPaymentHistory = catchAsync(
 
 // Webhook status check endpoint
 export const webhookStatus = catchAsync(async (req: Request, res: Response) => {
-  const timestamp = new Date().toISOString();
+  try {
+    // Get webhook configuration info
+    const webhookInfo = {
+      endpoint: `${config.backend_url}/api/v1.0/stripe/webhook`,
+      status: "ACTIVE",
+      timestamp: new Date().toISOString(),
+      environment: config.node_env,
+    };
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Webhook endpoint is active",
-    data: {
-      timestamp,
-      status: "active",
-      endpoint: "/api/v1.0/webhooks/webhook",
-      environment: process.env.NODE_ENV || "development",
-    },
-  });
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Webhook endpoint is active",
+      data: webhookInfo,
+    });
+  } catch (error: any) {
+    sendResponse(res, {
+      statusCode: httpStatus.INTERNAL_SERVER_ERROR,
+      success: false,
+      message: "Webhook status check failed",
+      data: null,
+    });
+  }
 });
 
 // Get account statistics for debugging

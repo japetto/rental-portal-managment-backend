@@ -354,7 +354,7 @@ export const createPaymentLink = async (paymentData: {
         type: "redirect",
         redirect: {
           url: getValidRedirectUrl(
-            `/payments/success?receipt=${paymentData.receiptNumber}&amount=${paymentData.amount}&type=${paymentData.type}`,
+            `/payment-success?receipt=${paymentData.receiptNumber}&amount=${paymentData.amount}&type=${paymentData.type}`,
           ),
         },
       },
@@ -1378,7 +1378,7 @@ export const createStripeAccount = async (accountData: any) => {
     // Automatically create webhook for this account after successful creation
     let webhookResult = null;
     try {
-      const webhookUrl = `${config.backend_url}/api/stripe/webhook`;
+      const webhookUrl = `${config.backend_url}/api/v1.0/stripe/webhook`;
 
       console.log(
         `🔗 Creating webhook for new account: ${createdAccount.name}`,
