@@ -29,6 +29,7 @@ export interface IPayment extends Document {
   stripePaymentLinkId?: string; // Payment link ID from Stripe
   stripeAccountId?: Types.ObjectId; // Stripe account used for this payment
   stripePaymentIntentId?: string; // Payment intent ID from Stripe
+  stripeMetadata?: any; // Store metadata for webhook processing
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -131,9 +132,14 @@ export interface IRentSummaryResponse {
       totalAmount: number;
       daysOverdue: number;
       receiptNumber?: string;
+      amount: number;
+      depositAmount: number;
+      includesDeposit: boolean;
+      isFirstTimePayment: boolean;
     };
     summary: {
       totalOverdueAmount: number;
+      totalDue: number;
       overdueCount: number;
       pendingCount: number;
       totalPaidAmount: number;
