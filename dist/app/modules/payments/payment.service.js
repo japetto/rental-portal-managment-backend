@@ -620,8 +620,29 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             url: paymentLink.url,
             receiptNumber,
         });
+        // Create a pending payment record that the webhook can update
+        const paymentRecord = yield payments_schema_1.Payments.create({
+            tenantId: paymentData.tenantId,
+            propertyId: paymentData.propertyId || activeLease.propertyId._id,
+            spotId: paymentData.spotId,
+            amount: paymentData.amount,
+            type: paymentData.type,
+            status: "PENDING", // Will be updated to PAID by webhook
+            dueDate: paymentData.dueDate,
+            paymentMethod: "ONLINE",
+            receiptNumber: receiptNumber,
+            description: paymentData.description,
+            totalAmount: paymentData.amount + (paymentData.lateFeeAmount || 0),
+            createdBy: paymentData.createdBy,
+            stripeAccountId: stripeAccount._id,
+        });
+        console.log("✅ Payment record created with PENDING status:", {
+            id: paymentRecord._id,
+            receiptNumber: paymentRecord.receiptNumber,
+            status: paymentRecord.status,
+        });
         return {
-            payment: null, // No payment record created yet
+            payment: paymentRecord,
             paymentLink,
             receiptNumber, // Pass receipt number for webhook to use
         };

@@ -271,7 +271,8 @@ exports.deleteStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(
 function handlePaymentSuccess(paymentIntent, accountId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            console.log("💰 Processing payment success webhook:", {
+            console.log("💰 PAYMENT SUCCESS WEBHOOK STARTED:", {
+                timestamp: new Date().toISOString(),
                 paymentIntentId: paymentIntent.id,
                 metadata: paymentIntent.metadata,
                 amount: paymentIntent.amount,
@@ -281,24 +282,45 @@ function handlePaymentSuccess(paymentIntent, accountId) {
             // Extract metadata from the payment intent
             const metadata = paymentIntent.metadata;
             if (!metadata.tenantId || !metadata.receiptNumber) {
-                console.error("❌ Missing required payment metadata:", metadata);
+                console.error("❌ PAYMENT SUCCESS WEBHOOK ERROR: Missing required payment metadata:", {
+                    timestamp: new Date().toISOString(),
+                    metadata: metadata,
+                    paymentIntentId: paymentIntent.id,
+                });
                 throw new Error("Missing required payment metadata");
             }
             // Find existing payment record by receipt number
+            console.log("🔍 PAYMENT SUCCESS WEBHOOK: Looking for payment record with receipt number:", metadata.receiptNumber);
             const existingPayment = yield payments_schema_1.Payments.findOne({
                 receiptNumber: metadata.receiptNumber,
             });
             if (!existingPayment) {
-                console.error("❌ No payment record found for receipt:", metadata.receiptNumber);
+                console.error("❌ PAYMENT SUCCESS WEBHOOK ERROR: No payment record found for receipt:", {
+                    timestamp: new Date().toISOString(),
+                    receiptNumber: metadata.receiptNumber,
+                    paymentIntentId: paymentIntent.id,
+                });
                 return;
             }
             // Check if payment already processed to prevent duplicates
             if (existingPayment.status === "PAID") {
-                console.log("⚠️ Payment already processed, skipping...");
+                console.log("⚠️ PAYMENT SUCCESS WEBHOOK: Payment already processed, skipping...", {
+                    timestamp: new Date().toISOString(),
+                    paymentId: existingPayment._id,
+                    receiptNumber: existingPayment.receiptNumber,
+                    status: existingPayment.status,
+                });
                 return;
             }
             // Update existing payment record with PAID status
-            console.log("💾 Updating payment record with PAID status...");
+            console.log("💾 PAYMENT SUCCESS WEBHOOK: Updating payment record with PAID status...", {
+                timestamp: new Date().toISOString(),
+                paymentId: existingPayment._id,
+                receiptNumber: existingPayment.receiptNumber,
+                currentStatus: existingPayment.status,
+                newStatus: "PAID",
+                paymentIntentId: paymentIntent.id,
+            });
             const updatedPayment = yield payments_schema_1.Payments.findByIdAndUpdate(existingPayment._id, {
                 status: "PAID",
                 paidDate: new Date(paymentIntent.created * 1000),
@@ -311,7 +333,8 @@ function handlePaymentSuccess(paymentIntent, accountId) {
                 stripeAccountId: accountId, // Store which Stripe account processed this
             }, { new: true });
             if (updatedPayment) {
-                console.log("✅ Payment updated successfully:", {
+                console.log("✅ PAYMENT SUCCESS WEBHOOK: Payment updated successfully:", {
+                    timestamp: new Date().toISOString(),
                     id: updatedPayment._id,
                     status: updatedPayment.status,
                     amount: updatedPayment.amount,
@@ -322,11 +345,20 @@ function handlePaymentSuccess(paymentIntent, accountId) {
                 });
             }
             else {
-                console.error("❌ Failed to update payment");
+                console.error("❌ PAYMENT SUCCESS WEBHOOK ERROR: Failed to update payment", {
+                    timestamp: new Date().toISOString(),
+                    paymentId: existingPayment._id,
+                    receiptNumber: existingPayment.receiptNumber,
+                });
             }
         }
         catch (error) {
-            console.error("Payment success handling error:", error);
+            console.error("❌ PAYMENT SUCCESS WEBHOOK ERROR:", {
+                timestamp: new Date().toISOString(),
+                error: error.message || "Unknown error",
+                stack: error.stack,
+                paymentIntentId: paymentIntent.id,
+            });
             throw error;
         }
     });
@@ -369,7 +401,8 @@ function handlePaymentCanceled(paymentIntent, accountId) {
 }
 exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const sig = req.headers["stripe-signature"];
-    console.log("🔔 Webhook received:", {
+    console.log("🔔 WEBHOOK RECEIVED:", {
+        timestamp: new Date().toISOString(),
         method: req.method,
         path: req.path,
         headers: {
@@ -378,6 +411,9 @@ exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
             "user-agent": req.headers["user-agent"],
         },
         bodySize: req.body ? JSON.stringify(req.body).length : 0,
+        bodyPreview: req.body
+            ? JSON.stringify(req.body).substring(0, 200) + "..."
+            : "No body",
     });
     try {
         let event;
@@ -391,7 +427,7 @@ exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
                 isActive: true,
                 webhookStatus: "ACTIVE",
             }).select("+stripeSecretKey +webhookSecret");
-            console.log(`🔍 Found ${accounts.length} active Stripe accounts to try`);
+            console.log(`🔍 WEBHOOK VERIFICATION: Found ${accounts.length} active Stripe accounts to try`);
             for (const account of accounts) {
                 if (account.stripeSecretKey && account.webhookSecret) {
                     try {
@@ -399,35 +435,36 @@ exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
                             apiVersion: "2025-06-30.basil",
                         });
                         event = stripe.webhooks.constructEvent(payload, sig, account.webhookSecret);
-                        console.log(`✅ Webhook verified with account: ${account.name}`);
+                        console.log(`✅ WEBHOOK VERIFIED: Successfully verified with account: ${account.name} (ID: ${account._id})`);
                         accountId = account._id.toString();
                         break;
                     }
                     catch (accountErr) {
-                        console.log(`❌ Webhook verification failed for account ${account.name}: ${accountErr.message}`);
+                        console.log(`❌ WEBHOOK VERIFICATION FAILED: Account ${account.name} (ID: ${account._id}): ${accountErr.message}`);
                     }
                 }
             }
         }
         catch (importErr) {
-            console.error("Error importing StripeAccounts schema:", importErr.message);
+            console.error("❌ WEBHOOK ERROR: Error importing StripeAccounts schema:", importErr.message);
         }
         // If account-specific verification failed, try with default webhook secret
         if (!event) {
             try {
                 event = (0, stripe_service_1.constructWebhookEvent)(payload, sig);
-                console.log("✅ Webhook verified with default secret");
+                console.log("✅ WEBHOOK VERIFIED: Successfully verified with default secret");
             }
             catch (err) {
-                console.error("Webhook signature verification failed:", err.message);
+                console.error("❌ WEBHOOK VERIFICATION FAILED: Signature verification failed:", err.message);
                 res.status(400).send(`Webhook Error: Signature verification failed`);
                 return;
             }
         }
-        console.log("🔔 Processing webhook event:", {
-            type: event.type,
-            id: event.id,
-            created: event.created,
+        console.log("🔔 PROCESSING WEBHOOK EVENT:", {
+            timestamp: new Date().toISOString(),
+            eventType: event.type,
+            eventId: event.id,
+            eventCreated: event.created,
             accountId,
             data: {
                 object: event.data.object.id,
@@ -436,35 +473,46 @@ exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
         });
         switch (event.type) {
             case "payment_intent.succeeded":
+                console.log("💰 WEBHOOK: Processing payment_intent.succeeded event");
                 yield handlePaymentSuccess(event.data.object, accountId);
                 break;
             case "payment_intent.payment_failed":
+                console.log("❌ WEBHOOK: Processing payment_intent.payment_failed event");
                 yield handlePaymentFailure(event.data.object, accountId);
                 break;
             case "payment_intent.canceled":
+                console.log("🚫 WEBHOOK: Processing payment_intent.canceled event");
                 yield handlePaymentCanceled(event.data.object, accountId);
                 break;
             case "payment_intent.processing":
-                console.log("Payment processing...");
+                console.log("⏳ WEBHOOK: Payment processing...");
                 break;
             case "payment_intent.requires_action":
-                console.log("Payment requires action...");
+                console.log("⚠️ WEBHOOK: Payment requires action...");
                 break;
             case "charge.succeeded":
-                console.log("Charge succeeded...");
+                console.log("💳 WEBHOOK: Charge succeeded...");
                 break;
             case "charge.updated":
-                console.log("Charge updated...");
+                console.log("📝 WEBHOOK: Charge updated...");
                 break;
             default:
-                console.log(`Unhandled webhook event type: ${event.type}`);
+                console.log(`❓ WEBHOOK: Unhandled webhook event type: ${event.type}`);
                 break;
         }
-        console.log("✅ Webhook processed successfully");
+        console.log("✅ WEBHOOK PROCESSED SUCCESSFULLY:", {
+            timestamp: new Date().toISOString(),
+            eventType: event.type,
+            eventId: event.id,
+        });
         res.json({ received: true });
     }
     catch (error) {
-        console.error("Webhook error:", error);
+        console.error("❌ WEBHOOK ERROR:", {
+            timestamp: new Date().toISOString(),
+            error: error.message || "Unknown error",
+            stack: error.stack,
+        });
         res.status(400).send(`Webhook Error: ${error.message || "Unknown error"}`);
     }
 }));
