@@ -666,6 +666,8 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       Buffer.isBuffer(req.body),
     );
 
+    console.log("🔍 Serverless webhook - Request body:", req.body);
+
     if (Buffer.isBuffer(req.body)) {
       // Raw buffer (ideal case)
       rawBody = req.body;
