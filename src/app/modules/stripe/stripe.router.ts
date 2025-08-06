@@ -1,55 +1,32 @@
 import { Router } from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
-import { userAuth } from "../../../middlewares/userAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
-  createPaymentWithLink,
   createStripeAccount,
   createWebhook,
-  createWebhooksForAllAccounts,
   deleteStripeAccount,
-  deleteWebhook,
-  getAccountStatistics,
   getAllStripeAccounts,
-  getAssignablePropertiesForAccount,
-  getAvailableStripeAccounts,
   getDefaultAccount,
-  getPaymentLinkDetails,
-  getStripeAccountById,
-  getStripeAccountsByProperty,
-  getTenantPaymentStatus,
-  getUnassignedProperties,
-  getWebhook,
   handleWebhook,
   linkPropertiesToAccount,
-  listWebhooks,
   setDefaultAccount,
-  syncPaymentHistory,
   unlinkPropertiesFromAccount,
-  updateStripeAccount,
-  updateStripeAccountSecretKey,
-  updateWebhook,
-  verifyStripeAccount,
-  webhookStatus,
 } from "./stripe.controller";
 import {
-  createPaymentWithLinkSchema,
   createStripeAccountSchema,
   deleteStripeAccountSchema,
-  getPaymentLinkDetailsSchema,
-  getStripeAccountByIdSchema,
-  getStripeAccountsByPropertySchema,
   linkPropertiesToAccountSchema,
   setDefaultAccountSchema,
-  syncPaymentHistorySchema,
   unlinkPropertiesFromAccountSchema,
-  updateStripeAccountSchema,
-  verifyStripeAccountSchema,
 } from "./stripe.validation";
 
 const router = Router();
 
-// Stripe Account Management Routes (Admin only)
+// ========================================
+// STRIPE ACCOUNT MANAGEMENT ROUTES (Admin only)
+// ========================================
+
+// Create new Stripe account
 router.post(
   "/accounts",
   adminAuth,
@@ -57,84 +34,21 @@ router.post(
   createStripeAccount,
 );
 
-// Property linking/unlinking routes
-router.post(
-  "/accounts/link-properties",
-  adminAuth,
-  zodValidationRequest(linkPropertiesToAccountSchema),
-  linkPropertiesToAccount,
-);
-router.post(
-  "/accounts/unlink-properties",
-  adminAuth,
-  zodValidationRequest(unlinkPropertiesFromAccountSchema),
-  unlinkPropertiesFromAccount,
-);
+// Get all Stripe accounts
+router.get("/accounts", adminAuth, getAllStripeAccounts);
 
-// Default account management
+// Get default account
+router.get("/accounts/default", adminAuth, getDefaultAccount);
+
+// Set default account
 router.post(
   "/accounts/set-default",
   adminAuth,
   zodValidationRequest(setDefaultAccountSchema),
   setDefaultAccount,
 );
-router.get("/accounts/default", adminAuth, getDefaultAccount);
 
-// Account listing and details
-router.get("/accounts", adminAuth, getAllStripeAccounts);
-
-// Get account statistics for debugging
-router.get("/accounts/statistics", adminAuth, getAccountStatistics);
-
-// Get all properties with stripe details
-router.get(
-  "/accounts/:accountId",
-  adminAuth,
-  zodValidationRequest(getStripeAccountByIdSchema),
-  getStripeAccountById,
-);
-
-// Get all stripe accounts by property
-router.get(
-  "/accounts/property/:propertyId",
-  adminAuth,
-  zodValidationRequest(getStripeAccountsByPropertySchema),
-  getStripeAccountsByProperty,
-);
-
-// Get all available stripe accounts by property
-router.get(
-  "/accounts/available/:propertyId",
-  adminAuth,
-  getAvailableStripeAccounts,
-);
-
-// Get unassigned properties (for assignment to Stripe accounts)
-router.get("/properties/unassigned", adminAuth, getUnassignedProperties);
-
-// Get assignable properties for a specific Stripe account
-router.get(
-  "/accounts/:accountId/assignable-properties",
-  adminAuth,
-  getAssignablePropertiesForAccount,
-);
-
-// Account updates and management
-router.patch(
-  "/accounts/:accountId",
-  adminAuth,
-  zodValidationRequest(updateStripeAccountSchema),
-  updateStripeAccount,
-);
-
-// Update stripe account secret key (for debugging)
-router.patch(
-  "/accounts/:accountId/secret-key",
-  adminAuth,
-  updateStripeAccountSecretKey,
-);
-
-// Delete stripe account
+// Delete Stripe account
 router.delete(
   "/accounts/:accountId",
   adminAuth,
@@ -142,63 +56,34 @@ router.delete(
   deleteStripeAccount,
 );
 
-// Verify stripe account
-router.patch(
-  "/accounts/:accountId/verify",
-  adminAuth,
-  zodValidationRequest(verifyStripeAccountSchema),
-  verifyStripeAccount,
-);
+// ========================================
+// PROPERTY LINKING/UNLINKING ROUTES (Admin only)
+// ========================================
 
-// Payment Link Management Routes (Admin only)
-
-// Create payment link
+// Link properties to Stripe account
 router.post(
-  "/create-payment-link",
-  userAuth,
-  zodValidationRequest(createPaymentWithLinkSchema),
-  createPaymentWithLink,
+  "/accounts/link-properties",
+  adminAuth,
+  zodValidationRequest(linkPropertiesToAccountSchema),
+  linkPropertiesToAccount,
 );
 
-// Get payment link details
-router.get(
-  "/payment-link/:paymentLinkId",
-  userAuth,
-  zodValidationRequest(getPaymentLinkDetailsSchema),
-  getPaymentLinkDetails,
+// Unlink properties from Stripe account
+router.post(
+  "/accounts/unlink-properties",
+  adminAuth,
+  zodValidationRequest(unlinkPropertiesFromAccountSchema),
+  unlinkPropertiesFromAccount,
 );
 
-// Get comprehensive tenant payment status with automatic payment creation
-router.get(
-  "/tenant-payment-status/:tenantId",
-  userAuth,
-  getTenantPaymentStatus,
-);
+// ========================================
+// WEBHOOK ROUTES
+// ========================================
 
-// Webhook Routes (No auth required for Stripe webhooks)
+// Handle Stripe webhooks (No auth required)
 router.post("/webhook", handleWebhook);
 
-// Webhook status check endpoint
-router.get("/webhook/status", webhookStatus);
-
-// Webhook Management Routes (Admin only)
+// Create webhook (Admin only)
 router.post("/webhooks/:accountId", adminAuth, createWebhook);
-router.post(
-  "/webhooks/create-by-type",
-  adminAuth,
-  createWebhooksForAllAccounts,
-);
-router.get("/webhooks/:accountId", adminAuth, listWebhooks);
-router.get("/webhooks/:accountId/:webhookId", adminAuth, getWebhook);
-router.patch("/webhooks/:accountId/:webhookId", adminAuth, updateWebhook);
-router.delete("/webhooks/:accountId/:webhookId", adminAuth, deleteWebhook);
-
-// Payment History Sync (Admin only)
-router.post(
-  "/sync-payment-history/:userId",
-  userAuth,
-  zodValidationRequest(syncPaymentHistorySchema),
-  syncPaymentHistory,
-);
 
 export const stripeRoutes = router;

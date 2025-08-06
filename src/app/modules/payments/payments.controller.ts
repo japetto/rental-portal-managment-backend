@@ -2,6 +2,11 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
+import {
+  createPaymentWithLinkEnhanced,
+  getPaymentLinkDetails as getPaymentLinkDetailsService,
+  getTenantPaymentStatusEnhanced,
+} from "../stripe/stripe.service";
 import { Payments } from "./payments.schema";
 
 // Get payment data by receipt number (for payment success page)
@@ -104,6 +109,91 @@ const getPaymentByReceipt = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Create a new payment with unique payment link - Enhanced for first-time payments
+const createPaymentWithLink = catchAsync(
+  async (req: Request, res: Response) => {
+    const { tenantId, currentDate } = req.body;
+
+    const result = await createPaymentWithLinkEnhanced({
+      tenantId,
+      currentDate,
+      createdBy: req.user?.id || "SYSTEM",
+    });
+
+    sendResponse(res, {
+      statusCode: httpStatus.CREATED,
+      success: true,
+      message: result.isFirstTimePayment
+        ? "First-time rent payment link created successfully"
+        : "Rent payment link created successfully",
+      data: {
+        paymentLink: {
+          id: result.paymentLink.id,
+          url: result.paymentLink.url,
+        },
+        receiptNumber: result.receiptNumber,
+        lease: result.lease,
+        paymentInfo: result.paymentInfo,
+      },
+    });
+  },
+);
+
+// Get payment link details
+const getPaymentLinkDetails = catchAsync(
+  async (req: Request, res: Response) => {
+    const { paymentLinkId } = req.params;
+
+    // Get the payment to find the associated Stripe account
+    const payment = await Payments.findOne({
+      stripePaymentLinkId: paymentLinkId,
+    }).populate("stripeAccountId");
+
+    if (!payment) {
+      return sendResponse(res, {
+        statusCode: httpStatus.NOT_FOUND,
+        success: false,
+        message: "Payment link not found",
+        data: null,
+      });
+    }
+
+    const paymentLink = await getPaymentLinkDetailsService(
+      paymentLinkId,
+      (payment.stripeAccountId as any).stripeSecretKey,
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Payment link details retrieved successfully",
+      data: paymentLink,
+    });
+  },
+);
+
+// Get comprehensive tenant payment status with automatic payment creation
+const getTenantPaymentStatus = catchAsync(
+  async (req: Request, res: Response) => {
+    const { tenantId } = req.params;
+
+    const result = await getTenantPaymentStatusEnhanced({
+      tenantId,
+      createdBy: req.user?.id || "SYSTEM",
+    });
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Tenant payment status retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const PaymentController = {
   getPaymentByReceipt,
+  createPaymentWithLink,
+  getPaymentLinkDetails,
+  getTenantPaymentStatus,
 };

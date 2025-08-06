@@ -5,7 +5,7 @@ import sendResponse from "../../../shared/sendResponse";
 import {
   getPaymentHistory as getPaymentHistoryService,
   getRentSummary as getRentSummaryService,
-} from "../payments/payment-history.service";
+} from "../payments/payment.service";
 import { Payments } from "../payments/payments.schema";
 import { createPaymentLink as createPaymentLinkService } from "../stripe/stripe.service";
 import { UserService } from "./users.service";

@@ -4,7 +4,7 @@ import { Leases } from "../leases/leases.schema";
 import { Payments } from "../payments/payments.schema";
 import { Properties } from "../properties/properties.schema";
 import { Users } from "../users/users.schema";
-import { StripeAccounts } from "./stripe-accounts.schema";
+import { StripeAccounts } from "./stripe.schema";
 
 // Helper function to ensure URL has proper scheme
 const getValidRedirectUrl = (path: string): string => {
@@ -1103,7 +1103,7 @@ export const getTenantPaymentStatusEnhanced = async (paymentData: {
       if (currentMonthPayment.stripePaymentLinkId) {
         // Get existing payment link details
         try {
-          const { StripeAccounts } = await import("./stripe-accounts.schema");
+          const { StripeAccounts } = await import("./stripe.schema");
           const stripeAccount = await StripeAccounts.findOne({
             _id: currentMonthPayment.stripeAccountId,
             isActive: true,

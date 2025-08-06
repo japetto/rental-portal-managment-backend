@@ -1,5 +1,5 @@
 import { model, Schema } from "mongoose";
-import { IStripeAccount } from "./stripe-accounts.interface";
+import { IStripeAccount } from "./stripe.interface";
 
 export const stripeAccountsSchema = new Schema<IStripeAccount>(
   {
@@ -89,7 +89,7 @@ stripeAccountsSchema.pre("save", async function (next) {
 
   // Ensure only one default account exists
   if (this.isDefaultAccount && !this.isNew) {
-    const { StripeAccounts } = await import("./stripe-accounts.schema");
+    const { StripeAccounts } = await import("./stripe.schema");
     const existingDefault = await StripeAccounts.findOne({
       isDefaultAccount: true,
       isDeleted: false,
