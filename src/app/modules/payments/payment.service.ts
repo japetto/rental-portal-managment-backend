@@ -1,9 +1,7 @@
-import { PaymentStatus } from "../../../shared/enums/payment.enums";
 import { Leases } from "../leases/leases.schema";
 import { Properties } from "../properties/properties.schema";
 import { Spots } from "../spots/spots.schema";
 import { Users } from "../users/users.schema";
-import { IRentSummaryResponse } from "./payments.interface";
 import { Payments } from "./payments.schema";
 
 const getPaymentHistory = async (tenantId: string) => {
@@ -154,233 +152,308 @@ const calculateSummary = (payments: any[]) => {
   };
 };
 
-const getPaymentSummary = async (tenantId: string) => {
-  const user = await Users.findOne({
-    _id: tenantId,
-    isDeleted: false,
-    isActive: true,
-  });
+// Enhanced rent summary with shared payment calculation logic
+const getRentSummaryEnhanced = async (tenantId: string) => {
+  try {
+    // Get active lease for the tenant
+    const activeLease = await Leases.findOne({
+      tenantId: tenantId,
+      leaseStatus: "ACTIVE",
+      isDeleted: false,
+    }).populate("propertyId spotId");
 
-  if (!user) {
-    return {
-      totalPaid: 0,
-      totalPayments: 0,
-      successRate: 0,
-      overdueAmount: 0,
-    };
-  }
-
-  // Get payments from database only for summary
-  const dbPayments = await Payments.find({
-    tenantId,
-    isDeleted: false,
-  });
-
-  return calculateSummary(
-    dbPayments.map(p => ({
-      status: p.status,
-      amount: p.totalAmount,
-    })),
-  );
-};
-
-const getRentSummary = async (
-  tenantId: string,
-): Promise<IRentSummaryResponse> => {
-  const user = await Users.findOne({
-    _id: tenantId,
-    isDeleted: false,
-    isActive: true,
-  });
-  if (!user) {
-    throw new Error("User not found or account is deactivated");
-  }
-
-  console.log("Looking for lease for tenant:", tenantId);
-
-  // Get active lease
-  const activeLease = await Leases.findOne({
-    tenantId,
-    leaseStatus: "ACTIVE",
-    isDeleted: false,
-  }).populate("propertyId spotId");
-
-  console.log("Active lease found:", activeLease ? "Yes" : "No");
-
-  if (!activeLease) {
-    // Check if there are any leases for this tenant (for debugging)
-    const anyLease = await Leases.findOne({ tenantId });
-    console.log("Any lease found:", anyLease ? "Yes" : "No");
-
-    if (anyLease) {
-      console.log("Lease status:", anyLease.leaseStatus);
-      console.log("Lease isDeleted:", anyLease.isDeleted);
+    if (!activeLease) {
+      return {
+        hasActiveLease: false,
+        message: "No active lease found",
+        rentSummary: undefined,
+      };
     }
 
-    return {
-      hasActiveLease: false,
-      message: "No active lease found",
-      rentSummary: undefined,
+    // Get tenant, property, and spot information
+    const tenant = await Users.findById(tenantId);
+    const property = await Properties.findById(activeLease.propertyId);
+    const spot = await Spots.findById(activeLease.spotId);
+
+    if (!tenant || !property || !spot) {
+      throw new Error("Tenant, property, or spot information not found");
+    }
+
+    // Get payment history to determine if this is a first-time payment
+    const paymentHistory = await Payments.find({
+      tenantId: tenantId,
+      type: "RENT",
+      status: { $in: ["PAID", "PENDING", "OVERDUE"] },
+      isDeleted: false,
+    }).sort({ dueDate: 1 });
+
+    // Calculate current date and months
+    const currentDate = new Date();
+    const currentMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    );
+    const nextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1,
+    );
+
+    // Defensive: ensure leaseStart is a Date
+    const leaseStart: Date =
+      activeLease.leaseStart instanceof Date
+        ? activeLease.leaseStart
+        : new Date(activeLease.leaseStart);
+
+    // Defensive: ensure rentAmount is a number
+    const rentAmount: number =
+      typeof activeLease.rentAmount === "number"
+        ? activeLease.rentAmount
+        : Number(activeLease.rentAmount);
+
+    // Check current month payment status
+    const currentMonthPayment = await Payments.findOne({
+      tenantId: tenantId,
+      type: "RENT",
+      dueDate: {
+        $gte: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1),
+        $lt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
+      },
+      isDeleted: false,
+    });
+
+    // Check next month payment status
+    const nextMonthPayment = await Payments.findOne({
+      tenantId: tenantId,
+      type: "RENT",
+      dueDate: {
+        $gte: new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + 1,
+          1,
+        ),
+        $lt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1),
+      },
+      isDeleted: false,
+    });
+
+    // Get all pending/overdue payments
+    const pendingPayments = await Payments.find({
+      tenantId: tenantId,
+      type: "RENT",
+      status: { $in: ["PENDING", "OVERDUE"] },
+      isDeleted: false,
+    }).sort({ dueDate: 1 });
+
+    // Calculate overdue amounts
+    const overduePayments = pendingPayments.filter(
+      payment => payment.status === "OVERDUE",
+    );
+    const totalOverdueAmount = overduePayments.reduce(
+      (sum, payment) => sum + payment.totalAmount,
+      0,
+    );
+
+    // Calculate days overdue for current payment
+    const daysOverdue =
+      currentMonthPayment && currentMonthPayment.status === "OVERDUE"
+        ? Math.floor(
+            (currentDate.getTime() - currentMonthPayment.dueDate.getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : 0;
+
+    // Determine payment action and next payment details
+    let paymentAction = "NONE";
+    let nextPaymentDetails = null;
+    let isFirstTimePayment = false;
+    let canPayNextMonth = false;
+
+    if (paymentHistory.length === 0) {
+      // First-time payment scenario
+      isFirstTimePayment = true;
+      paymentAction = "FIRST_TIME_PAYMENT";
+
+      // Calculate first payment details
+      let firstPaymentAmount = rentAmount + activeLease.depositAmount;
+      let firstPaymentDescription = `First Month Rent + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+
+      // Check if lease started mid-month
+      const leaseStartDay = leaseStart.getDate();
+      if (leaseStartDay > 1) {
+        const daysInMonth = new Date(
+          leaseStart.getFullYear(),
+          leaseStart.getMonth() + 1,
+          0,
+        ).getDate();
+        const remainingDays = daysInMonth - leaseStartDay + 1;
+        const proRatedRent = Math.round(
+          (rentAmount / daysInMonth) * remainingDays,
+        );
+        firstPaymentAmount = proRatedRent + activeLease.depositAmount;
+        firstPaymentDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+      }
+
+      nextPaymentDetails = {
+        amount: firstPaymentAmount,
+        dueDate: leaseStart,
+        description: firstPaymentDescription,
+        includesDeposit: true,
+        isProRated: leaseStartDay > 1,
+        proRatedDays:
+          leaseStartDay > 1
+            ? (() => {
+                const daysInMonth = new Date(
+                  leaseStart.getFullYear(),
+                  leaseStart.getMonth() + 1,
+                  0,
+                ).getDate();
+                return daysInMonth - leaseStartDay + 1;
+              })()
+            : null,
+      };
+    } else {
+      // Regular payment scenarios
+      if (!currentMonthPayment) {
+        // No payment for current month
+        paymentAction = "CURRENT_MONTH_DUE";
+        nextPaymentDetails = {
+          amount: rentAmount,
+          dueDate: currentMonth,
+          description: `Monthly Rent Payment - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`,
+          includesDeposit: false,
+          isProRated: false,
+        };
+      } else if (currentMonthPayment.status === "PAID" && !nextMonthPayment) {
+        // Current month is paid, can pay next month
+        paymentAction = "CAN_PAY_NEXT_MONTH";
+        canPayNextMonth = true;
+        nextPaymentDetails = {
+          amount: rentAmount,
+          dueDate: nextMonth,
+          description: `Monthly Rent Payment (Next Month) - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`,
+          includesDeposit: false,
+          isProRated: false,
+        };
+      } else if (currentMonthPayment.status === "PAID" && nextMonthPayment) {
+        // Already paid for current and next month - one month ahead limit reached
+        paymentAction = "PAYMENT_LIMIT_REACHED";
+        const currentMonthName = currentMonth.toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        });
+        const nextMonthName = nextMonth.toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        });
+        nextPaymentDetails = {
+          warning: `You have already paid for ${currentMonthName} and ${nextMonthName}. You cannot pay more than one month ahead.`,
+        };
+      } else if (currentMonthPayment.status === "PENDING") {
+        paymentAction = "CURRENT_MONTH_PENDING";
+        nextPaymentDetails = {
+          amount: currentMonthPayment.totalAmount,
+          dueDate: currentMonthPayment.dueDate,
+          description: currentMonthPayment.description,
+          status: "PENDING",
+        };
+      } else if (currentMonthPayment.status === "OVERDUE") {
+        paymentAction = "CURRENT_MONTH_OVERDUE";
+        nextPaymentDetails = {
+          amount: currentMonthPayment.totalAmount,
+          dueDate: currentMonthPayment.dueDate,
+          description: currentMonthPayment.description,
+          status: "OVERDUE",
+          daysOverdue: daysOverdue,
+        };
+      }
+    }
+
+    // Simplified rent summary
+    const rentSummary = {
+      // Basic property info
+      property: {
+        name: property.name,
+        address: property.address,
+      },
+      spot: {
+        spotNumber: spot.spotNumber || spot.spotIdentifier,
+      },
+
+      // Lease info
+      lease: {
+        rentAmount: activeLease.rentAmount,
+        depositAmount: activeLease.depositAmount,
+        leaseStart: activeLease.leaseStart,
+        leaseEnd: activeLease.leaseEnd,
+      },
+
+      // Current month status
+      currentMonth: {
+        status: currentMonthPayment?.status || "PENDING",
+        dueDate: currentMonthPayment?.dueDate || currentMonth,
+        amount: currentMonthPayment?.totalAmount || activeLease.rentAmount,
+        daysOverdue: daysOverdue,
+        // Add deposit information for first-time payments
+        rentAmount: activeLease.rentAmount,
+        depositAmount: isFirstTimePayment ? activeLease.depositAmount : 0,
+        includesDeposit: isFirstTimePayment,
+        isFirstTimePayment: isFirstTimePayment,
+      },
+
+      // Payment action and details
+      paymentAction,
+      canPayNextMonth,
+      isFirstTimePayment,
+
+      // Simple summary
+      summary: {
+        totalOverdueAmount,
+        overdueCount: overduePayments.length,
+        pendingCount: pendingPayments.length,
+      },
+
+      // Recent payments (last 3 only)
+      recentPayments: (
+        await Payments.find({
+          tenantId: tenantId,
+          type: "RENT",
+          status: "PAID",
+          isDeleted: false,
+        })
+          .sort({ dueDate: -1 })
+          .limit(3)
+          .lean()
+      ).map(payment => ({
+        dueDate: payment.dueDate,
+        amount: payment.totalAmount,
+        status: payment.status,
+      })),
+
+      // Pending payments
+      pendingPayments: pendingPayments.map(payment => ({
+        dueDate: payment.dueDate,
+        amount: payment.totalAmount,
+        status: payment.status,
+        daysOverdue:
+          payment.status === "OVERDUE"
+            ? Math.floor(
+                (currentDate.getTime() - payment.dueDate.getTime()) /
+                  (1000 * 60 * 60 * 24),
+              )
+            : 0,
+      })),
     };
+
+    return {
+      hasActiveLease: true,
+      rentSummary,
+    };
+  } catch (error) {
+    console.error("Error getting enhanced rent summary:", error);
+    throw error;
   }
-
-  // Get property and spot details
-  const property = await Properties.findById(activeLease.propertyId);
-  const spot = await Spots.findById(activeLease.spotId);
-
-  if (!property || !spot) {
-    throw new Error("Property or spot not found");
-  }
-
-  // Get current month's rent payment
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-
-  // Calculate due date (typically 1st of each month)
-  const dueDate = new Date(currentYear, currentMonth, 1);
-
-  // Get rent payment for current month
-  const currentMonthPayment = await Payments.findOne({
-    tenantId,
-    type: "RENT",
-    dueDate: {
-      $gte: new Date(currentYear, currentMonth, 1),
-      $lt: new Date(currentYear, currentMonth + 1, 1),
-    },
-    isDeleted: false,
-  });
-
-  // Get all pending rent payments
-  const pendingRentPayments = await Payments.find({
-    tenantId,
-    type: "RENT",
-    status: { $in: ["PENDING", "OVERDUE"] },
-    isDeleted: false,
-  }).sort({ dueDate: 1 });
-
-  // Get recent paid rent payments (last 6 months)
-  const recentPaidPayments = await Payments.find({
-    tenantId,
-    type: "RENT",
-    status: "PAID",
-    isDeleted: false,
-  })
-    .sort({ dueDate: -1 })
-    .limit(6);
-
-  // Calculate overdue amount
-  const overduePayments = pendingRentPayments.filter(
-    payment => payment.status === "OVERDUE",
-  );
-  const totalOverdueAmount = overduePayments.reduce(
-    (sum, payment) => sum + payment.totalAmount,
-    0,
-  );
-
-  // Calculate days overdue for current payment
-  const daysOverdue =
-    currentMonthPayment && currentMonthPayment.status === "OVERDUE"
-      ? Math.floor(
-          (currentDate.getTime() - currentMonthPayment.dueDate.getTime()) /
-            (1000 * 60 * 60 * 24),
-        )
-      : 0;
-
-  const rentSummary = {
-    // Payment link information - removed automatic creation
-    paymentLink: {
-      id: undefined,
-      url: undefined,
-    },
-    // Property and spot information
-    property: {
-      id: (property as any)._id?.toString() || property._id,
-      name: property.name,
-      address: property.address,
-    },
-    spot: {
-      id: (spot as any)._id?.toString() || spot._id,
-      spotNumber: spot.spotNumber,
-      spotIdentifier: spot.spotIdentifier,
-      amenities: spot.amenities,
-      size: spot.size,
-    },
-
-    // Lease information
-    lease: {
-      id: (activeLease as any)._id?.toString() || activeLease._id,
-      leaseType: activeLease.leaseType,
-      leaseStart: activeLease.leaseStart,
-      leaseEnd: activeLease.leaseEnd,
-      rentAmount: activeLease.rentAmount,
-      depositAmount: activeLease.depositAmount,
-      leaseStatus: activeLease.leaseStatus,
-      paymentStatus: activeLease.paymentStatus,
-    },
-
-    // Current month payment
-    currentMonth: {
-      dueDate: dueDate,
-      rentAmount: activeLease.rentAmount,
-      status: (currentMonthPayment?.status as PaymentStatus) || "PENDING",
-      paidDate: currentMonthPayment?.paidDate,
-      paymentMethod: currentMonthPayment?.paymentMethod,
-      lateFeeAmount: currentMonthPayment?.lateFeeAmount || 0,
-      totalAmount: currentMonthPayment?.totalAmount || activeLease.rentAmount,
-      daysOverdue: daysOverdue,
-      receiptNumber: currentMonthPayment?.receiptNumber,
-    },
-
-    // Payment summary
-    summary: {
-      totalOverdueAmount,
-      overdueCount: overduePayments.length,
-      pendingCount: pendingRentPayments.length,
-      totalPaidAmount: recentPaidPayments.reduce(
-        (sum, payment) => sum + payment.totalAmount,
-        0,
-      ),
-      averagePaymentAmount:
-        recentPaidPayments.length > 0
-          ? recentPaidPayments.reduce(
-              (sum, payment) => sum + payment.totalAmount,
-              0,
-            ) / recentPaidPayments.length
-          : 0,
-    },
-
-    // Recent payment history
-    recentPayments: recentPaidPayments.map(payment => ({
-      id: (payment as any)._id?.toString() || payment._id,
-      dueDate: payment.dueDate,
-      paidDate: payment.paidDate,
-      amount: payment.totalAmount,
-      paymentMethod: payment.paymentMethod,
-      receiptNumber: payment.receiptNumber,
-      status: payment.status,
-    })),
-
-    // Pending payments
-    pendingPayments: pendingRentPayments.map(payment => ({
-      id: (payment as any)._id?.toString() || payment._id,
-      dueDate: payment.dueDate,
-      amount: payment.totalAmount,
-      status: payment.status,
-      daysOverdue:
-        payment.status === "OVERDUE"
-          ? Math.floor(
-              (currentDate.getTime() - payment.dueDate.getTime()) /
-                (1000 * 60 * 60 * 24),
-            )
-          : 0,
-    })),
-  };
-
-  return {
-    hasActiveLease: true,
-    rentSummary,
-  };
 };
 
 // Create payment with link
@@ -1146,7 +1219,7 @@ export const PaymentService = {
   getTenantPaymentStatusEnhanced,
   getPaymentLinkDetails,
   getPaymentHistory,
-  getRentSummary,
+  getRentSummary: getRentSummaryEnhanced, // Changed to use the enhanced function
   createPaymentWithLink,
   handleSuccessfulPayment,
 };

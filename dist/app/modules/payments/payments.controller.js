@@ -108,35 +108,6 @@ const getPaymentByReceipt = (0, catchAsync_1.default)((req, res) => __awaiter(vo
         data: paymentData,
     });
 }));
-// Create a new payment with unique payment link - Enhanced for first-time payments
-const createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { tenantId, currentDate } = req.body;
-    const result = yield (0, payment_service_1.createPaymentWithLinkEnhanced)({
-        tenantId,
-        currentDate,
-        createdBy: ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || "SYSTEM",
-    });
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.CREATED,
-        success: true,
-        message: result.isFirstTimePayment
-            ? "First-time rent payment intent created successfully"
-            : "Rent payment intent created successfully",
-        data: {
-            paymentIntent: {
-                id: result.paymentIntent.id,
-                client_secret: result.paymentIntent.client_secret,
-                amount: result.paymentIntent.amount,
-                currency: result.paymentIntent.currency,
-                status: result.paymentIntent.status,
-            },
-            receiptNumber: result.receiptNumber,
-            lease: result.lease,
-            paymentInfo: result.paymentInfo,
-        },
-    });
-}));
 // Get payment link details
 const getPaymentLinkDetails = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { paymentLinkId } = req.params;
@@ -152,7 +123,7 @@ const getPaymentLinkDetails = (0, catchAsync_1.default)((req, res) => __awaiter(
             data: null,
         });
     }
-    const paymentLink = yield (0, payment_service_1.getPaymentLinkDetails)(paymentLinkId, payment.stripeAccountId.stripeSecretKey);
+    const paymentLink = yield payment_service_1.PaymentService.getPaymentLinkDetails(paymentLinkId, payment.stripeAccountId.stripeSecretKey);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -164,7 +135,7 @@ const getPaymentLinkDetails = (0, catchAsync_1.default)((req, res) => __awaiter(
 const getTenantPaymentStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { tenantId } = req.params;
-    const result = yield (0, payment_service_1.getTenantPaymentStatusEnhanced)({
+    const result = yield payment_service_1.PaymentService.getTenantPaymentStatusEnhanced({
         tenantId,
         createdBy: ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || "SYSTEM",
     });
@@ -187,7 +158,7 @@ const getPaymentHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void
             data: null,
         });
     }
-    const result = yield (0, payment_service_1.getPaymentHistory)(userId);
+    const result = yield payment_service_1.PaymentService.getPaymentHistory(userId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -207,88 +178,96 @@ const getRentSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
             data: null,
         });
     }
-    const result = yield (0, payment_service_1.getRentSummary)(userId);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: result.hasActiveLease
-            ? "Rent summary retrieved successfully"
-            : "No active lease found",
-        data: result,
-    });
-}));
-// Create payment link for a specific payment
-const createPaymentLink = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
-    const { paymentId } = req.params;
-    if (!userId) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.UNAUTHORIZED,
-            success: false,
-            message: "User not authenticated",
-            data: null,
-        });
-    }
-    // Find the payment and verify it belongs to the user
-    const payment = yield payments_schema_1.Payments.findOne({
-        _id: paymentId,
-        tenantId: userId,
-        status: { $in: ["PENDING", "OVERDUE"] },
-        isDeleted: false,
-    });
-    if (!payment) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.NOT_FOUND,
-            success: false,
-            message: "Payment not found or not eligible for payment",
-            data: null,
-        });
-    }
     try {
-        const paymentLink = yield (0, payment_service_1.createPaymentLink)({
-            tenantId: payment.tenantId.toString(),
-            propertyId: payment.propertyId.toString(),
-            spotId: payment.spotId.toString(),
-            amount: payment.amount,
-            type: payment.type,
-            dueDate: payment.dueDate,
-            description: payment.description,
-            lateFeeAmount: payment.lateFeeAmount,
-            receiptNumber: payment.receiptNumber,
+        const result = yield payment_service_1.PaymentService.getRentSummary(userId);
+        (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.OK,
+            success: true,
+            message: result.hasActiveLease
+                ? "Rent summary retrieved successfully"
+                : "No active lease found",
+            data: result,
         });
-        // Update payment record with the new payment link
-        yield payments_schema_1.Payments.findByIdAndUpdate(payment._id, {
-            stripePaymentLinkId: paymentLink.id,
+    }
+    catch (error) {
+        console.error("Error in getRentSummary controller:", error);
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.INTERNAL_SERVER_ERROR,
+            success: false,
+            message: "Error retrieving rent summary",
+            data: {
+                error: error.message,
+                hasActiveLease: false,
+            },
+        });
+    }
+}));
+// Create payment with link
+const createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { tenantId, currentDate } = req.body;
+    const createdBy = ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || "SYSTEM";
+    try {
+        const result = yield payment_service_1.PaymentService.createPaymentWithLink({
+            tenantId,
+            currentDate,
+            createdBy,
         });
         (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.OK,
             success: true,
-            message: "Payment link created successfully",
-            data: {
-                paymentId: payment._id,
-                paymentLink: {
-                    id: paymentLink.id,
-                    url: paymentLink.url,
-                },
-            },
+            message: "Payment with link created successfully",
+            data: result,
         });
     }
     catch (error) {
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.INTERNAL_SERVER_ERROR,
-            success: false,
-            message: "Failed to create payment link",
-            data: null,
-        });
+        // Handle specific error messages for better user experience
+        if (error.message.includes("You have already paid for") &&
+            error.message.includes("You cannot pay more than one month ahead")) {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: http_status_1.default.BAD_REQUEST,
+                success: false,
+                message: "Payment Limit Reached",
+                data: {
+                    error: error.message,
+                    warning: error.message,
+                    paymentStatus: "LIMIT_REACHED",
+                },
+            });
+        }
+        else if (error.message.includes("already exists and is pending")) {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: http_status_1.default.CONFLICT,
+                success: false,
+                message: "Payment Already Pending",
+                data: {
+                    error: error.message,
+                    paymentStatus: "PENDING",
+                },
+            });
+        }
+        else if (error.message.includes("is overdue")) {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: http_status_1.default.BAD_REQUEST,
+                success: false,
+                message: "Overdue Payment",
+                data: {
+                    error: error.message,
+                    paymentStatus: "OVERDUE",
+                },
+            });
+        }
+        else {
+            // Re-throw other errors to be handled by global error handler
+            throw error;
+        }
     }
 }));
 exports.PaymentController = {
     getPaymentByReceipt,
-    createPaymentWithLink,
     getPaymentLinkDetails,
     getTenantPaymentStatus,
     getPaymentHistory,
     getRentSummary,
-    createPaymentLink,
+    createPaymentWithLink,
 };

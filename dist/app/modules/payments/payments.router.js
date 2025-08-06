@@ -28,6 +28,4 @@ router.get("/tenant-payment-status/:tenantId", userAuth_1.userAuth, (0, zodValid
 router.get("/payment-history", userAuth_1.userAuth, payments_controller_1.PaymentController.getPaymentHistory);
 // Get user's rent summary
 router.get("/rent-summary", userAuth_1.userAuth, payments_controller_1.PaymentController.getRentSummary);
-// Create payment link for a specific payment
-router.post("/:paymentId/create-payment-link", userAuth_1.userAuth, payments_controller_1.PaymentController.createPaymentLink);
 exports.paymentRoutes = router;

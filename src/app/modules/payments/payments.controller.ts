@@ -194,16 +194,30 @@ const getRentSummary = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await PaymentService.getRentSummary(userId);
+  try {
+    const result = await PaymentService.getRentSummary(userId);
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: result.hasActiveLease
-      ? "Rent summary retrieved successfully"
-      : "No active lease found",
-    data: result,
-  });
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: result.hasActiveLease
+        ? "Rent summary retrieved successfully"
+        : "No active lease found",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Error in getRentSummary controller:", error);
+
+    return sendResponse(res, {
+      statusCode: httpStatus.INTERNAL_SERVER_ERROR,
+      success: false,
+      message: "Error retrieving rent summary",
+      data: {
+        error: error.message,
+        hasActiveLease: false,
+      },
+    });
+  }
 });
 
 // Create payment with link
