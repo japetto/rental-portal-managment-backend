@@ -8,8 +8,20 @@
   ],
   "routes": [
     {
+      "src": "/api/v1.0/stripe/webhook",
+      "dest": "dist/server.js",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "dist/server.js"
     }
-  ]
+  ],
+  "functions": {
+    "dist/server.js": {
+      "maxDuration": 30
+    }
+  }
 }

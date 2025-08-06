@@ -628,7 +628,126 @@ export const testWebhook = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Comprehensive webhook handler for account-specific webhooks
+// Add this new webhook handler specifically for serverless environments
+export const handleStripeWebhookServerless = async (req: any, res: any) => {
+  let event;
+  const signature = req.headers["stripe-signature"];
+
+  try {
+    // Extract accountId - either from URL path, query param, or metadata
+    const accountId = req.query.accountId || req.params.accountId;
+
+    if (!accountId) {
+      console.error("No accountId provided in webhook request");
+      return res.status(400).json({ error: "Missing accountId" });
+    }
+
+    // Get the account with the webhook secret
+    const stripeAccount = await StripeAccounts.findById(accountId).select(
+      "+stripeSecretKey +webhookSecret",
+    );
+
+    if (!stripeAccount || !stripeAccount.webhookSecret) {
+      console.error(`No webhook secret found for account ${accountId}`);
+      return res.status(400).json({ error: "Invalid account configuration" });
+    }
+
+    // Create Stripe instance with account-specific secret key
+    const stripe = new Stripe(stripeAccount.stripeSecretKey, {
+      apiVersion: "2025-06-30.basil",
+    });
+
+    // For serverless environments, we need to handle the body differently
+    let rawBody: Buffer;
+
+    console.log("🔍 Serverless webhook - Request body type:", typeof req.body);
+    console.log(
+      "🔍 Serverless webhook - Request body is Buffer:",
+      Buffer.isBuffer(req.body),
+    );
+
+    if (Buffer.isBuffer(req.body)) {
+      // Raw buffer (ideal case)
+      rawBody = req.body;
+      console.log("🔧 Serverless: Using raw buffer for webhook verification");
+    } else if (typeof req.body === "string") {
+      // String body
+      rawBody = Buffer.from(req.body, "utf8");
+      console.log(
+        "🔧 Serverless: Using string converted to buffer for webhook verification",
+      );
+    } else if (typeof req.body === "object" && req.body !== null) {
+      // Parsed JSON object - reconstruct the raw body
+      const jsonString = JSON.stringify(req.body);
+      rawBody = Buffer.from(jsonString, "utf8");
+      console.log(
+        "🔧 Serverless: Using reconstructed buffer from parsed JSON for webhook verification",
+      );
+      console.log("🔧 Serverless: JSON string length:", jsonString.length);
+    } else {
+      console.error(
+        "❌ Serverless: Invalid request body type:",
+        typeof req.body,
+      );
+      console.error("❌ Serverless: Request body:", req.body);
+      return res.status(400).json({
+        error:
+          "Invalid request body for serverless webhook. Expected Buffer, string, or object.",
+      });
+    }
+
+    if (!signature) {
+      console.error("❌ Serverless: No Stripe signature found in headers");
+      return res.status(400).json({ error: "Missing Stripe signature" });
+    }
+
+    console.log("🔧 Serverless: Raw body length:", rawBody.length);
+    console.log(
+      "🔧 Serverless: Signature:",
+      signature.substring(0, 20) + "...",
+    );
+
+    // Verify the webhook signature using the raw buffer
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      signature,
+      stripeAccount.webhookSecret,
+    );
+
+    console.log(
+      `🔔 SERVERLESS WEBHOOK RECEIVED: ${event.type} for account ${accountId}`,
+    );
+
+    // Handle the event based on type
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        await handleSuccessfulPayment(event.data.object, stripeAccount);
+        break;
+
+      case "payment_intent.payment_failed":
+        await handleFailedPayment(event.data.object, stripeAccount);
+        break;
+
+      case "payment_intent.canceled":
+        await handleCanceledPayment(event.data.object, stripeAccount);
+        break;
+
+      // Add other event types as needed
+      default:
+        console.log(`Serverless: Unhandled event type: ${event.type}`);
+    }
+
+    // Return a success response
+    return res.status(200).json({ received: true });
+  } catch (error: any) {
+    console.error(`Serverless webhook error: ${error.message}`);
+    console.error(`Serverless error stack: ${error.stack}`);
+    return res
+      .status(400)
+      .json({ error: `Serverless Webhook Error: ${error.message}` });
+  }
+};
+
 export const handleStripeWebhook = async (req: any, res: any) => {
   let event;
   const signature = req.headers["stripe-signature"];
@@ -657,9 +776,48 @@ export const handleStripeWebhook = async (req: any, res: any) => {
       apiVersion: "2025-06-30.basil",
     });
 
+    // Handle different request body types for different environments
+    let rawBody: Buffer;
+
+    console.log("🔍 Request body type:", typeof req.body);
+    console.log("🔍 Request body is Buffer:", Buffer.isBuffer(req.body));
+
+    if (Buffer.isBuffer(req.body)) {
+      // Development environment - raw buffer from express.raw()
+      rawBody = req.body;
+      console.log("🔧 Using raw buffer for webhook verification");
+    } else if (typeof req.body === "string") {
+      // Production environment - string that needs to be converted to buffer
+      rawBody = Buffer.from(req.body, "utf8");
+      console.log(
+        "🔧 Using string converted to buffer for webhook verification",
+      );
+    } else if (typeof req.body === "object" && req.body !== null) {
+      // Production environment - parsed JSON object
+      // We need to reconstruct the raw body from the parsed object
+      rawBody = Buffer.from(JSON.stringify(req.body), "utf8");
+      console.log(
+        "🔧 Using reconstructed buffer from parsed JSON for webhook verification",
+      );
+    } else {
+      console.error("❌ Invalid request body type:", typeof req.body);
+      console.error("❌ Request body:", req.body);
+      return res.status(400).json({
+        error: "Invalid request body. Expected Buffer, string, or object.",
+      });
+    }
+
+    if (!signature) {
+      console.error("❌ No Stripe signature found in headers");
+      return res.status(400).json({ error: "Missing Stripe signature" });
+    }
+
+    console.log("🔧 Raw body length:", rawBody.length);
+    console.log("🔧 Signature:", signature.substring(0, 20) + "...");
+
     // Verify the webhook signature using the raw buffer
     event = stripe.webhooks.constructEvent(
-      req.body, // req.body is now a Buffer when using express.raw()
+      rawBody,
       signature,
       stripeAccount.webhookSecret,
     );
@@ -689,6 +847,7 @@ export const handleStripeWebhook = async (req: any, res: any) => {
     return res.status(200).json({ received: true });
   } catch (error: any) {
     console.error(`Webhook error: ${error.message}`);
+    console.error(`Error stack: ${error.stack}`);
     return res.status(400).json({ error: `Webhook Error: ${error.message}` });
   }
 };

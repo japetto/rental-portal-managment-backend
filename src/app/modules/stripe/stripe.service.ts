@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import config from "../../../config/config";
 import { StripeAccounts } from "./stripe.schema";
-import { createWebhookEndpoint, verifyStripeAccountId } from "./stripe.utils";
+import { verifyStripeAccountId } from "./stripe.utils";
 
 // Create Stripe instance with account-specific secret key
 export const createStripeInstance = (secretKey: string): Stripe => {
@@ -394,4 +394,76 @@ export const deleteStripeAccount = async (accountId: string) => {
   }
 
   return account;
+};
+
+// Create webhook endpoint for a Stripe account
+export const createWebhookEndpoint = async (
+  accountId: string,
+  webhookUrl: string,
+) => {
+  try {
+    // Get the Stripe account with secret key
+    const stripeAccount =
+      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
+
+    if (!stripeAccount) {
+      throw new Error("Stripe account not found");
+    }
+
+    if (!stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe secret key is missing for this account");
+    }
+
+    // Create Stripe instance with account-specific secret key
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+
+    // Use the serverless webhook endpoint for better production compatibility
+    const serverlessWebhookUrl = webhookUrl.replace(
+      "/webhook",
+      "/webhook-serverless",
+    );
+
+    // Make sure the webhookUrl includes the accountId as a query parameter
+    const webhookUrlWithId = serverlessWebhookUrl.includes("?")
+      ? `${serverlessWebhookUrl}&accountId=${accountId}`
+      : `${serverlessWebhookUrl}?accountId=${accountId}`;
+
+    // Create webhook endpoint
+    const webhook = await stripe.webhookEndpoints.create({
+      url: webhookUrlWithId,
+      enabled_events: [
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "payment_intent.canceled",
+        "payment_link.created",
+        "payment_link.updated",
+      ],
+      metadata: {
+        accountId: accountId,
+        accountName: stripeAccount.name,
+        propertyIds: stripeAccount.propertyIds.join(","),
+      },
+    });
+
+    console.log(`✅ Webhook created for account ${stripeAccount.name}:`, {
+      webhookId: webhook.id,
+      url: webhook.url,
+      status: webhook.status,
+    });
+
+    // IMPORTANT: Store the webhook secret when it's created
+    // This is only available at creation time
+    await StripeAccounts.findByIdAndUpdate(accountId, {
+      webhookId: webhook.id,
+      webhookUrl: webhookUrlWithId,
+      webhookSecret: webhook.secret, // Store the webhook secret
+      webhookStatus: "ACTIVE",
+      webhookCreatedAt: new Date(),
+    });
+
+    return webhook;
+  } catch (error: any) {
+    console.error("Error creating webhook endpoint:", error);
+    throw new Error(`Failed to create webhook: ${error.message}`);
+  }
 };

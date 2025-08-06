@@ -7,6 +7,7 @@ import {
   getAllStripeAccounts,
   getDefaultAccount,
   handleStripeWebhook,
+  handleStripeWebhookServerless,
   linkPropertiesToAccount,
   setDefaultAccount,
   testWebhook,
@@ -84,11 +85,14 @@ router.post(
 router.get("/webhook/test", testWebhook);
 
 // Handle Stripe webhooks (No auth required)
-// For webhook routes, we need raw body for signature verification
+// Use express.raw() for development and handle parsed JSON for production
 router.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   handleStripeWebhook,
 );
+
+// Serverless webhook handler for production environments
+router.post("/webhook-serverless", handleStripeWebhookServerless);
 
 export const stripeRoutes = router;

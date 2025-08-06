@@ -69,6 +69,8 @@ router.post("/accounts/unlink-properties", adminAuth_1.adminAuth, (0, zodValidat
 // Test webhook endpoint (No auth required)
 router.get("/webhook/test", stripe_controller_1.testWebhook);
 // Handle Stripe webhooks (No auth required)
-// For webhook routes, we need raw body for signature verification
+// Use express.raw() for development and handle parsed JSON for production
 router.post("/webhook", express_1.default.raw({ type: "application/json" }), stripe_controller_1.handleStripeWebhook);
+// Serverless webhook handler for production environments
+router.post("/webhook-serverless", stripe_controller_1.handleStripeWebhookServerless);
 exports.stripeRoutes = router;
