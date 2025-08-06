@@ -86,19 +86,6 @@ router.post(
 // Get user's own profile
 router.get("/me", userAuth, UserController.getMyProfile);
 
-// Get user's payment history
-router.get("/payment-history", userAuth, UserController.getPaymentHistory);
-
-// Get user's rent summary
-router.get("/rent-summary", userAuth, UserController.getRentSummary);
-
-// Create payment link for a specific payment
-router.post(
-  "/payments/:paymentId/create-payment-link",
-  userAuth,
-  UserController.createPaymentLink,
-);
-
 // Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth, UserController.getUserById);
 

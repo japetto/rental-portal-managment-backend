@@ -52,9 +52,7 @@ export const getPaymentHistory = async (tenantId: string) => {
     if (payment.stripePaymentLinkId) {
       try {
         // Get the Stripe account for this payment
-        const { StripeAccounts } = await import(
-          "../stripe/stripe-accounts.schema"
-        );
+        const { StripeAccounts } = await import("../stripe/stripe.schema");
         const stripeAccount = await StripeAccounts.findById(
           payment.stripeAccountId,
         );

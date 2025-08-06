@@ -41,4 +41,21 @@ router.get(
   PaymentController.getTenantPaymentStatus,
 );
 
+// ========================================
+// USER PAYMENT ROUTES (moved from users module)
+// ========================================
+
+// Get user's payment history
+router.get("/payment-history", userAuth, PaymentController.getPaymentHistory);
+
+// Get user's rent summary
+router.get("/rent-summary", userAuth, PaymentController.getRentSummary);
+
+// Create payment link for a specific payment
+router.post(
+  "/:paymentId/create-payment-link",
+  userAuth,
+  PaymentController.createPaymentLink,
+);
+
 export const paymentRoutes = router;

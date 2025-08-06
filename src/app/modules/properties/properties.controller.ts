@@ -14,9 +14,7 @@ export class PropertiesController {
         .sort({ createdAt: -1 });
 
       // Get all Stripe accounts with their property assignments
-      const { StripeAccounts } = await import(
-        "../stripe/stripe-accounts.schema"
-      );
+      const { StripeAccounts } = await import("../stripe/stripe.schema");
       const stripeAccounts = await StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select(
@@ -25,7 +23,7 @@ export class PropertiesController {
 
       // Create a map of property ID to Stripe account
       const propertyToStripeMap = new Map();
-      stripeAccounts.forEach(account => {
+      stripeAccounts.forEach((account: any) => {
         account.propertyIds.forEach((propertyId: any) => {
           propertyToStripeMap.set(propertyId._id.toString(), {
             _id: account._id,
@@ -83,9 +81,7 @@ export class PropertiesController {
         .sort({ createdAt: -1 });
 
       // Get all Stripe accounts with their property assignments
-      const { StripeAccounts } = await import(
-        "../stripe/stripe-accounts.schema"
-      );
+      const { StripeAccounts } = await import("../stripe/stripe.schema");
       const stripeAccounts = await StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select(
@@ -102,7 +98,7 @@ export class PropertiesController {
 
       // Create a map of property ID to Stripe account
       const propertyToStripeMap = new Map();
-      stripeAccounts.forEach(account => {
+      stripeAccounts.forEach((account: any) => {
         account.propertyIds.forEach((propertyId: any) => {
           propertyToStripeMap.set(propertyId._id.toString(), {
             _id: account._id,
@@ -143,7 +139,7 @@ export class PropertiesController {
           stripeAccount: propertyStripeAccount,
           availableStripeAccounts: {
             propertySpecific: propertyStripeAccount,
-            globalAccounts: globalAccounts.map(account => ({
+            globalAccounts: globalAccounts.map((account: any) => ({
               _id: account._id,
               name: account.name,
               description: account.description,
@@ -178,16 +174,14 @@ export class PropertiesController {
         .sort({ createdAt: -1 });
 
       // Get all Stripe accounts with their property assignments
-      const { StripeAccounts } = await import(
-        "../stripe/stripe-accounts.schema"
-      );
+      const { StripeAccounts } = await import("../stripe/stripe.schema");
       const stripeAccounts = await StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select("propertyIds");
 
       // Create a set of property IDs that have Stripe accounts
       const propertiesWithStripe = new Set();
-      stripeAccounts.forEach(account => {
+      stripeAccounts.forEach((account: any) => {
         account.propertyIds.forEach((propertyId: any) => {
           propertiesWithStripe.add(propertyId._id.toString());
         });
