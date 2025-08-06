@@ -2,10 +2,11 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import Stripe from "stripe";
 import catchAsync from "../../../shared/catchAsync";
+import { PaymentStatus } from "../../../shared/enums/payment.enums";
 import sendResponse from "../../../shared/sendResponse";
 import { Payments } from "../payments/payments.schema";
+import { StripeAccounts } from "./stripe.schema";
 import {
-  constructWebhookEvent,
   createStripeAccount as createStripeAccountService,
   deleteStripeAccount as deleteStripeAccountService,
   getAllStripeAccounts as getAllStripeAccountsService,
@@ -292,7 +293,7 @@ export async function handlePaymentSuccess(
     let metadata = paymentIntent.metadata;
 
     // If payment intent has no metadata, try to get it from the charge
-    if (!metadata.tenantId || !metadata.receiptNumber) {
+    if (!metadata.paymentRecordId) {
       console.log(
         "🔍 PAYMENT SUCCESS WEBHOOK: No metadata in payment intent, checking charges...",
       );
@@ -323,7 +324,7 @@ export async function handlePaymentSuccess(
       }
     }
 
-    if (!metadata.tenantId || !metadata.receiptNumber) {
+    if (!metadata.paymentRecordId) {
       console.error(
         "❌ PAYMENT SUCCESS WEBHOOK ERROR: Missing required payment metadata:",
         {
@@ -335,22 +336,20 @@ export async function handlePaymentSuccess(
       throw new Error("Missing required payment metadata");
     }
 
-    // Find existing payment record by receipt number
+    // Find existing payment record by paymentRecordId
     console.log(
-      "🔍 PAYMENT SUCCESS WEBHOOK: Looking for payment record with receipt number:",
-      metadata.receiptNumber,
+      "🔍 PAYMENT SUCCESS WEBHOOK: Looking for payment record with ID:",
+      metadata.paymentRecordId,
     );
 
-    const existingPayment = await Payments.findOne({
-      receiptNumber: metadata.receiptNumber,
-    });
+    const existingPayment = await Payments.findById(metadata.paymentRecordId);
 
     if (!existingPayment) {
       console.error(
-        "❌ PAYMENT SUCCESS WEBHOOK ERROR: No payment record found for receipt:",
+        "❌ PAYMENT SUCCESS WEBHOOK ERROR: No payment record found for ID:",
         {
           timestamp: new Date().toISOString(),
-          receiptNumber: metadata.receiptNumber,
+          paymentRecordId: metadata.paymentRecordId,
           paymentIntentId: paymentIntent.id,
         },
       );
@@ -358,7 +357,7 @@ export async function handlePaymentSuccess(
     }
 
     // Check if payment already processed to prevent duplicates
-    if (existingPayment.status === "PAID") {
+    if (existingPayment.status === PaymentStatus.PAID) {
       console.log(
         "⚠️ PAYMENT SUCCESS WEBHOOK: Payment already processed, skipping...",
         {
@@ -371,6 +370,14 @@ export async function handlePaymentSuccess(
       return;
     }
 
+    // Use stored metadata if available, otherwise use PaymentIntent data
+    const storedMetadata = existingPayment.stripeMetadata || {};
+
+    console.log(
+      "📋 PAYMENT SUCCESS WEBHOOK: Using stored metadata:",
+      storedMetadata,
+    );
+
     // Update existing payment record with PAID status
     console.log(
       "💾 PAYMENT SUCCESS WEBHOOK: Updating payment record with PAID status...",
@@ -379,7 +386,7 @@ export async function handlePaymentSuccess(
         paymentId: existingPayment._id,
         receiptNumber: existingPayment.receiptNumber,
         currentStatus: existingPayment.status,
-        newStatus: "PAID",
+        newStatus: PaymentStatus.PAID,
         paymentIntentId: paymentIntent.id,
       },
     );
@@ -387,7 +394,7 @@ export async function handlePaymentSuccess(
     const updatedPayment = await Payments.findByIdAndUpdate(
       existingPayment._id,
       {
-        status: "PAID",
+        status: PaymentStatus.PAID,
         paidDate: new Date(paymentIntent.created * 1000),
         paymentMethod: "ONLINE",
         transactionId: paymentIntent.id,
@@ -396,6 +403,11 @@ export async function handlePaymentSuccess(
         amount: paymentIntent.amount / 100, // Update with actual amount paid
         totalAmount: paymentIntent.amount / 100,
         stripeAccountId: accountId, // Store which Stripe account processed this
+        // Update description if we have stored metadata
+        description:
+          storedMetadata.paymentDescription || existingPayment.description,
+        // Generate new receipt number for paid payment
+        receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       },
       { new: true },
     );
@@ -445,7 +457,7 @@ export async function handlePaymentFailure(
       await Payments.findOneAndUpdate(
         { receiptNumber },
         {
-          status: "CANCELLED",
+          status: PaymentStatus.CANCELLED,
           stripeAccountId: accountId,
         },
       );
@@ -468,7 +480,7 @@ export async function handlePaymentCanceled(
       await Payments.findOneAndUpdate(
         { receiptNumber },
         {
-          status: "CANCELLED",
+          status: PaymentStatus.CANCELLED,
           stripeAccountId: accountId,
         },
       );
@@ -531,7 +543,7 @@ export async function handleChargeSuccess(
     }
 
     // Check if payment already processed to prevent duplicates
-    if (existingPayment.status === "PAID") {
+    if (existingPayment.status === PaymentStatus.PAID) {
       console.log(
         "⚠️ CHARGE SUCCESS WEBHOOK: Payment already processed, skipping...",
         {
@@ -552,7 +564,7 @@ export async function handleChargeSuccess(
         paymentId: existingPayment._id,
         receiptNumber: existingPayment.receiptNumber,
         currentStatus: existingPayment.status,
-        newStatus: "PAID",
+        newStatus: PaymentStatus.PAID,
         chargeId: charge.id,
       },
     );
@@ -560,7 +572,7 @@ export async function handleChargeSuccess(
     const updatedPayment = await Payments.findByIdAndUpdate(
       existingPayment._id,
       {
-        status: "PAID",
+        status: PaymentStatus.PAID,
         paidDate: new Date(charge.created * 1000),
         paymentMethod: "ONLINE",
         transactionId: charge.id,
@@ -616,154 +628,284 @@ export const testWebhook = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
-  const sig = req.headers["stripe-signature"];
-
-  console.log("🔔 WEBHOOK RECEIVED:", {
-    timestamp: new Date().toISOString(),
-    method: req.method,
-    path: req.path,
-    headers: {
-      "stripe-signature": sig ? "present" : "missing",
-      "content-type": req.headers["content-type"],
-      "user-agent": req.headers["user-agent"],
-    },
-    bodySize: req.body ? req.body.length : 0,
-    bodyPreview: req.body ? req.body.substring(0, 200) + "..." : "No body",
-    bodyType: typeof req.body,
-  });
+// Comprehensive webhook handler for account-specific webhooks
+export const handleStripeWebhook = async (req: any, res: any) => {
+  let event;
+  const signature = req.headers["stripe-signature"];
 
   try {
-    let event;
-    let accountId: string | undefined;
+    // Extract accountId - either from URL path, query param, or metadata
+    const accountId = req.query.accountId || req.params.accountId;
 
-    // Get the raw body for signature verification
-    const payload = req.body;
-
-    // Try to verify with account-specific webhook secrets first
-    try {
-      const { StripeAccounts } = await import("./stripe.schema");
-      const accounts = await StripeAccounts.find({
-        isActive: true,
-        webhookStatus: "ACTIVE",
-      }).select("+stripeSecretKey +webhookSecret");
-
-      console.log(
-        `🔍 WEBHOOK VERIFICATION: Found ${accounts.length} active Stripe accounts to try`,
-      );
-
-      if (accounts.length === 0) {
-        console.log(
-          "⚠️ WEBHOOK WARNING: No active Stripe accounts found in database",
-        );
-      }
-
-      for (const account of accounts) {
-        if (account.stripeSecretKey && account.webhookSecret) {
-          try {
-            const stripe = new Stripe(account.stripeSecretKey, {
-              apiVersion: "2025-06-30.basil",
-            });
-
-            event = stripe.webhooks.constructEvent(
-              payload,
-              sig as string,
-              account.webhookSecret,
-            );
-
-            console.log(
-              `✅ WEBHOOK VERIFIED: Successfully verified with account: ${account.name} (ID: ${account._id})`,
-            );
-            accountId = (account._id as any).toString();
-            break;
-          } catch (accountErr: any) {
-            console.log(
-              `❌ WEBHOOK VERIFICATION FAILED: Account ${account.name} (ID: ${account._id}): ${accountErr.message}`,
-            );
-          }
-        }
-      }
-    } catch (importErr: any) {
-      console.error(
-        "❌ WEBHOOK ERROR: Error importing StripeAccounts schema:",
-        importErr.message,
-      );
+    if (!accountId) {
+      console.error("No accountId provided in webhook request");
+      return res.status(400).json({ error: "Missing accountId" });
     }
 
-    // If account-specific verification failed, try with default webhook secret
-    if (!event) {
-      try {
-        event = constructWebhookEvent(payload, sig);
-        console.log(
-          "✅ WEBHOOK VERIFIED: Successfully verified with default secret",
-        );
-      } catch (err: any) {
-        console.error(
-          "❌ WEBHOOK VERIFICATION FAILED: Signature verification failed:",
-          err.message,
-        );
-        res.status(400).send(`Webhook Error: Signature verification failed`);
-        return;
-      }
+    // Get the account with the webhook secret
+    const stripeAccount = await StripeAccounts.findById(accountId).select(
+      "+stripeSecretKey +webhookSecret",
+    );
+
+    if (!stripeAccount || !stripeAccount.webhookSecret) {
+      console.error(`No webhook secret found for account ${accountId}`);
+      return res.status(400).json({ error: "Invalid account configuration" });
     }
 
-    console.log("🔔 PROCESSING WEBHOOK EVENT:", {
-      timestamp: new Date().toISOString(),
-      eventType: event.type,
-      eventId: (event as any).id,
-      eventCreated: (event as any).created,
-      accountId,
-      data: {
-        object: (event.data.object as any).id,
-        objectType: (event.data.object as any).object,
-      },
+    // Create Stripe instance with account-specific secret key
+    const stripe = new Stripe(stripeAccount.stripeSecretKey, {
+      apiVersion: "2025-06-30.basil",
     });
 
+    // Verify the webhook signature using the raw buffer
+    event = stripe.webhooks.constructEvent(
+      req.body, // req.body is now a Buffer when using express.raw()
+      signature,
+      stripeAccount.webhookSecret,
+    );
+
+    console.log(`🔔 WEBHOOK RECEIVED: ${event.type} for account ${accountId}`);
+
+    // Handle the event based on type
     switch (event.type) {
       case "payment_intent.succeeded":
-        console.log("💰 WEBHOOK: Processing payment_intent.succeeded event");
-        await handlePaymentSuccess(event.data.object, accountId);
+        await handleSuccessfulPayment(event.data.object, stripeAccount);
         break;
+
       case "payment_intent.payment_failed":
-        console.log(
-          "❌ WEBHOOK: Processing payment_intent.payment_failed event",
-        );
-        await handlePaymentFailure(event.data.object, accountId);
+        await handleFailedPayment(event.data.object, stripeAccount);
         break;
+
       case "payment_intent.canceled":
-        console.log("🚫 WEBHOOK: Processing payment_intent.canceled event");
-        await handlePaymentCanceled(event.data.object, accountId);
+        await handleCanceledPayment(event.data.object, stripeAccount);
         break;
-      case "payment_intent.processing":
-        console.log("⏳ WEBHOOK: Payment processing...");
-        break;
-      case "payment_intent.requires_action":
-        console.log("⚠️ WEBHOOK: Payment requires action...");
-        break;
-      case "charge.succeeded":
-        console.log("💳 WEBHOOK: Processing charge.succeeded event");
-        await handleChargeSuccess(event.data.object, accountId);
-        break;
-      case "charge.updated":
-        console.log("📝 WEBHOOK: Charge updated...");
-        break;
+
+      // Add other event types as needed
       default:
-        console.log(`❓ WEBHOOK: Unhandled webhook event type: ${event.type}`);
-        break;
+        console.log(`Unhandled event type: ${event.type}`);
     }
 
-    console.log("✅ WEBHOOK PROCESSED SUCCESSFULLY:", {
-      timestamp: new Date().toISOString(),
-      eventType: event.type,
-      eventId: (event as any).id,
-    });
-    res.json({ received: true });
+    // Return a success response
+    return res.status(200).json({ received: true });
   } catch (error: any) {
-    console.error("❌ WEBHOOK ERROR:", {
-      timestamp: new Date().toISOString(),
-      error: error.message || "Unknown error",
-      stack: error.stack,
-    });
-    res.status(400).send(`Webhook Error: ${error.message || "Unknown error"}`);
+    console.error(`Webhook error: ${error.message}`);
+    return res.status(400).json({ error: `Webhook Error: ${error.message}` });
   }
-});
+};
+
+// Process successful payments with multiple fallback strategies
+async function handleSuccessfulPayment(paymentIntent: any, stripeAccount: any) {
+  try {
+    console.log("🎉 Processing successful payment:", paymentIntent.id);
+    console.log("Payment metadata:", paymentIntent.metadata);
+
+    // If we have metadata with paymentRecordId, use it to update the payment record
+    if (paymentIntent.metadata && paymentIntent.metadata.paymentRecordId) {
+      const paymentRecordId = paymentIntent.metadata.paymentRecordId;
+
+      // Update the payment record
+      const updatedPayment = await Payments.findByIdAndUpdate(
+        paymentRecordId,
+        {
+          status: PaymentStatus.PAID,
+          paidDate: new Date(paymentIntent.created * 1000),
+          paymentMethod: "ONLINE",
+          stripePaymentIntentId: paymentIntent.id,
+          stripeTransactionId:
+            paymentIntent.charges?.data[0]?.id || paymentIntent.latest_charge,
+          stripeMetadata: paymentIntent.metadata,
+          receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        },
+        { new: true }, // Return the updated document
+      );
+
+      if (updatedPayment) {
+        console.log(
+          `✅ Payment record updated successfully: ${updatedPayment._id}`,
+        );
+        // Perform any additional actions (e.g., send receipt email)
+      } else {
+        console.error(`❌ Payment record not found: ${paymentRecordId}`);
+        // Handle case where payment record doesn't exist
+      }
+    } else {
+      // If metadata is missing, try to find payment by Payment Intent ID
+      console.log(
+        "Payment Intent metadata missing, searching by Payment Intent ID",
+      );
+
+      const existingPayment = await Payments.findOne({
+        stripePaymentIntentId: paymentIntent.id,
+      });
+
+      if (existingPayment) {
+        existingPayment.status = PaymentStatus.PAID;
+        existingPayment.paidDate = new Date(paymentIntent.created * 1000);
+        existingPayment.stripeTransactionId =
+          paymentIntent.charges?.data[0]?.id || paymentIntent.latest_charge;
+        await existingPayment.save();
+        console.log(
+          `✅ Payment record updated by PaymentIntent ID: ${existingPayment._id}`,
+        );
+      } else {
+        // Try finding by payment link as last resort
+        console.log(
+          "Payment not found, attempting to lookup via Checkout Session",
+        );
+
+        // Create stripe instance with account secret key
+        const stripe = new Stripe(stripeAccount.stripeSecretKey, {
+          apiVersion: "2025-06-30.basil",
+        });
+
+        // Try to get related checkout session
+        try {
+          const sessions = await stripe.checkout.sessions.list({
+            payment_intent: paymentIntent.id,
+            limit: 1,
+          });
+
+          if (sessions.data.length > 0) {
+            const session = sessions.data[0];
+
+            // If we have a payment link ID in the session, use it to find our payment
+            if (session.payment_link) {
+              const paymentByLink = await Payments.findOne({
+                stripePaymentLinkId: session.payment_link,
+              });
+
+              if (paymentByLink) {
+                paymentByLink.status = PaymentStatus.PAID;
+                paymentByLink.paidDate = new Date(paymentIntent.created * 1000);
+                paymentByLink.stripePaymentIntentId = paymentIntent.id;
+                paymentByLink.stripeTransactionId =
+                  paymentIntent.charges?.data[0]?.id ||
+                  paymentIntent.latest_charge;
+                await paymentByLink.save();
+                console.log(
+                  `✅ Payment record updated by Payment Link ID: ${paymentByLink._id}`,
+                );
+              } else {
+                console.error(
+                  `❌ No payment found for Payment Link: ${session.payment_link}`,
+                );
+                // Consider creating a new payment record or logging this for manual review
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching checkout session:", err);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error handling successful payment:", error);
+  }
+}
+
+// Process failed payments
+async function handleFailedPayment(paymentIntent: any, stripeAccount: any) {
+  try {
+    console.log("❌ Processing failed payment:", paymentIntent.id);
+
+    // If we have metadata with paymentRecordId, use it to update the payment record
+    if (paymentIntent.metadata && paymentIntent.metadata.paymentRecordId) {
+      const paymentRecordId = paymentIntent.metadata.paymentRecordId;
+
+      // Update the payment record
+      const updatedPayment = await Payments.findByIdAndUpdate(
+        paymentRecordId,
+        {
+          status: PaymentStatus.PENDING, // Use PENDING since FAILED doesn't exist in enum
+          stripePaymentIntentId: paymentIntent.id,
+          stripeMetadata: {
+            ...paymentIntent.metadata,
+            error:
+              paymentIntent.last_payment_error?.message || "Payment failed",
+          },
+        },
+        { new: true },
+      );
+
+      if (updatedPayment) {
+        console.log(`✅ Failed payment record updated: ${updatedPayment._id}`);
+      } else {
+        console.error(`❌ Failed payment record not found: ${paymentRecordId}`);
+      }
+    } else {
+      // If no metadata, try to find by Payment Intent ID
+      const existingPayment = await Payments.findOne({
+        stripePaymentIntentId: paymentIntent.id,
+      });
+
+      if (existingPayment) {
+        existingPayment.status = PaymentStatus.PENDING; // Use PENDING
+        existingPayment.stripeMetadata = {
+          ...existingPayment.stripeMetadata,
+          error: paymentIntent.last_payment_error?.message || "Payment failed",
+        };
+        await existingPayment.save();
+        console.log(
+          `✅ Failed payment record updated by PaymentIntent ID: ${existingPayment._id}`,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error handling failed payment:", error);
+  }
+}
+
+// Process canceled payments
+async function handleCanceledPayment(paymentIntent: any, stripeAccount: any) {
+  try {
+    console.log("🚫 Processing canceled payment:", paymentIntent.id);
+
+    // If we have metadata with paymentRecordId, use it to update the payment record
+    if (paymentIntent.metadata && paymentIntent.metadata.paymentRecordId) {
+      const paymentRecordId = paymentIntent.metadata.paymentRecordId;
+
+      // Update the payment record
+      const updatedPayment = await Payments.findByIdAndUpdate(
+        paymentRecordId,
+        {
+          status: PaymentStatus.CANCELLED,
+          stripePaymentIntentId: paymentIntent.id,
+          stripeMetadata: {
+            ...paymentIntent.metadata,
+            error: "Payment was canceled",
+          },
+        },
+        { new: true },
+      );
+
+      if (updatedPayment) {
+        console.log(
+          `✅ Canceled payment record updated: ${updatedPayment._id}`,
+        );
+      } else {
+        console.error(
+          `❌ Canceled payment record not found: ${paymentRecordId}`,
+        );
+      }
+    } else {
+      // If no metadata, try to find by Payment Intent ID
+      const existingPayment = await Payments.findOne({
+        stripePaymentIntentId: paymentIntent.id,
+      });
+
+      if (existingPayment) {
+        existingPayment.status = PaymentStatus.CANCELLED;
+        existingPayment.stripeMetadata = {
+          ...existingPayment.stripeMetadata,
+          error: "Payment was canceled",
+        };
+        await existingPayment.save();
+        console.log(
+          `✅ Canceled payment record updated by PaymentIntent ID: ${existingPayment._id}`,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error handling canceled payment:", error);
+  }
+}

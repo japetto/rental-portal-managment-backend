@@ -144,14 +144,11 @@ export const createStripeAccount = async (accountData: any) => {
     let webhookResult = null;
     try {
       const webhookUrl = `${config.backend_url}/stripe/webhook`;
-      console.log("🚀 ~ webhookUrl:", webhookUrl);
 
       const webhook = await createWebhookEndpoint(
         (createdAccount as any)._id.toString(),
         webhookUrl,
       );
-
-      console.log("🚀 ~ webhook:", webhook);
 
       // Update the account with webhook information
       await StripeAccounts.findByIdAndUpdate((createdAccount as any)._id, {

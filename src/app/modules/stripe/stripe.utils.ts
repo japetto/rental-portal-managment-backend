@@ -89,9 +89,14 @@ export const createWebhookEndpoint = async (
     // Create Stripe instance with account-specific secret key
     const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
 
+    // Make sure the webhookUrl includes the accountId as a query parameter
+    const webhookUrlWithId = webhookUrl.includes("?")
+      ? `${webhookUrl}&accountId=${accountId}`
+      : `${webhookUrl}?accountId=${accountId}`;
+
     // Create webhook endpoint
     const webhook = await stripe.webhookEndpoints.create({
-      url: webhookUrl,
+      url: webhookUrlWithId,
       enabled_events: [
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
@@ -112,10 +117,11 @@ export const createWebhookEndpoint = async (
       status: webhook.status,
     });
 
-    // Update the account with webhook information including the secret
+    // IMPORTANT: Store the webhook secret when it's created
+    // This is only available at creation time
     await StripeAccounts.findByIdAndUpdate(accountId, {
       webhookId: webhook.id,
-      webhookUrl: webhook.url,
+      webhookUrl: webhookUrlWithId,
       webhookSecret: webhook.secret, // Store the webhook secret
       webhookStatus: "ACTIVE",
       webhookCreatedAt: new Date(),

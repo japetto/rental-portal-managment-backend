@@ -195,7 +195,7 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         const paymentHistory = yield payments_schema_1.Payments.find({
             tenantId: tenantId,
             type: "RENT",
-            status: { $in: ["PAID", "PENDING", "OVERDUE"] },
+            status: "PAID", // Only count successful payments
             isDeleted: false,
         }).sort({ dueDate: 1 });
         // Calculate current date and months
@@ -240,6 +240,24 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         // Calculate overdue amounts
         const overduePayments = pendingPayments.filter(payment => payment.status === "OVERDUE");
         const totalOverdueAmount = overduePayments.reduce((sum, payment) => sum + payment.totalAmount, 0);
+        // Calculate total amount due (current month + overdue)
+        let currentMonthAmount = (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || activeLease.rentAmount;
+        // For first-time payments, use the first payment amount
+        if (paymentHistory.length === 0) {
+            const leaseStartDay = leaseStart.getDate();
+            if (leaseStartDay > 1) {
+                // Pro-rated first month
+                const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
+                const remainingDays = daysInMonth - leaseStartDay + 1;
+                const proRatedRent = Math.round((rentAmount / daysInMonth) * remainingDays);
+                currentMonthAmount = proRatedRent + activeLease.depositAmount;
+            }
+            else {
+                // Full first month
+                currentMonthAmount = rentAmount + activeLease.depositAmount;
+            }
+        }
+        const totalDue = currentMonthAmount + totalOverdueAmount;
         // Calculate days overdue for current payment
         const daysOverdue = currentMonthPayment && currentMonthPayment.status === "OVERDUE"
             ? Math.floor((currentDate.getTime() - currentMonthPayment.dueDate.getTime()) /
@@ -361,7 +379,8 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             currentMonth: {
                 status: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) || "PENDING",
                 dueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.dueDate) || currentMonth,
-                amount: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || activeLease.rentAmount,
+                amount: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) ||
+                    (isFirstTimePayment ? currentMonthAmount : activeLease.rentAmount),
                 daysOverdue: daysOverdue,
                 // Add deposit information for first-time payments
                 rentAmount: activeLease.rentAmount,
@@ -376,6 +395,7 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             // Simple summary
             summary: {
                 totalOverdueAmount,
+                totalDue,
                 overdueCount: overduePayments.length,
                 pendingCount: pendingPayments.length,
             },
@@ -439,7 +459,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         const paymentHistory = yield payments_schema_1.Payments.find({
             tenantId: paymentData.tenantId,
             type: "RENT",
-            status: { $in: ["PAID", "PENDING", "OVERDUE"] },
+            status: "PAID", // Only count successful payments
             isDeleted: false,
         }).sort({ dueDate: 1 });
         // Calculate appropriate due date based on lease start and current date
@@ -635,6 +655,30 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
         // Generate a unique payment ID for metadata
         const tempPaymentId = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        // Create a temporary payment record to store metadata
+        const tempPaymentRecord = yield payments_schema_1.Payments.create({
+            tenantId: paymentData.tenantId,
+            propertyId,
+            spotId,
+            amount: paymentAmount,
+            type: "RENT",
+            status: "PENDING",
+            dueDate: paymentDueDate,
+            description: paymentDescription,
+            lateFeeAmount: 0,
+            totalAmount: paymentAmount,
+            createdBy: paymentData.createdBy,
+            receiptNumber: `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            // Store metadata for webhook processing
+            stripeMetadata: {
+                isFirstTimePayment,
+                includeDeposit,
+                paymentAmount: paymentAmount.toString(),
+                paymentDueDate: paymentDueDate.toISOString(),
+                paymentDescription,
+                createdBy: paymentData.createdBy,
+            },
+        });
         const paymentLink = yield stripe.paymentLinks.create({
             line_items: [
                 {
@@ -649,32 +693,47 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 },
             ],
             metadata: {
-                tempPaymentId: tempPaymentId,
+                paymentRecordId: tempPaymentRecord._id.toString(), // Store our payment record ID
                 tenantId: paymentData.tenantId,
                 propertyId: propertyId,
                 spotId: spotId,
-                paymentType: "RENT",
-                isFirstTimePayment: isFirstTimePayment.toString(),
-                includeDeposit: includeDeposit.toString(),
-                paymentAmount: paymentAmount.toString(),
-                paymentDueDate: paymentDueDate.toISOString(),
-                paymentDescription: paymentDescription,
-                createdBy: paymentData.createdBy,
+            },
+            // This passes metadata to the Payment Intent when it's created
+            payment_intent_data: {
+                metadata: {
+                    paymentRecordId: tempPaymentRecord._id.toString(),
+                    tenantId: paymentData.tenantId,
+                    propertyId: propertyId,
+                    spotId: spotId,
+                },
+            },
+            payment_method_types: ["card"],
+            after_completion: {
+                type: "redirect",
+                redirect: {
+                    url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/payment-success?payment_intent={CHECKOUT_SESSION_ID}`,
+                },
             },
         });
         console.log("✅ Payment link created successfully:", {
             paymentLinkId: paymentLink.id,
-            tempPaymentId: tempPaymentId,
+            tempPaymentId: tempPaymentRecord._id,
             amount: paymentAmount,
             isFirstTimePayment,
             includeDeposit,
+        });
+        // Update payment record with payment link ID
+        yield payments_schema_1.Payments.findByIdAndUpdate(tempPaymentRecord._id, {
+            stripePaymentLinkId: paymentLink.id,
+            stripeAccountId: stripeAccount._id,
+            status: "PENDING", // Update status to pending
         });
         return {
             paymentLink: {
                 id: paymentLink.id,
                 url: paymentLink.url,
             },
-            tempPaymentId: tempPaymentId,
+            tempPaymentId: tempPaymentRecord._id,
             amount: paymentAmount,
             dueDate: paymentDueDate,
             description: paymentDescription,
@@ -766,37 +825,40 @@ const handleSuccessfulPayment = (stripePaymentIntent) => __awaiter(void 0, void 
             amount: stripePaymentIntent.amount / 100,
             metadata: stripePaymentIntent.metadata,
         });
-        const { tempPaymentId, tenantId, propertyId, spotId, paymentType, isFirstTimePayment, includeDeposit, paymentAmount, paymentDueDate, paymentDescription, createdBy, } = stripePaymentIntent.metadata;
-        // Validate required metadata
-        if (!tenantId || !propertyId || !spotId) {
-            throw new Error("Missing required payment metadata");
+        // Extract payment record ID from metadata
+        const { paymentRecordId } = stripePaymentIntent.metadata;
+        if (!paymentRecordId) {
+            console.error("❌ Missing paymentRecordId in metadata:", stripePaymentIntent.metadata);
+            throw new Error("Missing payment record ID in metadata");
         }
-        // Create payment record only after successful payment
-        const paymentRecord = yield payments_schema_1.Payments.create({
-            tenantId,
-            propertyId,
-            spotId,
-            amount: parseFloat(paymentAmount),
-            type: paymentType,
-            status: "PAID", // Payment is already successful
-            dueDate: new Date(paymentDueDate),
+        // Find the existing payment record
+        const existingPayment = yield payments_schema_1.Payments.findById(paymentRecordId);
+        if (!existingPayment) {
+            console.error("❌ Payment record not found:", paymentRecordId);
+            throw new Error("Payment record not found");
+        }
+        // Use stored metadata if available, otherwise use PaymentIntent data
+        const storedMetadata = existingPayment.stripeMetadata || {};
+        console.log("📋 Using stored metadata:", storedMetadata);
+        // Update the payment record with successful payment details
+        const updatedPayment = yield payments_schema_1.Payments.findByIdAndUpdate(paymentRecordId, {
+            status: "PAID",
             paidDate: new Date(stripePaymentIntent.created * 1000),
-            description: paymentDescription,
-            lateFeeAmount: 0,
-            totalAmount: parseFloat(paymentAmount),
-            createdBy: createdBy || "SYSTEM",
-            receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             paymentMethod: "ONLINE",
             transactionId: stripePaymentIntent.id,
             stripeTransactionId: stripePaymentIntent.id,
             stripePaymentIntentId: stripePaymentIntent.id,
+            receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            // Update description if we have stored metadata
+            description: storedMetadata.paymentDescription || existingPayment.description,
+        }, { new: true });
+        console.log("✅ Payment record updated successfully:", {
+            paymentId: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment._id,
+            amount: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.totalAmount,
+            status: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.status,
+            description: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.description,
         });
-        console.log("✅ Payment record created successfully:", {
-            paymentId: paymentRecord._id,
-            amount: paymentRecord.totalAmount,
-            status: paymentRecord.status,
-        });
-        return paymentRecord;
+        return updatedPayment;
     }
     catch (error) {
         console.error("❌ Error handling successful payment:", error);
@@ -819,7 +881,7 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
         const paymentHistory = yield payments_schema_1.Payments.find({
             tenantId: paymentData.tenantId,
             type: "RENT",
-            status: { $in: ["PAID", "PENDING", "OVERDUE"] },
+            status: "PAID", // Only count successful payments
             isDeleted: false,
         }).sort({ dueDate: 1 });
         // Get current month's payment status
@@ -845,6 +907,9 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
         // Calculate overdue amounts
         const overduePayments = pendingPayments.filter(payment => payment.status === "OVERDUE");
         const totalOverdueAmount = overduePayments.reduce((sum, payment) => sum + payment.totalAmount, 0);
+        // Calculate total amount due (current month + overdue)
+        const currentMonthAmount = (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || activeLease.rentAmount;
+        const totalDue = currentMonthAmount + totalOverdueAmount;
         // Calculate days overdue for current payment
         const daysOverdue = currentMonthPayment && currentMonthPayment.status === "OVERDUE"
             ? Math.floor((currentDate.getTime() - currentMonthPayment.dueDate.getTime()) /
@@ -972,6 +1037,7 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
             isFirstTimePayment,
             summary: {
                 totalOverdueAmount,
+                totalDue,
                 overdueCount: overduePayments.length,
                 pendingCount: pendingPayments.length,
                 totalPaidAmount: recentPayments.reduce((sum, payment) => sum + payment.totalAmount, 0),

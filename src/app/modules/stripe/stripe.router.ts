@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
@@ -6,7 +6,7 @@ import {
   deleteStripeAccount,
   getAllStripeAccounts,
   getDefaultAccount,
-  handleWebhook,
+  handleStripeWebhook,
   linkPropertiesToAccount,
   setDefaultAccount,
   testWebhook,
@@ -84,6 +84,11 @@ router.post(
 router.get("/webhook/test", testWebhook);
 
 // Handle Stripe webhooks (No auth required)
-router.post("/webhook", handleWebhook);
+// For webhook routes, we need raw body for signature verification
+router.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
+);
 
 export const stripeRoutes = router;

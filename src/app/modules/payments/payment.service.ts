@@ -839,6 +839,15 @@ const createPaymentWithLink = async (paymentData: {
         propertyId: propertyId,
         spotId: spotId,
       },
+      // This passes metadata to the Payment Intent when it's created
+      payment_intent_data: {
+        metadata: {
+          paymentRecordId: (tempPaymentRecord._id as any).toString(),
+          tenantId: paymentData.tenantId,
+          propertyId: propertyId,
+          spotId: spotId,
+        },
+      },
       payment_method_types: ["card"],
       after_completion: {
         type: "redirect",
@@ -854,6 +863,13 @@ const createPaymentWithLink = async (paymentData: {
       amount: paymentAmount,
       isFirstTimePayment,
       includeDeposit,
+    });
+
+    // Update payment record with payment link ID
+    await Payments.findByIdAndUpdate(tempPaymentRecord._id, {
+      stripePaymentLinkId: paymentLink.id,
+      stripeAccountId: stripeAccount._id,
+      status: "PENDING", // Update status to pending
     });
 
     return {
