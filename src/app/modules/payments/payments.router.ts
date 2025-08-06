@@ -51,11 +51,4 @@ router.get("/payment-history", userAuth, PaymentController.getPaymentHistory);
 // Get user's rent summary
 router.get("/rent-summary", userAuth, PaymentController.getRentSummary);
 
-// Create payment link for a specific payment
-router.post(
-  "/:paymentId/create-payment-link",
-  userAuth,
-  PaymentController.createPaymentLink,
-);
-
 export const paymentRoutes = router;

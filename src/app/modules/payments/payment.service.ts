@@ -1,4 +1,3 @@
-import Stripe from "stripe";
 import { PaymentStatus } from "../../../shared/enums/payment.enums";
 import { Leases } from "../leases/leases.schema";
 import { Properties } from "../properties/properties.schema";
@@ -7,7 +6,7 @@ import { Users } from "../users/users.schema";
 import { IRentSummaryResponse } from "./payments.interface";
 import { Payments } from "./payments.schema";
 
-export const getPaymentHistory = async (tenantId: string) => {
+const getPaymentHistory = async (tenantId: string) => {
   const user = await Users.findOne({
     _id: tenantId,
     isDeleted: false,
@@ -85,7 +84,7 @@ export const getPaymentHistory = async (tenantId: string) => {
   return { payments: combinedPayments, summary };
 };
 
-export const mergePaymentData = (dbPayments: any[], stripePayments: any[]) => {
+const mergePaymentData = (dbPayments: any[], stripePayments: any[]) => {
   const mergedPayments = [];
 
   // Add database payments
@@ -133,7 +132,7 @@ export const mergePaymentData = (dbPayments: any[], stripePayments: any[]) => {
   );
 };
 
-export const calculateSummary = (payments: any[]) => {
+const calculateSummary = (payments: any[]) => {
   const totalPaid = payments
     .filter(p => p.status === "PAID")
     .reduce((sum, p) => sum + p.amount, 0);
@@ -155,7 +154,7 @@ export const calculateSummary = (payments: any[]) => {
   };
 };
 
-export const getPaymentSummary = async (tenantId: string) => {
+const getPaymentSummary = async (tenantId: string) => {
   const user = await Users.findOne({
     _id: tenantId,
     isDeleted: false,
@@ -185,7 +184,7 @@ export const getPaymentSummary = async (tenantId: string) => {
   );
 };
 
-export const getRentSummary = async (
+const getRentSummary = async (
   tenantId: string,
 ): Promise<IRentSummaryResponse> => {
   const user = await Users.findOne({
@@ -288,39 +287,12 @@ export const getRentSummary = async (
         )
       : 0;
 
-  // Create dynamic payment link for current month if payment is pending
-  let currentMonthPaymentLink = null;
-  if (currentMonthPayment && currentMonthPayment.status === "PENDING") {
-    try {
-      currentMonthPaymentLink = await createPaymentLink({
-        tenantId: currentMonthPayment.tenantId.toString(),
-        propertyId: currentMonthPayment.propertyId.toString(),
-        spotId: currentMonthPayment.spotId.toString(),
-        amount: currentMonthPayment.amount,
-        type: currentMonthPayment.type,
-        dueDate: currentMonthPayment.dueDate,
-        description: currentMonthPayment.description,
-        lateFeeAmount: currentMonthPayment.lateFeeAmount,
-        receiptNumber:
-          currentMonthPayment.receiptNumber ||
-          `RENT-${currentMonthPayment._id}`,
-      });
-    } catch (error) {
-      console.error("Error creating payment link for current month:", error);
-    }
-  }
-
   const rentSummary = {
-    // Payment link information - now dynamic for current month
-    paymentLink: currentMonthPaymentLink
-      ? {
-          id: currentMonthPaymentLink.id,
-          url: currentMonthPaymentLink.url,
-        }
-      : {
-          id: undefined,
-          url: undefined,
-        },
+    // Payment link information - removed automatic creation
+    paymentLink: {
+      id: undefined,
+      url: undefined,
+    },
     // Property and spot information
     property: {
       id: (property as any)._id?.toString() || property._id,
@@ -411,454 +383,15 @@ export const getRentSummary = async (
   };
 };
 
-// Create a unique payment link for a specific payment transaction
-export const createPaymentLink = async (paymentData: {
-  tenantId: string;
-  propertyId?: string;
-  spotId: string;
-  amount: number;
-  type: string;
-  dueDate: Date;
-  description: string;
-  lateFeeAmount?: number;
-  receiptNumber: string;
-}) => {
-  try {
-    // Get user details for metadata
-    const user = await Users.findOne({
-      _id: paymentData.tenantId,
-      isDeleted: false,
-      isActive: true,
-    });
-    if (!user) throw new Error("User not found or account is deactivated");
-
-    let property;
-    let activeLease;
-    let stripeAccount;
-
-    if (paymentData.propertyId) {
-      // If propertyId is provided, use it directly
-      property = await Properties.findById(paymentData.propertyId);
-      if (!property) throw new Error("Property not found");
-
-      // Check if user has an active lease for this property
-      activeLease = await Leases.findOne({
-        tenantId: paymentData.tenantId,
-        propertyId: paymentData.propertyId,
-        leaseStatus: "ACTIVE",
-        isDeleted: false,
-      });
-
-      if (!activeLease) {
-        throw new Error("User does not have an active lease for this property");
-      }
-
-      // Get the Stripe account for this property
-      const { StripeAccounts } = await import("../stripe/stripe.schema");
-      stripeAccount = await StripeAccounts.findOne({
-        propertyIds: paymentData.propertyId,
-        isActive: true,
-        webhookStatus: "ACTIVE",
-      }).select("+stripeSecretKey");
-    } else {
-      // If propertyId is not provided, find the active lease and get property from it
-      activeLease = await Leases.findOne({
-        tenantId: paymentData.tenantId,
-        leaseStatus: "ACTIVE",
-        isDeleted: false,
-      }).populate("propertyId");
-
-      if (!activeLease) {
-        throw new Error("No active lease found for this tenant");
-      }
-
-      property = activeLease.propertyId;
-      if (!property) {
-        throw new Error("Property not found in active lease");
-      }
-
-      // Get the Stripe account for this property
-      const { StripeAccounts } = await import("../stripe/stripe.schema");
-      stripeAccount = await StripeAccounts.findOne({
-        propertyIds: (property as any)._id,
-        isActive: true,
-        webhookStatus: "ACTIVE",
-      }).select("+stripeSecretKey");
-    }
-
-    if (!stripeAccount) {
-      throw new Error("No active Stripe account found for this property");
-    }
-
-    console.log("Found Stripe account in createPaymentLink:", {
-      id: stripeAccount._id,
-      name: stripeAccount.name,
-      hasSecretKey: !!stripeAccount.stripeSecretKey,
-      secretKeyLength: stripeAccount.stripeSecretKey?.length,
-      isActive: stripeAccount.isActive,
-      isVerified: stripeAccount.isVerified,
-    });
-
-    if (!stripeAccount.stripeSecretKey) {
-      throw new Error("Stripe secret key is missing for this account");
-    }
-
-    const totalAmount = paymentData.amount + (paymentData.lateFeeAmount || 0);
-
-    // Debug logging for payment link creation
-    console.log("🔗 Creating payment link with metadata:", {
-      tenantId: paymentData.tenantId,
-      receiptNumber: paymentData.receiptNumber,
-      amount: totalAmount,
-      type: paymentData.type,
-      dueDate: paymentData.dueDate,
-    });
-
-    // Create Stripe instance with account-specific secret key
-    const { createStripeInstance } = await import("../stripe/stripe.service");
-    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-
-    // Helper function to format address
-    const formatAddress = (address: any) => {
-      if (!address) return "N/A";
-      const parts = [];
-      if (address.street) parts.push(address.street);
-      if (address.city) parts.push(address.city);
-      if (address.state) parts.push(address.state);
-      if (address.zipCode) parts.push(address.zipCode);
-      return parts.length > 0 ? parts.join(", ") : "N/A";
-    };
-
-    // Helper function to get valid redirect URL
-    const getValidRedirectUrl = (path: string) => {
-      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-      return `${baseUrl}${path}`;
-    };
-
-    // Create payment link with unique metadata
-    const paymentLink = await stripe.paymentLinks.create({
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `${paymentData.type} Payment`,
-              description: ` ${paymentData.dueDate.toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-              })} - Name: ${user.name}`,
-            },
-            unit_amount: Math.round(totalAmount * 100), // Convert to cents
-          },
-          quantity: 1,
-        },
-      ] as any,
-      metadata: {
-        // Core payment information
-        tenantId: paymentData.tenantId,
-        propertyId: paymentData.propertyId || (property as any)._id.toString(),
-        spotId: paymentData.spotId,
-        leaseId: (activeLease as any)._id.toString(),
-        paymentType: paymentData.type,
-        dueDate: paymentData.dueDate.toISOString(),
-        receiptNumber: paymentData.receiptNumber,
-
-        // Property and tenant details
-        propertyName: (property as any).name,
-        propertyAddress: formatAddress((property as any).address) || "N/A",
-        propertyType: (property as any).propertyType || "N/A",
-        lotNumber: (property as any).lotNumber || "N/A",
-        unitNumber: (property as any).unitNumber || "N/A",
-
-        // Tenant information
-        tenantName: user.name,
-        tenantEmail: user.email || "N/A",
-        tenantPhone: (user as any).phone || "N/A",
-
-        // Payment details
-        amount: totalAmount.toString(),
-        baseAmount: paymentData.amount.toString(),
-        lateFeeAmount: (paymentData.lateFeeAmount || 0).toString(),
-        paymentMonth: paymentData.dueDate.toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-        }),
-        paymentYear: paymentData.dueDate.getFullYear().toString(),
-
-        // Lease information
-        leaseStartDate: (activeLease as any).leaseStart?.toISOString() || "N/A",
-        leaseEndDate: (activeLease as any).leaseEnd?.toISOString() || "N/A",
-        rentAmount: (activeLease as any).rentAmount?.toString() || "N/A",
-
-        // Stripe account information
-        stripeAccountName: stripeAccount.name,
-
-        // Additional context
-        paymentDescription: paymentData.description,
-        createdAt: new Date().toISOString(),
-      },
-      after_completion: {
-        type: "redirect",
-        redirect: {
-          url: getValidRedirectUrl(
-            `/payment-success?receipt=${paymentData.receiptNumber}&amount=${paymentData.amount}&type=${paymentData.type}`,
-          ),
-        },
-      },
-    } as any);
-
-    return paymentLink;
-  } catch (error) {
-    console.error("Error creating payment link:", error);
-    throw error;
-  }
-};
-
-// Create a payment record and generate a unique payment intent (with metadata)
-export const createPaymentWithLink = async (paymentData: {
-  tenantId: string;
-  propertyId?: string;
-  spotId: string;
-  amount: number;
-  type: string;
-  dueDate: Date;
-  description: string;
-  lateFeeAmount?: number;
-  createdBy: string;
-}) => {
-  try {
-    // Generate receipt number
-    const receiptNumber = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    let activeLease;
-    let stripeAccount;
-
-    if (paymentData.propertyId) {
-      // Check if user has an active lease for this property
-      activeLease = await Leases.findOne({
-        tenantId: paymentData.tenantId,
-        propertyId: paymentData.propertyId,
-        leaseStatus: "ACTIVE",
-        isDeleted: false,
-      });
-
-      if (!activeLease) {
-        throw new Error("User does not have an active lease for this property");
-      }
-
-      // Get the Stripe account for this property
-      const { StripeAccounts } = await import("../stripe/stripe.schema");
-      stripeAccount = await StripeAccounts.findOne({
-        propertyIds: paymentData.propertyId,
-        isActive: true,
-        webhookStatus: "ACTIVE",
-      }).select("+stripeSecretKey");
-    } else {
-      // If propertyId is not provided, find the active lease and get property from it
-      activeLease = await Leases.findOne({
-        tenantId: paymentData.tenantId,
-        leaseStatus: "ACTIVE",
-        isDeleted: false,
-      }).populate("propertyId");
-
-      if (!activeLease) {
-        throw new Error("No active lease found for this tenant");
-      }
-
-      // Get the Stripe account for this property
-      const { StripeAccounts } = await import("../stripe/stripe.schema");
-      stripeAccount = await StripeAccounts.findOne({
-        propertyIds: (activeLease.propertyId as any)._id,
-        isActive: true,
-        webhookStatus: "ACTIVE",
-      }).select("+stripeSecretKey");
-    }
-
-    if (!stripeAccount) {
-      throw new Error("No active Stripe account found for this property");
-    }
-
-    if (!stripeAccount.stripeSecretKey) {
-      throw new Error("Stripe secret key is missing for this account");
-    }
-
-    console.log("🔍 DEBUG: Using Stripe account for payment:", {
-      accountId: stripeAccount._id,
-      accountName: stripeAccount.name,
-      isActive: stripeAccount.isActive,
-      isVerified: stripeAccount.isVerified,
-      webhookStatus: stripeAccount.webhookStatus,
-    });
-
-    // Get user details
-    const user = await Users.findById(paymentData.tenantId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Get property details
-    const property = await Properties.findById(
-      paymentData.propertyId || (activeLease?.propertyId as any)._id,
-    );
-    if (!property) {
-      throw new Error("Property not found");
-    }
-
-    // Calculate total amount including late fees
-    const totalAmount = paymentData.amount + (paymentData.lateFeeAmount || 0);
-
-    // Create Stripe instance
-    const stripe = new Stripe(stripeAccount.stripeSecretKey, {
-      apiVersion: "2025-06-30.basil",
-    });
-
-    // Helper function to format address
-    const formatAddress = (address: any) => {
-      if (!address) return "N/A";
-      const parts = [];
-      if (address.street) parts.push(address.street);
-      if (address.city) parts.push(address.city);
-      if (address.state) parts.push(address.state);
-      if (address.zipCode) parts.push(address.zipCode);
-      return parts.length > 0 ? parts.join(", ") : "N/A";
-    };
-
-    // Helper function to get valid redirect URL
-    const getValidRedirectUrl = (path: string) => {
-      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-      return `${baseUrl}${path}`;
-    };
-
-    // Prepare metadata object
-    const metadata = {
-      // Core payment information
-      tenantId: paymentData.tenantId,
-      propertyId: paymentData.propertyId || (property as any)._id.toString(),
-      spotId: paymentData.spotId,
-      leaseId: (activeLease as any)._id.toString(),
-      paymentType: paymentData.type,
-      dueDate: paymentData.dueDate.toISOString(),
-      receiptNumber: receiptNumber,
-
-      // Property and tenant details
-      propertyName: (property as any).name,
-      propertyAddress: formatAddress((property as any).address) || "N/A",
-      propertyType: (property as any).propertyType || "N/A",
-      lotNumber: (property as any).lotNumber || "N/A",
-      unitNumber: (property as any).unitNumber || "N/A",
-
-      // Tenant information
-      tenantName: user.name,
-      tenantEmail: user.email || "N/A",
-      tenantPhone: (user as any).phone || "N/A",
-
-      // Payment details
-      amount: totalAmount.toString(),
-      baseAmount: paymentData.amount.toString(),
-      lateFeeAmount: (paymentData.lateFeeAmount || 0).toString(),
-      paymentMonth: paymentData.dueDate.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-      }),
-      paymentYear: paymentData.dueDate.getFullYear().toString(),
-
-      // Lease information
-      leaseStartDate: (activeLease as any).leaseStart?.toISOString() || "N/A",
-      leaseEndDate: (activeLease as any).leaseEnd?.toISOString() || "N/A",
-      rentAmount: (activeLease as any).rentAmount?.toString() || "N/A",
-
-      // Stripe account information
-      stripeAccountName: stripeAccount.name,
-
-      // Additional context
-      paymentDescription: paymentData.description,
-      createdAt: new Date().toISOString(),
-    };
-
-    console.log("🔍 DEBUG: Metadata being sent to Stripe:", metadata);
-
-    // Create payment intent with metadata
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalAmount * 100), // Convert to cents
-      currency: "usd",
-      metadata,
-      description: `${paymentData.type} Payment - ${paymentData.dueDate.toLocaleDateString(
-        "en-US",
-        {
-          year: "numeric",
-          month: "long",
-        },
-      )} - ${user.name}`,
-      receipt_email: user.email,
-      return_url: getValidRedirectUrl(
-        `/payment-success?receipt=${receiptNumber}&amount=${paymentData.amount}&type=${paymentData.type}`,
-      ),
-    });
-
-    console.log("✅ Payment intent created successfully:", {
-      id: paymentIntent.id,
-      client_secret: paymentIntent.client_secret,
-      receiptNumber,
-      metadata: paymentIntent.metadata,
-      accountId: stripeAccount._id,
-      accountName: stripeAccount.name,
-      webhookStatus: stripeAccount.webhookStatus,
-    });
-
-    // Create a pending payment record that the webhook can update
-    const paymentRecord = await Payments.create({
-      tenantId: paymentData.tenantId,
-      propertyId:
-        paymentData.propertyId || (activeLease?.propertyId as any)._id,
-      spotId: paymentData.spotId,
-      amount: paymentData.amount,
-      type: paymentData.type,
-      status: "PENDING", // Will be updated to PAID by webhook
-      dueDate: paymentData.dueDate,
-      paidDate: null,
-      paymentMethod: "ONLINE",
-      transactionId: paymentIntent.id,
-      stripeTransactionId: paymentIntent.id,
-      stripePaymentIntentId: paymentIntent.id,
-      receiptNumber: receiptNumber,
-      description: paymentData.description,
-      lateFeeAmount: paymentData.lateFeeAmount || 0,
-      totalAmount: totalAmount,
-      stripeAccountId: stripeAccount._id,
-      createdBy: paymentData.createdBy,
-    });
-
-    console.log("✅ Payment record created with PENDING status:", {
-      id: paymentRecord._id,
-      receiptNumber: paymentRecord.receiptNumber,
-      status: paymentRecord.status,
-    });
-
-    return {
-      payment: paymentRecord,
-      paymentIntent: {
-        id: paymentIntent.id,
-        client_secret: paymentIntent.client_secret,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-        status: paymentIntent.status,
-      },
-      receiptNumber,
-    };
-  } catch (error) {
-    console.error("Error creating payment with intent:", error);
-    throw error;
-  }
-};
-
-// Create a payment record and generate a unique payment link with enhanced logic
-export const createPaymentWithLinkEnhanced = async (paymentData: {
+// Create payment with link
+const createPaymentWithLink = async (paymentData: {
   tenantId: string;
   currentDate?: string;
   createdBy: string;
 }) => {
-  console.log("🚀 ~ paymentData:", paymentData);
   try {
+    console.log("🚀 ~ createPaymentWithLink ~ paymentData:", paymentData);
+
     // Get active lease for the tenant
     const activeLease = await Leases.findOne({
       tenantId: paymentData.tenantId,
@@ -868,6 +401,15 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
 
     if (!activeLease) {
       throw new Error("No active lease found for this tenant");
+    }
+
+    // Get tenant, property, and spot information for payment description
+    const tenant = await Users.findById(paymentData.tenantId);
+    const property = await Properties.findById(activeLease.propertyId);
+    const spot = await Spots.findById(activeLease.spotId);
+
+    if (!tenant || !property || !spot) {
+      throw new Error("Tenant, property, or spot information not found");
     }
 
     // Get payment history to determine if this is a first-time payment
@@ -882,10 +424,13 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
     const effectiveCurrentDate = paymentData.currentDate
       ? new Date(paymentData.currentDate)
       : new Date();
+
     let paymentDueDate: Date;
     let paymentAmount: number;
     let isFirstTimePayment = false;
     let paymentDescription: string;
+    let includeDeposit = false;
+    let warningMessage: string | undefined;
 
     // Defensive: ensure leaseStart is a Date
     const leaseStart: Date =
@@ -903,9 +448,10 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
     if (paymentHistory.length === 0) {
       // First-time payment - use lease start date as due date
       isFirstTimePayment = true;
+      includeDeposit = true;
       paymentDueDate = new Date(leaseStart);
-      paymentAmount = rentAmount;
-      paymentDescription = "First Month Rent Payment";
+      paymentAmount = rentAmount + activeLease.depositAmount;
+      paymentDescription = `First Month Rent + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
 
       // Check if lease started mid-month and adjust amount if needed
       const leaseStartDay = leaseStart.getDate();
@@ -913,6 +459,7 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
         leaseStart: leaseStart.toISOString(),
         leaseStartDay,
         rentAmount,
+        depositAmount: activeLease.depositAmount,
         isFirstTimePayment,
       });
 
@@ -924,39 +471,49 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
           0,
         ).getDate();
         const remainingDays = daysInMonth - leaseStartDay + 1;
-        paymentAmount = Math.round((rentAmount / daysInMonth) * remainingDays);
-        paymentDescription = `Pro-rated First Month Rent (${remainingDays} days)`;
+        const proRatedRent = Math.round(
+          (rentAmount / daysInMonth) * remainingDays,
+        );
+        paymentAmount = proRatedRent + activeLease.depositAmount;
+        paymentDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
 
         console.log("📊 Pro-rated calculation:", {
           daysInMonth,
           remainingDays,
           originalAmount: rentAmount,
-          proRatedAmount: paymentAmount,
+          proRatedAmount: proRatedRent,
+          depositAmount: activeLease.depositAmount,
+          totalAmount: paymentAmount,
         });
       } else {
-        // If lease starts on the 1st of the month, charge full rent
-        paymentAmount = rentAmount;
-        paymentDescription = "First Month Rent Payment";
-        console.log("💰 Full rent charged:", { amount: paymentAmount });
+        // If lease starts on the 1st of the month, charge full rent + deposit
+        paymentAmount = rentAmount + activeLease.depositAmount;
+        paymentDescription = `First Month Rent + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+        console.log("💰 Full rent + deposit charged:", {
+          amount: paymentAmount,
+        });
       }
     } else {
-      // Not first-time payment - use current month's 1st day
+      // Not first-time payment - check current month and next month
       const currentMonth = new Date(
         effectiveCurrentDate.getFullYear(),
         effectiveCurrentDate.getMonth(),
         1,
       );
+      const nextMonth = new Date(
+        effectiveCurrentDate.getFullYear(),
+        effectiveCurrentDate.getMonth() + 1,
+        1,
+      );
 
       // Check if we already have a payment for current month
-      const existingCurrentMonthPayment = paymentHistory.find(payment => {
-        // Defensive: ensure payment.dueDate is a Date
+      const currentMonthPayment = paymentHistory.find(payment => {
         const dueDate: Date =
           payment.dueDate instanceof Date
             ? payment.dueDate
             : new Date(payment.dueDate);
 
         if (isNaN(dueDate.getTime())) {
-          // Skip invalid dates
           return false;
         }
 
@@ -968,19 +525,77 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
         return paymentMonth.getTime() === currentMonth.getTime();
       });
 
-      if (existingCurrentMonthPayment) {
-        throw new Error("Rent payment for current month already exists");
-      }
+      // Check if we already have a payment for next month
+      const nextMonthPayment = paymentHistory.find(payment => {
+        const dueDate: Date =
+          payment.dueDate instanceof Date
+            ? payment.dueDate
+            : new Date(payment.dueDate);
 
-      paymentDueDate = currentMonth;
-      // Always charge full rent amount for regular monthly payments
-      paymentAmount = rentAmount;
-      paymentDescription = "Monthly Rent Payment";
+        if (isNaN(dueDate.getTime())) {
+          return false;
+        }
 
-      console.log("💰 Regular monthly payment - full rent charged:", {
-        amount: paymentAmount,
-        dueDate: paymentDueDate.toISOString(),
+        const paymentMonth = new Date(
+          dueDate.getFullYear(),
+          dueDate.getMonth(),
+          1,
+        );
+        return paymentMonth.getTime() === nextMonth.getTime();
       });
+
+      // Determine which month to create payment for
+      if (!currentMonthPayment) {
+        // No payment for current month - create current month payment
+        paymentDueDate = currentMonth;
+        paymentAmount = rentAmount;
+        paymentDescription = `Monthly Rent Payment - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+        console.log("💰 Creating payment for current month:", {
+          amount: paymentAmount,
+          dueDate: paymentDueDate.toISOString(),
+        });
+      } else if (currentMonthPayment.status === "PAID" && !nextMonthPayment) {
+        // Current month is paid, no payment for next month - create next month payment
+        paymentDueDate = nextMonth;
+        paymentAmount = rentAmount;
+        paymentDescription = `Monthly Rent Payment (Next Month) - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+        console.log("💰 Creating payment for next month (one month ahead):", {
+          amount: paymentAmount,
+          dueDate: paymentDueDate.toISOString(),
+        });
+      } else if (currentMonthPayment.status === "PAID" && nextMonthPayment) {
+        // Current month is paid AND next month already has payment - show warning
+        const currentMonthName = new Date(
+          effectiveCurrentDate.getFullYear(),
+          effectiveCurrentDate.getMonth(),
+          1,
+        ).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+        const nextMonthName = new Date(
+          effectiveCurrentDate.getFullYear(),
+          effectiveCurrentDate.getMonth() + 1,
+          1,
+        ).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+        throw new Error(
+          `You have already paid for ${currentMonthName} and ${nextMonthName}. You cannot pay more than one month ahead.`,
+        );
+      } else if (currentMonthPayment.status === "PENDING") {
+        // Current month payment exists but is pending
+        throw new Error(
+          "Rent payment for current month already exists and is pending",
+        );
+      } else if (currentMonthPayment.status === "OVERDUE") {
+        // Current month payment is overdue
+        throw new Error(
+          "Rent payment for current month is overdue. Please pay the overdue amount first.",
+        );
+      } else {
+        // Fallback - should not reach here, but just in case
+        throw new Error(
+          "Unable to determine payment scenario. Please contact support.",
+        );
+      }
     }
 
     // Check if payment already exists for the calculated month
@@ -1045,41 +660,93 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
       throw new Error("Spot ID is required for payment creation");
     }
 
-    const paymentDataForCreation = {
-      tenantId: paymentData.tenantId,
-      propertyId,
-      spotId,
+    // Get the Stripe account for this property
+    const { StripeAccounts } = await import("../stripe/stripe.schema");
+    const stripeAccount = await StripeAccounts.findOne({
+      propertyIds: propertyId,
+      isActive: true,
+      isVerified: true,
+    }).select("+stripeSecretKey"); // Explicitly select the secret key
+
+    if (!stripeAccount) {
+      throw new Error("No active Stripe account found for this property");
+    }
+
+    // Debug: Check if secret key exists
+    console.log("🔍 Stripe account found:", {
+      accountId: stripeAccount._id,
+      name: stripeAccount.name,
+      hasSecretKey: !!stripeAccount.stripeSecretKey,
+      secretKeyLength: stripeAccount.stripeSecretKey?.length || 0,
+    });
+
+    if (!stripeAccount.stripeSecretKey) {
+      throw new Error("Stripe account secret key is not configured");
+    }
+
+    // Create Stripe payment link first (without saving payment record)
+    const { createStripeInstance } = await import("../stripe/stripe.service");
+    console.log("🔧 Creating Stripe instance with secret key...");
+    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+
+    // Generate a unique payment ID for metadata
+    const tempPaymentId = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const paymentLink = await stripe.paymentLinks.create({
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: paymentDescription,
+            },
+            unit_amount: Math.round(paymentAmount * 100), // Convert to cents
+          },
+          quantity: 1,
+        } as any,
+      ],
+      metadata: {
+        tempPaymentId: tempPaymentId,
+        tenantId: paymentData.tenantId,
+        propertyId: propertyId,
+        spotId: spotId,
+        paymentType: "RENT",
+        isFirstTimePayment: isFirstTimePayment.toString(),
+        includeDeposit: includeDeposit.toString(),
+        paymentAmount: paymentAmount.toString(),
+        paymentDueDate: paymentDueDate.toISOString(),
+        paymentDescription: paymentDescription,
+        createdBy: paymentData.createdBy,
+      },
+    });
+
+    console.log("✅ Payment link created successfully:", {
+      paymentLinkId: paymentLink.id,
+      tempPaymentId: tempPaymentId,
       amount: paymentAmount,
-      type: "RENT",
-      dueDate: paymentDueDate,
-      description: paymentDescription,
-      lateFeeAmount: 0,
-      createdBy: paymentData.createdBy,
-    };
-
-    console.log(
-      "🎯 Creating payment with calculated values:",
-      paymentDataForCreation,
-    );
-
-    const result = await createPaymentWithLink(paymentDataForCreation);
+      isFirstTimePayment,
+      includeDeposit,
+    });
 
     return {
-      ...result,
+      paymentLink: {
+        id: paymentLink.id,
+        url: paymentLink.url,
+      },
+      tempPaymentId: tempPaymentId,
+      amount: paymentAmount,
+      dueDate: paymentDueDate,
+      description: paymentDescription,
       isFirstTimePayment,
+      includeDeposit,
+      warningMessage,
       lease: {
         id: activeLease._id,
         rentAmount: rentAmount,
+        depositAmount: activeLease.depositAmount,
         leaseType: activeLease.leaseType,
         leaseStatus: activeLease.leaseStatus,
         leaseStart: leaseStart,
-      },
-      paymentInfo: {
-        isFirstTimePayment,
-        calculatedAmount: paymentAmount,
-        originalRentAmount: rentAmount,
-        dueDate: paymentDueDate,
-        description: paymentDescription,
       },
     };
   } catch (error) {
@@ -1089,7 +756,7 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
 };
 
 // Get payment link details
-export const getPaymentLinkDetails = async (
+const getPaymentLinkDetails = async (
   paymentLinkId: string,
   secretKey: string,
 ) => {
@@ -1099,7 +766,7 @@ export const getPaymentLinkDetails = async (
 };
 
 // Get transaction history for a payment link
-export const getPaymentLinkTransactions = async (
+const getPaymentLinkTransactions = async (
   paymentLinkId: string,
   secretKey: string,
 ) => {
@@ -1111,7 +778,7 @@ export const getPaymentLinkTransactions = async (
 };
 
 // Create payment record from Stripe data
-export const createPaymentFromStripe = async (
+const createPaymentFromStripe = async (
   stripePayment: any,
   tenantId: string,
 ) => {
@@ -1164,8 +831,70 @@ export const createPaymentFromStripe = async (
   });
 };
 
+// Handle successful payment via webhook
+const handleSuccessfulPayment = async (stripePaymentIntent: any) => {
+  try {
+    console.log("🎉 Processing successful payment:", {
+      paymentIntentId: stripePaymentIntent.id,
+      amount: stripePaymentIntent.amount / 100,
+      metadata: stripePaymentIntent.metadata,
+    });
+
+    const {
+      tempPaymentId,
+      tenantId,
+      propertyId,
+      spotId,
+      paymentType,
+      isFirstTimePayment,
+      includeDeposit,
+      paymentAmount,
+      paymentDueDate,
+      paymentDescription,
+      createdBy,
+    } = stripePaymentIntent.metadata;
+
+    // Validate required metadata
+    if (!tenantId || !propertyId || !spotId) {
+      throw new Error("Missing required payment metadata");
+    }
+
+    // Create payment record only after successful payment
+    const paymentRecord = await Payments.create({
+      tenantId,
+      propertyId,
+      spotId,
+      amount: parseFloat(paymentAmount),
+      type: paymentType,
+      status: "PAID", // Payment is already successful
+      dueDate: new Date(paymentDueDate),
+      paidDate: new Date(stripePaymentIntent.created * 1000),
+      description: paymentDescription,
+      lateFeeAmount: 0,
+      totalAmount: parseFloat(paymentAmount),
+      createdBy: createdBy || "SYSTEM",
+      receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      paymentMethod: "ONLINE",
+      transactionId: stripePaymentIntent.id,
+      stripeTransactionId: stripePaymentIntent.id,
+      stripePaymentIntentId: stripePaymentIntent.id,
+    });
+
+    console.log("✅ Payment record created successfully:", {
+      paymentId: paymentRecord._id,
+      amount: paymentRecord.totalAmount,
+      status: paymentRecord.status,
+    });
+
+    return paymentRecord;
+  } catch (error) {
+    console.error("❌ Error handling successful payment:", error);
+    throw error;
+  }
+};
+
 // Get comprehensive tenant payment status with automatic payment creation
-export const getTenantPaymentStatusEnhanced = async (paymentData: {
+const getTenantPaymentStatusEnhanced = async (paymentData: {
   tenantId: string;
   createdBy: string;
 }) => {
@@ -1270,19 +999,13 @@ export const getTenantPaymentStatusEnhanced = async (paymentData: {
         try {
           newPayment = await createPaymentWithLink({
             tenantId: paymentData.tenantId,
-            propertyId: (activeLease.propertyId as any)._id.toString(),
-            spotId: (activeLease.spotId as any)._id.toString(),
-            amount: paymentAmount,
-            type: "RENT",
-            dueDate: paymentDueDate,
-            description: paymentDescription,
-            lateFeeAmount: 0,
+            currentDate: new Date().toISOString(),
             createdBy: paymentData.createdBy,
           });
 
           paymentLink = {
-            id: newPayment.paymentIntent.id,
-            url: `https://checkout.stripe.com/pay/${newPayment.paymentIntent.id}#fid=${newPayment.paymentIntent.id}`,
+            id: newPayment.paymentLink.id,
+            url: newPayment.paymentLink.url,
           };
         } catch (error) {
           console.error("Error creating first-time payment:", error);
@@ -1295,19 +1018,13 @@ export const getTenantPaymentStatusEnhanced = async (paymentData: {
         try {
           newPayment = await createPaymentWithLink({
             tenantId: paymentData.tenantId,
-            propertyId: (activeLease.propertyId as any)._id.toString(),
-            spotId: (activeLease.spotId as any)._id.toString(),
-            amount: activeLease.rentAmount,
-            type: "RENT",
-            dueDate: currentMonth,
-            description: "Monthly Rent Payment",
-            lateFeeAmount: 0,
+            currentDate: new Date().toISOString(),
             createdBy: paymentData.createdBy,
           });
 
           paymentLink = {
-            id: newPayment.paymentIntent.id,
-            url: `https://checkout.stripe.com/pay/${newPayment.paymentIntent.id}#fid=${newPayment.paymentIntent.id}`,
+            id: newPayment.paymentLink.id,
+            url: newPayment.paymentLink.url,
           };
         } catch (error) {
           console.error("Error creating payment:", error);
@@ -1423,4 +1140,13 @@ export const getTenantPaymentStatusEnhanced = async (paymentData: {
     console.error("Error getting tenant payment status:", error);
     throw error;
   }
+};
+
+export const PaymentService = {
+  getTenantPaymentStatusEnhanced,
+  getPaymentLinkDetails,
+  getPaymentHistory,
+  getRentSummary,
+  createPaymentWithLink,
+  handleSuccessfulPayment,
 };
