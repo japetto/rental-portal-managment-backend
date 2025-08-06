@@ -526,6 +526,7 @@ const handleStripeWebhookServerless = (req, res) => __awaiter(void 0, void 0, vo
         let rawBody;
         console.log("🔍 Serverless webhook - Request body type:", typeof req.body);
         console.log("🔍 Serverless webhook - Request body is Buffer:", Buffer.isBuffer(req.body));
+        console.log("🔍 Serverless webhook - Request body:", req.body);
         if (Buffer.isBuffer(req.body)) {
             // Raw buffer (ideal case)
             rawBody = req.body;

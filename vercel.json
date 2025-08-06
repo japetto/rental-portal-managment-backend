@@ -1,11 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "dist/server.js",
-      "use": "@vercel/node"
-    }
-  ],
   "routes": [
     {
       "src": "/api/v1.0/stripe/webhook",
@@ -18,10 +12,5 @@
       "src": "/(.*)",
       "dest": "dist/server.js"
     }
-  ],
-  "functions": {
-    "dist/server.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
