@@ -17,6 +17,8 @@ const router = express_1.default.Router();
 router.get("/receipt/:receiptNumber", payments_controller_1.PaymentController.getPaymentByReceipt);
 // Create payment link (User authenticated)
 router.post("/create-payment-link", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(payments_validation_1.createPaymentWithLinkSchema), payments_controller_1.PaymentController.createPaymentWithLink);
+// Verify payment link ownership
+router.get("/verify-payment-link/:paymentLinkId", userAuth_1.userAuth, payments_controller_1.PaymentController.verifyPaymentLink);
 // Get payment link details (User authenticated)
 router.get("/payment-link/:paymentLinkId", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(payments_validation_1.getPaymentLinkDetailsSchema), payments_controller_1.PaymentController.getPaymentLinkDetails);
 // Get tenant payment status (User authenticated)

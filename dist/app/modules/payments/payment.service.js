@@ -434,11 +434,115 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         throw error;
     }
 });
-// Create payment with link
+// Add this new function to verify payment link ownership
+const verifyPaymentLinkOwnership = (paymentLinkId, tenantId) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Find the payment record that owns this payment link
+        const paymentRecord = yield payments_schema_1.Payments.findOne({
+            stripePaymentLinkId: paymentLinkId,
+            tenantId: tenantId,
+            isDeleted: false,
+        });
+        if (!paymentRecord) {
+            return {
+                isValid: false,
+                message: "Payment link not found or does not belong to this tenant",
+                paymentRecord: null,
+            };
+        }
+        // Check if payment is still pending
+        if (paymentRecord.status !== "PENDING") {
+            return {
+                isValid: false,
+                message: `Payment is no longer pending. Current status: ${paymentRecord.status}`,
+                paymentRecord: null,
+            };
+        }
+        // Check if payment link is not expired (optional - you can add expiration logic)
+        const linkAge = Date.now() - paymentRecord.createdAt.getTime();
+        const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+        if (linkAge > maxAge) {
+            return {
+                isValid: false,
+                message: "Payment link has expired. Please create a new payment link.",
+                paymentRecord: null,
+            };
+        }
+        return {
+            isValid: true,
+            message: "Payment link is valid and belongs to this tenant",
+            paymentRecord: paymentRecord,
+        };
+    }
+    catch (error) {
+        console.error("Error verifying payment link ownership:", error);
+        return {
+            isValid: false,
+            message: "Error verifying payment link",
+            paymentRecord: null,
+        };
+    }
+});
+// Add this function to get pending payment details
+const getPendingPaymentDetails = (tenantId) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const pendingPayment = yield payments_schema_1.Payments.findOne({
+            tenantId: tenantId,
+            status: "PENDING",
+            type: "RENT",
+            isDeleted: false,
+        }).populate("propertyId spotId");
+        if (!pendingPayment) {
+            return null;
+        }
+        // Get tenant and property info for better description
+        const tenant = yield users_schema_1.Users.findById(tenantId);
+        const property = yield properties_schema_1.Properties.findById(pendingPayment.propertyId);
+        const spot = yield spots_schema_1.Spots.findById(pendingPayment.spotId);
+        return {
+            paymentId: pendingPayment._id,
+            paymentLinkId: pendingPayment.stripePaymentLinkId,
+            paymentLinkUrl: pendingPayment.paymentLinkUrl,
+            amount: pendingPayment.amount,
+            dueDate: pendingPayment.dueDate,
+            description: pendingPayment.description,
+            createdAt: pendingPayment.createdAt,
+            tenant: tenant ? { name: tenant.name, email: tenant.email } : null,
+            property: property
+                ? { name: property.name, address: property.address }
+                : null,
+            spot: spot
+                ? { spotNumber: spot.spotNumber, spotIdentifier: spot.spotIdentifier }
+                : null,
+        };
+    }
+    catch (error) {
+        console.error("Error getting pending payment details:", error);
+        return null;
+    }
+});
 const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         console.log("🚀 ~ createPaymentWithLink ~ paymentData:", paymentData);
+        // First, check if user already has a pending payment
+        const pendingPaymentDetails = yield getPendingPaymentDetails(paymentData.tenantId);
+        if (pendingPaymentDetails) {
+            // Return the existing pending payment details instead of throwing an error
+            return {
+                hasPendingPayment: true,
+                message: "You already have a pending payment. You can continue with the existing payment or cancel it first.",
+                pendingPayment: pendingPaymentDetails,
+                paymentLink: {
+                    id: pendingPaymentDetails.paymentLinkId,
+                    url: pendingPaymentDetails.paymentLinkUrl,
+                },
+                amount: pendingPaymentDetails.amount,
+                dueDate: pendingPaymentDetails.dueDate,
+                description: pendingPaymentDetails.description,
+                createdAt: pendingPaymentDetails.createdAt,
+            };
+        }
         // Get active lease for the tenant
         const activeLease = yield leases_schema_1.Leases.findOne({
             tenantId: paymentData.tenantId,
@@ -575,10 +679,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 const nextMonthName = new Date(effectiveCurrentDate.getFullYear(), effectiveCurrentDate.getMonth() + 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
                 throw new Error(`You have already paid for ${currentMonthName} and ${nextMonthName}. You cannot pay more than one month ahead.`);
             }
-            else if (currentMonthPayment.status === "PENDING") {
-                // Current month payment exists but is pending
-                throw new Error("Rent payment for current month already exists and is pending");
-            }
             else if (currentMonthPayment.status === "OVERDUE") {
                 // Current month payment is overdue
                 throw new Error("Rent payment for current month is overdue. Please pay the overdue amount first.");
@@ -653,8 +753,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
         console.log("🔧 Creating Stripe instance with secret key...");
         const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-        // Generate a unique payment ID for metadata
-        const tempPaymentId = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         // Create a temporary payment record to store metadata
         const tempPaymentRecord = yield payments_schema_1.Payments.create({
             tenantId: paymentData.tenantId,
@@ -679,6 +777,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 createdBy: paymentData.createdBy,
             },
         });
+        // Create Stripe Payment Link
         const paymentLink = yield stripe.paymentLinks.create({
             line_items: [
                 {
@@ -687,18 +786,17 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                         product_data: {
                             name: paymentDescription,
                         },
-                        unit_amount: Math.round(paymentAmount * 100), // Convert to cents
+                        unit_amount: Math.round(paymentAmount * 100),
                     },
                     quantity: 1,
                 },
             ],
             metadata: {
-                paymentRecordId: tempPaymentRecord._id.toString(), // Store our payment record ID
+                paymentRecordId: tempPaymentRecord._id.toString(),
                 tenantId: paymentData.tenantId,
                 propertyId: propertyId,
                 spotId: spotId,
             },
-            // This passes metadata to the Payment Intent when it's created
             payment_intent_data: {
                 metadata: {
                     paymentRecordId: tempPaymentRecord._id.toString(),
@@ -715,6 +813,13 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 },
             },
         });
+        // Update the temporary payment record with payment link details
+        yield payments_schema_1.Payments.findByIdAndUpdate(tempPaymentRecord._id, {
+            stripePaymentLinkId: paymentLink.id,
+            stripeAccountId: stripeAccount._id,
+            paymentLinkUrl: paymentLink.url, // Save the payment link URL
+            status: "PENDING",
+        });
         console.log("✅ Payment link created successfully:", {
             paymentLinkId: paymentLink.id,
             tempPaymentId: tempPaymentRecord._id,
@@ -722,18 +827,12 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             isFirstTimePayment,
             includeDeposit,
         });
-        // Update payment record with payment link ID
-        yield payments_schema_1.Payments.findByIdAndUpdate(tempPaymentRecord._id, {
-            stripePaymentLinkId: paymentLink.id,
-            stripeAccountId: stripeAccount._id,
-            status: "PENDING", // Update status to pending
-        });
         return {
+            hasPendingPayment: false,
             paymentLink: {
                 id: paymentLink.id,
                 url: paymentLink.url,
             },
-            tempPaymentId: tempPaymentRecord._id,
             amount: paymentAmount,
             dueDate: paymentDueDate,
             description: paymentDescription,
@@ -1078,4 +1177,6 @@ exports.PaymentService = {
     getRentSummary: getRentSummaryEnhanced, // Changed to use the enhanced function
     createPaymentWithLink,
     handleSuccessfulPayment,
+    verifyPaymentLinkOwnership,
+    getPendingPaymentDetails,
 };

@@ -25,6 +25,13 @@ router.post(
   PaymentController.createPaymentWithLink,
 );
 
+// Verify payment link ownership
+router.get(
+  "/verify-payment-link/:paymentLinkId",
+  userAuth,
+  PaymentController.verifyPaymentLink,
+);
+
 // Get payment link details (User authenticated)
 router.get(
   "/payment-link/:paymentLinkId",

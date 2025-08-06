@@ -213,17 +213,43 @@ const createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(
             currentDate,
             createdBy,
         });
+        // Check if this is a pending payment response
+        if (result.hasPendingPayment) {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: http_status_1.default.OK,
+                success: true,
+                message: result.message,
+                data: {
+                    hasPendingPayment: true,
+                    pendingPayment: result.pendingPayment,
+                    paymentLink: result.paymentLink,
+                    amount: result.amount,
+                    dueDate: result.dueDate,
+                    description: result.description,
+                    createdAt: result.createdAt,
+                    paymentStatus: "PENDING",
+                },
+            });
+        }
         (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.OK,
             success: true,
             message: "Payment with link created successfully",
-            data: result,
+            data: {
+                hasPendingPayment: false,
+                paymentLink: result.paymentLink,
+                amount: result.amount,
+                dueDate: result.dueDate,
+                description: result.description,
+                isFirstTimePayment: result.isFirstTimePayment,
+                includeDeposit: result.includeDeposit,
+                warningMessage: result.warningMessage,
+                lease: result.lease,
+            },
         });
     }
     catch (error) {
-        // Handle specific error messages for better user experience
-        if (error.message.includes("You have already paid for") &&
-            error.message.includes("You cannot pay more than one month ahead")) {
+        if (error.message.includes("You have already paid for the current month and next month")) {
             return (0, sendResponse_1.default)(res, {
                 statusCode: http_status_1.default.BAD_REQUEST,
                 success: false,
@@ -232,17 +258,6 @@ const createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(
                     error: error.message,
                     warning: error.message,
                     paymentStatus: "LIMIT_REACHED",
-                },
-            });
-        }
-        else if (error.message.includes("already exists and is pending")) {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.CONFLICT,
-                success: false,
-                message: "Payment Already Pending",
-                data: {
-                    error: error.message,
-                    paymentStatus: "PENDING",
                 },
             });
         }
@@ -258,9 +273,62 @@ const createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(
             });
         }
         else {
-            // Re-throw other errors to be handled by global error handler
             throw error;
         }
+    }
+}));
+// Add new controller method to verify payment link ownership
+const verifyPaymentLink = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { paymentLinkId } = req.params;
+    const tenantId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    if (!tenantId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: {
+                error: "Authentication required",
+            },
+        });
+    }
+    try {
+        const verificationResult = yield payment_service_1.PaymentService.verifyPaymentLinkOwnership(paymentLinkId, tenantId);
+        if (!verificationResult.isValid) {
+            return (0, sendResponse_1.default)(res, {
+                statusCode: http_status_1.default.BAD_REQUEST,
+                success: false,
+                message: verificationResult.message,
+                data: {
+                    isValid: false,
+                    message: verificationResult.message,
+                },
+            });
+        }
+        // Get detailed payment information
+        const pendingPaymentDetails = yield payment_service_1.PaymentService.getPendingPaymentDetails(tenantId);
+        (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.OK,
+            success: true,
+            message: "Payment link is valid",
+            data: {
+                isValid: true,
+                message: verificationResult.message,
+                paymentRecord: verificationResult.paymentRecord,
+                pendingPayment: pendingPaymentDetails,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error verifying payment link:", error);
+        (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.INTERNAL_SERVER_ERROR,
+            success: false,
+            message: "Error verifying payment link",
+            data: {
+                error: error.message,
+            },
+        });
     }
 }));
 exports.PaymentController = {
@@ -270,4 +338,5 @@ exports.PaymentController = {
     getPaymentHistory,
     getRentSummary,
     createPaymentWithLink,
+    verifyPaymentLink,
 };

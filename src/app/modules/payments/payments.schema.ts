@@ -43,6 +43,7 @@ export const paymentsSchema = new Schema<IPayment>(
     // Essential Stripe fields only
     stripeTransactionId: { type: String }, // From Stripe webhook
     stripePaymentLinkId: { type: String }, // Payment link ID from Stripe
+    paymentLinkUrl: { type: String }, // Payment link URL for returning users
     stripeAccountId: { type: Schema.Types.ObjectId, ref: "StripeAccounts" }, // Stripe account used for this payment
     stripePaymentIntentId: { type: String }, // Payment intent ID from Stripe
     stripeMetadata: { type: Schema.Types.Mixed }, // Store metadata for webhook processing

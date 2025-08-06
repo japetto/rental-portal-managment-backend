@@ -27,6 +27,7 @@ export interface IPayment extends Document {
   // Essential Stripe fields only
   stripeTransactionId?: string; // From Stripe webhook
   stripePaymentLinkId?: string; // Payment link ID from Stripe
+  paymentLinkUrl?: string; // Payment link URL for returning users
   stripeAccountId?: Types.ObjectId; // Stripe account used for this payment
   stripePaymentIntentId?: string; // Payment intent ID from Stripe
   stripeMetadata?: any; // Store metadata for webhook processing
