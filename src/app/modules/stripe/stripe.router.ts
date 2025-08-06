@@ -3,7 +3,6 @@ import { adminAuth } from "../../../middlewares/adminAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
   createStripeAccount,
-  createWebhook,
   deleteStripeAccount,
   getAllStripeAccounts,
   getDefaultAccount,
@@ -82,8 +81,5 @@ router.post(
 
 // Handle Stripe webhooks (No auth required)
 router.post("/webhook", handleWebhook);
-
-// Create webhook (Admin only)
-router.post("/webhooks/:accountId", adminAuth, createWebhook);
 
 export const stripeRoutes = router;

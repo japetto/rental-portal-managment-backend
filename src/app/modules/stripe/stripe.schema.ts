@@ -12,13 +12,6 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
         required: false, // Optional - can be linked later
       },
     ],
-    // Stripe account details
-    stripeAccountId: {
-      type: String,
-      required: false,
-      unique: true,
-      sparse: true,
-    },
     // Stripe secret key for this account (encrypted)
     stripeSecretKey: {
       type: String,
@@ -26,18 +19,9 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
       select: false,
       unique: true,
     }, // Hidden by default for security
-    // Account type: STANDARD = user's own account, CONNECT = platform account
-    accountType: {
-      type: String,
-      enum: ["STANDARD", "CONNECT"],
-      default: "STANDARD",
-      required: true,
-    },
     // Account status
     isActive: { type: Boolean, required: true, default: true },
     isVerified: { type: Boolean, required: true, default: false },
-    // Global account flag - if true, can be used for all properties
-    isGlobalAccount: { type: Boolean, required: true, default: false },
     // Default account flag - newly added properties will use this account
     isDefaultAccount: { type: Boolean, required: true, default: false },
 
@@ -53,8 +37,6 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
 
     // Metadata
     metadata: { type: Schema.Types.Mixed },
-    isDeleted: { type: Boolean, required: true, default: false },
-    deletedAt: { type: Date },
   },
   {
     timestamps: true,
@@ -63,14 +45,6 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
     },
   },
 );
-
-// Pre-save middleware for soft delete
-stripeAccountsSchema.pre("save", function (next) {
-  if (this.isDeleted && !this.deletedAt) {
-    this.deletedAt = new Date();
-  }
-  next();
-});
 
 // Pre-save middleware for validation
 stripeAccountsSchema.pre("save", async function (next) {
@@ -92,7 +66,6 @@ stripeAccountsSchema.pre("save", async function (next) {
     const { StripeAccounts } = await import("./stripe.schema");
     const existingDefault = await StripeAccounts.findOne({
       isDefaultAccount: true,
-      isDeleted: false,
       _id: { $ne: this._id },
     });
     if (existingDefault) {

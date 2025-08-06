@@ -4,15 +4,10 @@ export interface IStripeAccount extends Document {
   name: string;
   description?: string;
   propertyIds: Types.ObjectId[]; // Array of property IDs - supports multiple properties
-  // Stripe account details
-  stripeAccountId?: string; // Optional for STANDARD accounts
   stripeSecretKey: string; // Secret key for this Stripe account
-  accountType: "STANDARD" | "CONNECT"; // STANDARD = user's own account, CONNECT = platform account
   // Account status
   isActive: boolean;
   isVerified: boolean;
-  // Global account flag - if true, can be used for all properties
-  isGlobalAccount: boolean;
   // Default account flag - newly added properties will use this account
   isDefaultAccount: boolean;
 
@@ -24,8 +19,6 @@ export interface IStripeAccount extends Document {
 
   // Metadata
   metadata?: any;
-  isDeleted: boolean;
-  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

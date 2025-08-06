@@ -8,11 +8,9 @@ export const createStripeAccountSchema = z.object({
       .min(1, "Name is required")
       .max(100, "Name must be less than 100 characters"),
     description: z.string().optional(),
-    stripeAccountId: z.string().optional(),
     stripeSecretKey: z.string().min(1, "Stripe Secret Key is required"),
-    accountType: z.enum(["STANDARD", "CONNECT"]).optional().default("STANDARD"),
-    isGlobalAccount: z.boolean().optional(),
     isDefaultAccount: z.boolean().optional(),
+    metadata: z.any().optional(),
   }),
 });
 
@@ -66,7 +64,6 @@ export const updateStripeAccountSchema = z.object({
       .string()
       .min(1, "Stripe Secret Key is required")
       .optional(),
-    accountType: z.enum(["STANDARD", "CONNECT"]).optional(),
     isActive: z.boolean().optional(),
     isDefaultAccount: z.boolean().optional(),
   }),

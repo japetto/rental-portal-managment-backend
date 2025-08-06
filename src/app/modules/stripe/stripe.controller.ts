@@ -8,7 +8,6 @@ import { Payments } from "../payments/payments.schema";
 import {
   constructWebhookEvent,
   createStripeAccount as createStripeAccountService,
-  createWebhookEndpoint,
   deleteStripeAccount as deleteStripeAccountService,
   getAllStripeAccounts as getAllStripeAccountsService,
   getDefaultAccount as getDefaultAccountService,
@@ -16,6 +15,7 @@ import {
   setDefaultAccount as setDefaultAccountService,
   unlinkPropertiesFromAccount as unlinkPropertiesFromAccountService,
 } from "./stripe.service";
+import { createWebhookEndpoint } from "./stripe.utils";
 
 // Create a new Stripe account for a property
 export const createStripeAccount = catchAsync(
