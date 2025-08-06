@@ -39,9 +39,13 @@ const createServiceRequest = (payload, userId) => __awaiter(void 0, void 0, void
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid user ID format");
     }
     // Get user details to verify they're a tenant and get their property/spot info
-    const user = yield users_schema_1.Users.findById(userId);
+    const user = yield users_schema_1.Users.findOne({
+        _id: userId,
+        isDeleted: false,
+        isActive: true
+    });
     if (!user) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found or account is deactivated");
     }
     if (user.role !== "TENANT") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only tenants can create service requests");

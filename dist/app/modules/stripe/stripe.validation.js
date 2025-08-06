@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.syncPaymentHistorySchema = exports.getPaymentLinkDetailsSchema = exports.createPaymentWithLinkSchema = exports.verifyStripeAccountSchema = exports.deleteStripeAccountSchema = exports.getStripeAccountByPropertySchema = exports.getStripeAccountsByPropertySchema = exports.getStripeAccountByIdSchema = exports.updateStripeAccountSchema = exports.linkStripeAccountToPropertySchema = exports.getDefaultAccountSchema = exports.setDefaultAccountSchema = exports.unlinkPropertiesFromAccountSchema = exports.linkPropertiesToAccountSchema = exports.createStripeAccountSchema = void 0;
+exports.syncPaymentHistorySchema = exports.verifyStripeAccountSchema = exports.deleteStripeAccountSchema = exports.getStripeAccountByPropertySchema = exports.getStripeAccountsByPropertySchema = exports.getStripeAccountByIdSchema = exports.updateStripeAccountSchema = exports.linkStripeAccountToPropertySchema = exports.getDefaultAccountSchema = exports.setDefaultAccountSchema = exports.unlinkPropertiesFromAccountSchema = exports.linkPropertiesToAccountSchema = exports.createStripeAccountSchema = void 0;
 const zod_1 = require("zod");
 // Create Stripe Account validation
 exports.createStripeAccountSchema = zod_1.z.object({
@@ -10,11 +10,9 @@ exports.createStripeAccountSchema = zod_1.z.object({
             .min(1, "Name is required")
             .max(100, "Name must be less than 100 characters"),
         description: zod_1.z.string().optional(),
-        stripeAccountId: zod_1.z.string().optional(),
         stripeSecretKey: zod_1.z.string().min(1, "Stripe Secret Key is required"),
-        accountType: zod_1.z.enum(["STANDARD", "CONNECT"]).optional().default("STANDARD"),
-        isGlobalAccount: zod_1.z.boolean().optional(),
         isDefaultAccount: zod_1.z.boolean().optional(),
+        metadata: zod_1.z.any().optional(),
     }),
 });
 // Link Properties to Account validation
@@ -62,7 +60,6 @@ exports.updateStripeAccountSchema = zod_1.z.object({
             .string()
             .min(1, "Stripe Secret Key is required")
             .optional(),
-        accountType: zod_1.z.enum(["STANDARD", "CONNECT"]).optional(),
         isActive: zod_1.z.boolean().optional(),
         isDefaultAccount: zod_1.z.boolean().optional(),
     }),
@@ -95,20 +92,6 @@ exports.deleteStripeAccountSchema = zod_1.z.object({
 exports.verifyStripeAccountSchema = zod_1.z.object({
     params: zod_1.z.object({
         accountId: zod_1.z.string().min(1, "Account ID is required"),
-    }),
-});
-// Create Payment with Link validation - Simplified for rent payments
-exports.createPaymentWithLinkSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        tenantId: zod_1.z.string().min(1, "Tenant ID is required"),
-        // Optional: current date for payment calculation (defaults to current date)
-        currentDate: zod_1.z.string().optional(),
-    }),
-});
-// Get Payment Link Details validation
-exports.getPaymentLinkDetailsSchema = zod_1.z.object({
-    params: zod_1.z.object({
-        paymentLinkId: zod_1.z.string().min(1, "Payment Link ID is required"),
     }),
 });
 // Sync Payment History validation

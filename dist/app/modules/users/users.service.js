@@ -51,6 +51,7 @@ const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const config_1 = __importDefault(require("../../../config/config"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
+const payment_enums_1 = require("../../../shared/enums/payment.enums");
 const spots_schema_1 = require("../spots/spots.schema");
 const users_schema_1 = require("./users.schema");
 const users_utils_1 = require("./users.utils");
@@ -182,7 +183,6 @@ const updateUserInfo = (userId, payload, adminId) => __awaiter(void 0, void 0, v
 //* Update Tenant Data (Admin only)
 const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d;
-    console.log("🚀 ~ payload:", payload);
     const user = yield users_schema_1.Users.findById(userId);
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
@@ -277,7 +277,7 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                     // If lease doesn't exist, create a new one
                     const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
                         // Add default values for required fields
-                        leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, pets: {
+                        leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, leaseStatus: payment_enums_1.LeaseStatus.ACTIVE, pets: {
                             hasPets: ((_a = payload.lease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) || false,
                             petDetails: ((_b = payload.lease.pets) === null || _b === void 0 ? void 0 : _b.petDetails) || [],
                         } });
@@ -297,7 +297,7 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                         typeof leaseUpdateData.leaseEnd === "string") {
                         leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
                     }
-                    updatedLease = yield Leases.findByIdAndUpdate(user.leaseId, leaseUpdateData, { new: true, runValidators: false, session });
+                    updatedLease = yield Leases.findByIdAndUpdate(user.leaseId, leaseUpdateData, { new: true, runValidators: true, session });
                     if (!updatedLease) {
                         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
                     }
@@ -308,7 +308,7 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                 console.log("🆕 Creating new lease...");
                 const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
                     // Add default values for required fields
-                    leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, pets: {
+                    leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, leaseStatus: payment_enums_1.LeaseStatus.ACTIVE, pets: {
                         hasPets: ((_c = payload.lease.pets) === null || _c === void 0 ? void 0 : _c.hasPets) || false,
                         petDetails: ((_d = payload.lease.pets) === null || _d === void 0 ? void 0 : _d.petDetails) || [],
                     } });

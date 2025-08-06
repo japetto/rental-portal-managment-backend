@@ -32,10 +32,16 @@ const userAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
         }
         // Verify token
         const verifiedToken = jwtHelpers_1.jwtHelpers.jwtVerify(token, config_1.default.jwt_secret);
-        // Check if user exists
-        const user = yield users_schema_1.Users.findById(verifiedToken.id);
+        console.log("🚀 ~ verifiedToken.id:", verifiedToken.id);
+        // Check if user exists and is active
+        const user = yield users_schema_1.Users.findOne({
+            _id: verifiedToken.id,
+            isDeleted: false,
+            isActive: true,
+        });
+        console.log("🚀 ~ user:", user);
         if (!user) {
-            throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "User not found");
+            throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "User not found or account is deactivated");
         }
         // Check if user is verified (for non-invited users)
         if (!user.isInvited && !user.isVerified) {

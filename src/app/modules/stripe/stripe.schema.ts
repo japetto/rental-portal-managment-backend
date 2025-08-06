@@ -28,12 +28,17 @@ export const stripeAccountsSchema = new Schema<IStripeAccount>(
     // Webhook information
     webhookId: { type: String, required: false },
     webhookUrl: { type: String, required: false },
+    webhookSecret: { type: String, required: false, select: false }, // Store webhook secret for verification
     webhookStatus: {
       type: String,
       enum: ["ACTIVE", "INACTIVE", "FAILED"],
       default: "INACTIVE",
     },
     webhookCreatedAt: { type: Date },
+
+    // Essential Stripe account info
+    stripePublishableKey: { type: String }, // Publishable key for frontend
+    stripeCurrency: { type: String, default: "usd" },
 
     // Metadata
     metadata: { type: Schema.Types.Mixed },

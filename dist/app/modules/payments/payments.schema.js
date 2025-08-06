@@ -65,6 +65,7 @@ exports.paymentsSchema = new mongoose_1.Schema({
         required: true,
         default: payment_enums_1.PaymentStatus.PENDING,
     },
+    dueDate: { type: Date, required: true },
     paidDate: { type: Date },
     paymentMethod: {
         type: String,
@@ -77,10 +78,11 @@ exports.paymentsSchema = new mongoose_1.Schema({
     lateFeeAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     createdBy: { type: String, required: true },
-    // Stripe transaction fields
+    // Essential Stripe fields only
     stripeTransactionId: { type: String }, // From Stripe webhook
     stripePaymentLinkId: { type: String }, // Payment link ID from Stripe
     stripeAccountId: { type: mongoose_1.Schema.Types.ObjectId, ref: "StripeAccounts" }, // Stripe account used for this payment
+    stripePaymentIntentId: { type: String }, // Payment intent ID from Stripe
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

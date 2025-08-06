@@ -45,27 +45,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteWebhook = exports.updateWebhook = exports.getWebhook = exports.listWebhooks = exports.createWebhooksForAllAccounts = exports.createWebhook = exports.updateStripeAccountSecretKey = exports.getAccountStatistics = exports.webhookStatus = exports.syncPaymentHistory = exports.handleWebhook = exports.getTenantPaymentStatus = exports.getPaymentLinkDetails = exports.createPaymentWithLink = exports.getAssignablePropertiesForAccount = exports.getUnassignedProperties = exports.getAvailableStripeAccounts = exports.verifyStripeAccount = exports.deleteStripeAccount = exports.updateStripeAccount = exports.getStripeAccountsByProperty = exports.getStripeAccountById = exports.getAllStripeAccounts = exports.getDefaultAccount = exports.setDefaultAccount = exports.unlinkPropertiesFromAccount = exports.linkPropertiesToAccount = exports.createStripeAccount = void 0;
+exports.handleWebhook = exports.deleteStripeAccount = exports.getAllStripeAccounts = exports.getDefaultAccount = exports.setDefaultAccount = exports.unlinkPropertiesFromAccount = exports.linkPropertiesToAccount = exports.createStripeAccount = void 0;
 exports.handlePaymentSuccess = handlePaymentSuccess;
 exports.handlePaymentFailure = handlePaymentFailure;
 exports.handlePaymentCanceled = handlePaymentCanceled;
 const http_status_1 = __importDefault(require("http-status"));
+const stripe_1 = __importDefault(require("stripe"));
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const payments_schema_1 = require("../payments/payments.schema");
-const users_schema_1 = require("../users/users.schema");
 const stripe_service_1 = require("./stripe.service");
 // Create a new Stripe account for a property
 exports.createStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { name, description, stripeAccountId, stripeSecretKey, accountType = "STANDARD", isGlobalAccount = false, isDefaultAccount = false, metadata, } = req.body;
+    const { name, description, stripeSecretKey, isDefaultAccount = false, metadata, } = req.body;
     // Prepare account data with proper defaults
     const accountData = {
         name,
         description: description || undefined,
-        stripeAccountId,
         stripeSecretKey,
-        accountType,
-        isGlobalAccount: Boolean(isGlobalAccount),
         isDefaultAccount: Boolean(isDefaultAccount),
         propertyIds: [], // Start with empty property array
         metadata: metadata || undefined,
@@ -81,14 +78,6 @@ exports.createStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(
         });
     }
     catch (error) {
-        if (error.message === "Stripe account ID already exists") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.CONFLICT,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
         if (error.message === "Stripe account with this name already exists") {
             return (0, sendResponse_1.default)(res, {
                 statusCode: http_status_1.default.CONFLICT,
@@ -255,75 +244,7 @@ exports.getAllStripeAccounts = (0, catchAsync_1.default)((req, res) => __awaiter
         data: comprehensiveData,
     });
 }));
-// Get Stripe account by ID
-exports.getStripeAccountById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    try {
-        const account = yield (0, stripe_service_1.getStripeAccountById)(accountId);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: "Stripe account retrieved successfully",
-            data: account,
-        });
-    }
-    catch (error) {
-        if (error.message === "Stripe account not found") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.NOT_FOUND,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        throw error;
-    }
-}));
-// Get Stripe accounts by property ID
-exports.getStripeAccountsByProperty = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { propertyId } = req.params;
-    const accounts = yield (0, stripe_service_1.getStripeAccountsByProperty)(propertyId);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Stripe accounts retrieved successfully",
-        data: accounts,
-    });
-}));
-// Update Stripe account
-exports.updateStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    const updateData = req.body;
-    try {
-        const account = yield (0, stripe_service_1.updateStripeAccount)(accountId, updateData);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: "Stripe account updated successfully",
-            data: account,
-        });
-    }
-    catch (error) {
-        if (error.message === "Stripe account not found") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.NOT_FOUND,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        if (error.message === "Another account is already set as default") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.CONFLICT,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        throw error;
-    }
-}));
-// Delete Stripe account (soft delete)
+// Delete Stripe account (permanent delete)
 exports.deleteStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { accountId } = req.params;
     try {
@@ -347,206 +268,7 @@ exports.deleteStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(
         throw error;
     }
 }));
-// Verify Stripe account with Stripe API
-exports.verifyStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    try {
-        const account = yield (0, stripe_service_1.verifyStripeAccount)(accountId);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: account.message || "Stripe account verified successfully",
-            data: account,
-        });
-    }
-    catch (error) {
-        if (error.message === "Stripe account not found") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.NOT_FOUND,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        if (error.message.includes("Account verification failed")) {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.BAD_REQUEST,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        throw error;
-    }
-}));
-// Get available Stripe accounts for a property (including global and default)
-exports.getAvailableStripeAccounts = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { propertyId } = req.params;
-    try {
-        const result = yield (0, stripe_service_1.getAvailableStripeAccounts)(propertyId);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: "Available Stripe accounts retrieved successfully",
-            data: result,
-        });
-    }
-    catch (error) {
-        if (error.message === "Property not found") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.NOT_FOUND,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        throw error;
-    }
-}));
-// Get unassigned properties (properties not linked to any Stripe account)
-exports.getUnassignedProperties = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const unassignedProperties = yield (0, stripe_service_1.getUnassignedProperties)();
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Unassigned properties retrieved successfully",
-        data: unassignedProperties,
-    });
-}));
-// Get properties that can be assigned to a specific Stripe account
-exports.getAssignablePropertiesForAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    try {
-        const assignableProperties = yield (0, stripe_service_1.getAssignablePropertiesForAccount)(accountId);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: "Assignable properties retrieved successfully",
-            data: assignableProperties,
-        });
-    }
-    catch (error) {
-        if (error.message === "Stripe account not found") {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.NOT_FOUND,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        throw error;
-    }
-}));
-// Create a new payment with unique payment link - Enhanced for first-time payments
-exports.createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { tenantId, currentDate } = req.body;
-    const result = yield (0, stripe_service_1.createPaymentWithLinkEnhanced)({
-        tenantId,
-        currentDate,
-        createdBy: ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || "SYSTEM",
-    });
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.CREATED,
-        success: true,
-        message: result.isFirstTimePayment
-            ? "First-time rent payment link created successfully"
-            : "Rent payment link created successfully",
-        data: {
-            paymentLink: {
-                id: result.paymentLink.id,
-                url: result.paymentLink.url,
-            },
-            receiptNumber: result.receiptNumber,
-            lease: result.lease,
-            paymentInfo: result.paymentInfo,
-        },
-    });
-}));
-// Get payment link details
-exports.getPaymentLinkDetails = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { paymentLinkId } = req.params;
-    // Get the payment to find the associated Stripe account
-    const { Payments } = yield Promise.resolve().then(() => __importStar(require("../payments/payments.schema")));
-    const payment = yield Payments.findOne({
-        stripePaymentLinkId: paymentLinkId,
-    }).populate("stripeAccountId");
-    if (!payment) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.NOT_FOUND,
-            success: false,
-            message: "Payment link not found",
-            data: null,
-        });
-    }
-    const paymentLink = yield (0, stripe_service_1.getPaymentLinkDetails)(paymentLinkId, payment.stripeAccountId.stripeSecretKey);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Payment link details retrieved successfully",
-        data: paymentLink,
-    });
-}));
-// Get comprehensive tenant payment status with automatic payment creation
-exports.getTenantPaymentStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { tenantId } = req.params;
-    const result = yield (0, stripe_service_1.getTenantPaymentStatusEnhanced)({
-        tenantId,
-        createdBy: ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || "SYSTEM",
-    });
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Tenant payment status retrieved successfully",
-        data: result,
-    });
-}));
-exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const sig = req.headers["stripe-signature"];
-    try {
-        let event;
-        // Get the raw body for signature verification
-        const payload = req.body;
-        // For multi-account setup, we need to verify with the correct account's webhook secret
-        // Since we don't know which account this is for, we'll try the default one first
-        try {
-            event = (0, stripe_service_1.constructWebhookEvent)(payload, sig);
-        }
-        catch (err) {
-            console.error("Webhook signature verification failed:", err.message);
-            res.status(400).send(`Webhook Error: ${err.message}`);
-            return;
-        }
-        switch (event.type) {
-            case "payment_intent.succeeded":
-                yield handlePaymentSuccess(event.data.object);
-                break;
-            case "payment_intent.payment_failed":
-                yield handlePaymentFailure(event.data.object);
-                break;
-            case "payment_intent.canceled":
-                yield handlePaymentCanceled(event.data.object);
-                break;
-            case "payment_intent.processing":
-                break;
-            case "payment_intent.requires_action":
-                break;
-            case "charge.succeeded":
-                break;
-            case "charge.updated":
-                break;
-            default:
-                break;
-        }
-        res.json({ received: true });
-    }
-    catch (error) {
-        console.error("Webhook error:", error);
-        res.status(400).send(`Webhook Error: ${error.message || "Unknown error"}`);
-    }
-}));
-function handlePaymentSuccess(paymentIntent) {
+function handlePaymentSuccess(paymentIntent, accountId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             console.log("💰 Processing payment success webhook:", {
@@ -554,57 +276,53 @@ function handlePaymentSuccess(paymentIntent) {
                 metadata: paymentIntent.metadata,
                 amount: paymentIntent.amount,
                 status: paymentIntent.status,
+                accountId,
             });
-            // Extract metadata from the unique payment link
+            // Extract metadata from the payment intent
             const metadata = paymentIntent.metadata;
             if (!metadata.tenantId || !metadata.receiptNumber) {
                 console.error("❌ Missing required payment metadata:", metadata);
                 throw new Error("Missing required payment metadata");
             }
-            // Check if payment already exists to prevent duplicates
-            const duplicatePayment = yield payments_schema_1.Payments.findOne({
-                stripeTransactionId: paymentIntent.id,
+            // Find existing payment record by receipt number
+            const existingPayment = yield payments_schema_1.Payments.findOne({
+                receiptNumber: metadata.receiptNumber,
             });
-            if (duplicatePayment) {
+            if (!existingPayment) {
+                console.error("❌ No payment record found for receipt:", metadata.receiptNumber);
+                return;
+            }
+            // Check if payment already processed to prevent duplicates
+            if (existingPayment.status === "PAID") {
                 console.log("⚠️ Payment already processed, skipping...");
                 return;
             }
-            // Create new payment record with PAID status
-            console.log("💾 Creating payment record with PAID status...");
-            // Extract payment details from metadata
-            const paymentData = {
-                tenantId: metadata.tenantId,
-                propertyId: metadata.propertyId,
-                spotId: metadata.spotId,
-                amount: paymentIntent.amount / 100, // Convert from cents
-                type: metadata.paymentType || "RENT",
+            // Update existing payment record with PAID status
+            console.log("💾 Updating payment record with PAID status...");
+            const updatedPayment = yield payments_schema_1.Payments.findByIdAndUpdate(existingPayment._id, {
                 status: "PAID",
-                dueDate: new Date(metadata.dueDate),
                 paidDate: new Date(paymentIntent.created * 1000),
                 paymentMethod: "ONLINE",
                 transactionId: paymentIntent.id,
                 stripeTransactionId: paymentIntent.id,
-                stripePaymentLinkId: metadata.paymentLinkId || paymentIntent.id,
-                receiptNumber: metadata.receiptNumber,
-                description: metadata.paymentDescription || "Rent Payment",
+                stripePaymentIntentId: paymentIntent.id,
+                amount: paymentIntent.amount / 100, // Update with actual amount paid
                 totalAmount: paymentIntent.amount / 100,
-                lateFeeAmount: parseInt(metadata.lateFeeAmount || "0"),
-                createdBy: "SYSTEM",
-            };
-            console.log("📝 Creating payment with data:", paymentData);
-            const newPayment = yield payments_schema_1.Payments.create(paymentData);
-            if (newPayment) {
-                console.log("✅ Payment created successfully:", {
-                    id: newPayment._id,
-                    status: newPayment.status,
-                    amount: newPayment.amount,
-                    paidDate: newPayment.paidDate,
-                    transactionId: newPayment.transactionId,
-                    receiptNumber: newPayment.receiptNumber,
+                stripeAccountId: accountId, // Store which Stripe account processed this
+            }, { new: true });
+            if (updatedPayment) {
+                console.log("✅ Payment updated successfully:", {
+                    id: updatedPayment._id,
+                    status: updatedPayment.status,
+                    amount: updatedPayment.amount,
+                    paidDate: updatedPayment.paidDate,
+                    transactionId: updatedPayment.transactionId,
+                    receiptNumber: updatedPayment.receiptNumber,
+                    stripeAccountId: updatedPayment.stripeAccountId,
                 });
             }
             else {
-                console.error("❌ Failed to create payment");
+                console.error("❌ Failed to update payment");
             }
         }
         catch (error) {
@@ -613,14 +331,17 @@ function handlePaymentSuccess(paymentIntent) {
         }
     });
 }
-function handlePaymentFailure(paymentIntent) {
+function handlePaymentFailure(paymentIntent, accountId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const metadata = paymentIntent.metadata;
             const receiptNumber = metadata.receiptNumber;
             if (receiptNumber) {
                 // Update payment status to failed
-                yield payments_schema_1.Payments.findOneAndUpdate({ receiptNumber }, { status: "CANCELLED" });
+                yield payments_schema_1.Payments.findOneAndUpdate({ receiptNumber }, {
+                    status: "CANCELLED",
+                    stripeAccountId: accountId,
+                });
             }
         }
         catch (error) {
@@ -628,14 +349,17 @@ function handlePaymentFailure(paymentIntent) {
         }
     });
 }
-function handlePaymentCanceled(paymentIntent) {
+function handlePaymentCanceled(paymentIntent, accountId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const metadata = paymentIntent.metadata;
             const receiptNumber = metadata.receiptNumber;
             if (receiptNumber) {
                 // Update payment status to cancelled
-                yield payments_schema_1.Payments.findOneAndUpdate({ receiptNumber }, { status: "CANCELLED" });
+                yield payments_schema_1.Payments.findOneAndUpdate({ receiptNumber }, {
+                    status: "CANCELLED",
+                    stripeAccountId: accountId,
+                });
             }
         }
         catch (error) {
@@ -643,205 +367,104 @@ function handlePaymentCanceled(paymentIntent) {
         }
     });
 }
-// Sync payment history for a user
-exports.syncPaymentHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId } = req.params;
-    const user = yield users_schema_1.Users.findById(userId);
-    if (!user) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.NOT_FOUND,
-            success: false,
-            message: "User not found",
-            data: null,
-        });
-    }
-    // Get user's active lease to find the property and Stripe account
-    const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
-    const activeLease = yield Leases.findOne({
-        tenantId: userId,
-        leaseStatus: "ACTIVE",
-        isDeleted: false,
-    });
-    if (!activeLease) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.NOT_FOUND,
-            success: false,
-            message: "No active lease found for user",
-            data: null,
-        });
-    }
-    // Get the Stripe account for this property
-    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("./stripe-accounts.schema")));
-    const stripeAccount = yield StripeAccounts.findOne({
-        propertyIds: activeLease.propertyId,
-        isActive: true,
-        isVerified: true,
-    }).select("+stripeSecretKey");
-    if (!stripeAccount) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.NOT_FOUND,
-            success: false,
-            message: "No active Stripe account found for property",
-            data: null,
-        });
-    }
-    yield (0, stripe_service_1.syncStripePayments)(stripeAccount.stripeAccountId || "", userId, stripeAccount.stripeSecretKey);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Payment history synced successfully",
-        data: null,
-    });
-}));
-// Webhook status check endpoint
-exports.webhookStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const timestamp = new Date().toISOString();
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Webhook endpoint is active",
-        data: {
-            timestamp,
-            status: "active",
-            endpoint: "/api/v1.0/webhooks/webhook",
-            environment: process.env.NODE_ENV || "development",
+exports.handleWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const sig = req.headers["stripe-signature"];
+    console.log("🔔 Webhook received:", {
+        method: req.method,
+        path: req.path,
+        headers: {
+            "stripe-signature": sig ? "present" : "missing",
+            "content-type": req.headers["content-type"],
+            "user-agent": req.headers["user-agent"],
         },
+        bodySize: req.body ? JSON.stringify(req.body).length : 0,
     });
-}));
-// Get account statistics for debugging
-exports.getAccountStatistics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const statistics = yield (0, stripe_service_1.getAccountStatistics)();
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Account statistics retrieved successfully",
-        data: statistics,
-    });
-}));
-// Update Stripe account secret key (for debugging)
-exports.updateStripeAccountSecretKey = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    const { stripeSecretKey } = req.body;
     try {
-        const updatedAccount = yield (0, stripe_service_1.updateStripeAccountSecretKey)(accountId, stripeSecretKey);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: "Stripe account secret key updated successfully",
-            data: updatedAccount,
+        let event;
+        let accountId;
+        // Get the raw body for signature verification
+        const payload = req.body;
+        // Try to verify with account-specific webhook secrets first
+        try {
+            const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("./stripe.schema")));
+            const accounts = yield StripeAccounts.find({
+                isActive: true,
+                webhookStatus: "ACTIVE",
+            }).select("+stripeSecretKey +webhookSecret");
+            console.log(`🔍 Found ${accounts.length} active Stripe accounts to try`);
+            for (const account of accounts) {
+                if (account.stripeSecretKey && account.webhookSecret) {
+                    try {
+                        const stripe = new stripe_1.default(account.stripeSecretKey, {
+                            apiVersion: "2025-06-30.basil",
+                        });
+                        event = stripe.webhooks.constructEvent(payload, sig, account.webhookSecret);
+                        console.log(`✅ Webhook verified with account: ${account.name}`);
+                        accountId = account._id.toString();
+                        break;
+                    }
+                    catch (accountErr) {
+                        console.log(`❌ Webhook verification failed for account ${account.name}: ${accountErr.message}`);
+                    }
+                }
+            }
+        }
+        catch (importErr) {
+            console.error("Error importing StripeAccounts schema:", importErr.message);
+        }
+        // If account-specific verification failed, try with default webhook secret
+        if (!event) {
+            try {
+                event = (0, stripe_service_1.constructWebhookEvent)(payload, sig);
+                console.log("✅ Webhook verified with default secret");
+            }
+            catch (err) {
+                console.error("Webhook signature verification failed:", err.message);
+                res.status(400).send(`Webhook Error: Signature verification failed`);
+                return;
+            }
+        }
+        console.log("🔔 Processing webhook event:", {
+            type: event.type,
+            id: event.id,
+            created: event.created,
+            accountId,
+            data: {
+                object: event.data.object.id,
+                objectType: event.data.object.object,
+            },
         });
+        switch (event.type) {
+            case "payment_intent.succeeded":
+                yield handlePaymentSuccess(event.data.object, accountId);
+                break;
+            case "payment_intent.payment_failed":
+                yield handlePaymentFailure(event.data.object, accountId);
+                break;
+            case "payment_intent.canceled":
+                yield handlePaymentCanceled(event.data.object, accountId);
+                break;
+            case "payment_intent.processing":
+                console.log("Payment processing...");
+                break;
+            case "payment_intent.requires_action":
+                console.log("Payment requires action...");
+                break;
+            case "charge.succeeded":
+                console.log("Charge succeeded...");
+                break;
+            case "charge.updated":
+                console.log("Charge updated...");
+                break;
+            default:
+                console.log(`Unhandled webhook event type: ${event.type}`);
+                break;
+        }
+        console.log("✅ Webhook processed successfully");
+        res.json({ received: true });
     }
     catch (error) {
-        if (error.message.includes("Stripe account not found")) {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.NOT_FOUND,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        if (error.message.includes("Failed to update secret key")) {
-            return (0, sendResponse_1.default)(res, {
-                statusCode: http_status_1.default.BAD_REQUEST,
-                success: false,
-                message: error.message,
-                data: null,
-            });
-        }
-        throw error;
+        console.error("Webhook error:", error);
+        res.status(400).send(`Webhook Error: ${error.message || "Unknown error"}`);
     }
-}));
-// Create webhook for a specific Stripe account
-exports.createWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    const { webhookUrl } = req.body;
-    if (!webhookUrl) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.BAD_REQUEST,
-            success: false,
-            message: "Webhook URL is required",
-            data: null,
-        });
-    }
-    const webhook = yield (0, stripe_service_1.createWebhookEndpoint)(accountId, webhookUrl);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.CREATED,
-        success: true,
-        message: "Webhook created successfully",
-        data: {
-            id: webhook.id,
-            url: webhook.url,
-            status: webhook.status,
-            enabled_events: webhook.enabled_events,
-        },
-    });
-}));
-// Create webhooks for all active accounts
-exports.createWebhooksForAllAccounts = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { webhookUrl } = req.body;
-    if (!webhookUrl) {
-        return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.BAD_REQUEST,
-            success: false,
-            message: "Webhook URL is required",
-            data: null,
-        });
-    }
-    const result = yield (0, stripe_service_1.createWebhooksByAccountType)(webhookUrl);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.CREATED,
-        success: true,
-        message: `Webhooks created for ${result.successful}/${result.processedAccounts} ${result.accountTypeProcessed} accounts`,
-        data: result,
-    });
-}));
-// List webhooks for a Stripe account
-exports.listWebhooks = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId } = req.params;
-    const webhooks = yield (0, stripe_service_1.listWebhookEndpoints)(accountId);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Webhooks retrieved successfully",
-        data: webhooks,
-    });
-}));
-// Get webhook details
-exports.getWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId, webhookId } = req.params;
-    const webhook = yield (0, stripe_service_1.getWebhookEndpoint)(accountId, webhookId);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Webhook details retrieved successfully",
-        data: webhook,
-    });
-}));
-// Update webhook
-exports.updateWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId, webhookId } = req.params;
-    const updateData = req.body;
-    const webhook = yield (0, stripe_service_1.updateWebhookEndpoint)(accountId, webhookId, updateData);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Webhook updated successfully",
-        data: {
-            id: webhook.id,
-            url: webhook.url,
-            status: webhook.status,
-            enabled_events: webhook.enabled_events,
-        },
-    });
-}));
-// Delete webhook
-exports.deleteWebhook = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { accountId, webhookId } = req.params;
-    yield (0, stripe_service_1.deleteWebhookEndpoint)(accountId, webhookId);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Webhook deleted successfully",
-        data: null,
-    });
 }));

@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
 import Stripe from "stripe";
-import config from "../../../config/config";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { Payments } from "../payments/payments.schema";
@@ -15,7 +14,6 @@ import {
   setDefaultAccount as setDefaultAccountService,
   unlinkPropertiesFromAccount as unlinkPropertiesFromAccountService,
 } from "./stripe.service";
-import { createWebhookEndpoint } from "./stripe.utils";
 
 // Create a new Stripe account for a property
 export const createStripeAccount = catchAsync(
@@ -23,10 +21,7 @@ export const createStripeAccount = catchAsync(
     const {
       name,
       description,
-      stripeAccountId,
       stripeSecretKey,
-      accountType = "STANDARD",
-      isGlobalAccount = false,
       isDefaultAccount = false,
       metadata,
     } = req.body;
@@ -35,11 +30,7 @@ export const createStripeAccount = catchAsync(
     const accountData = {
       name,
       description: description || undefined,
-      stripeAccountId,
       stripeSecretKey,
-      accountType,
-
-      isGlobalAccount: Boolean(isGlobalAccount),
       isDefaultAccount: Boolean(isDefaultAccount),
       propertyIds: [], // Start with empty property array
       metadata: metadata || undefined,
@@ -57,14 +48,6 @@ export const createStripeAccount = catchAsync(
         data: stripeAccount,
       });
     } catch (error: any) {
-      if (error.message === "Stripe account ID already exists") {
-        return sendResponse(res, {
-          statusCode: httpStatus.CONFLICT,
-          success: false,
-          message: error.message,
-          data: null,
-        });
-      }
       if (error.message === "Stripe account with this name already exists") {
         return sendResponse(res, {
           statusCode: httpStatus.CONFLICT,
@@ -263,7 +246,7 @@ export const getAllStripeAccounts = catchAsync(
   },
 );
 
-// Delete Stripe account (soft delete)
+// Delete Stripe account (permanent delete)
 export const deleteStripeAccount = catchAsync(
   async (req: Request, res: Response) => {
     const { accountId } = req.params;
@@ -293,6 +276,7 @@ export const deleteStripeAccount = catchAsync(
 
 export async function handlePaymentSuccess(
   paymentIntent: Stripe.PaymentIntent,
+  accountId?: string,
 ) {
   try {
     console.log("💰 Processing payment success webhook:", {
@@ -300,9 +284,10 @@ export async function handlePaymentSuccess(
       metadata: paymentIntent.metadata,
       amount: paymentIntent.amount,
       status: paymentIntent.status,
+      accountId,
     });
 
-    // Extract metadata from the unique payment link
+    // Extract metadata from the payment intent
     const metadata = paymentIntent.metadata;
 
     if (!metadata.tenantId || !metadata.receiptNumber) {
@@ -340,8 +325,10 @@ export async function handlePaymentSuccess(
         paymentMethod: "ONLINE",
         transactionId: paymentIntent.id,
         stripeTransactionId: paymentIntent.id,
+        stripePaymentIntentId: paymentIntent.id,
         amount: paymentIntent.amount / 100, // Update with actual amount paid
         totalAmount: paymentIntent.amount / 100,
+        stripeAccountId: accountId, // Store which Stripe account processed this
       },
       { new: true },
     );
@@ -354,6 +341,7 @@ export async function handlePaymentSuccess(
         paidDate: updatedPayment.paidDate,
         transactionId: updatedPayment.transactionId,
         receiptNumber: updatedPayment.receiptNumber,
+        stripeAccountId: updatedPayment.stripeAccountId,
       });
     } else {
       console.error("❌ Failed to update payment");
@@ -366,6 +354,7 @@ export async function handlePaymentSuccess(
 
 export async function handlePaymentFailure(
   paymentIntent: Stripe.PaymentIntent,
+  accountId?: string,
 ) {
   try {
     const metadata = paymentIntent.metadata;
@@ -375,7 +364,10 @@ export async function handlePaymentFailure(
       // Update payment status to failed
       await Payments.findOneAndUpdate(
         { receiptNumber },
-        { status: "CANCELLED" },
+        {
+          status: "CANCELLED",
+          stripeAccountId: accountId,
+        },
       );
     }
   } catch (error: any) {
@@ -385,6 +377,7 @@ export async function handlePaymentFailure(
 
 export async function handlePaymentCanceled(
   paymentIntent: Stripe.PaymentIntent,
+  accountId?: string,
 ) {
   try {
     const metadata = paymentIntent.metadata;
@@ -394,7 +387,10 @@ export async function handlePaymentCanceled(
       // Update payment status to cancelled
       await Payments.findOneAndUpdate(
         { receiptNumber },
-        { status: "CANCELLED" },
+        {
+          status: "CANCELLED",
+          stripeAccountId: accountId,
+        },
       );
     }
   } catch (error: any) {
@@ -418,83 +414,68 @@ export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
 
   try {
     let event;
+    let accountId: string | undefined;
 
     // Get the raw body for signature verification
     const payload = req.body;
 
-    // For multi-account setup, we need to verify with the correct account's webhook secret
-    // Try to verify with all available Stripe accounts
-    let verificationSuccess = false;
-    let verificationError = null;
-
+    // Try to verify with account-specific webhook secrets first
     try {
-      // First try with the default webhook secret
-      event = constructWebhookEvent(payload, sig);
-      verificationSuccess = true;
-      console.log("✅ Webhook verified with default secret");
-    } catch (err: any) {
-      verificationError = err.message;
-      console.log(
-        "Default webhook verification failed, trying with account-specific secrets...",
-      );
+      const { StripeAccounts } = await import("./stripe.schema");
+      const accounts = await StripeAccounts.find({
+        isActive: true,
+        webhookStatus: "ACTIVE",
+      }).select("+stripeSecretKey +webhookSecret");
 
-      // If default fails, try with account-specific webhook secrets
-      try {
-        const { StripeAccounts } = await import("./stripe.schema");
-        const accounts = await StripeAccounts.find({
-          isActive: true,
-          isDeleted: false,
-          webhookStatus: "ACTIVE",
-        }).select("+stripeSecretKey");
+      console.log(`🔍 Found ${accounts.length} active Stripe accounts to try`);
 
-        console.log(
-          `🔍 Found ${accounts.length} active Stripe accounts to try`,
-        );
+      for (const account of accounts) {
+        if (account.stripeSecretKey && account.webhookSecret) {
+          try {
+            const stripe = new Stripe(account.stripeSecretKey, {
+              apiVersion: "2025-06-30.basil",
+            });
 
-        for (const account of accounts) {
-          if (account.stripeSecretKey) {
-            try {
-              const stripe = new Stripe(account.stripeSecretKey, {
-                apiVersion: "2025-06-30.basil",
-              });
+            event = stripe.webhooks.constructEvent(
+              payload,
+              sig as string,
+              account.webhookSecret,
+            );
 
-              event = stripe.webhooks.constructEvent(
-                payload,
-                sig as string,
-                config.stripe_webhook_secret, // Use the default webhook secret for now
-              );
-
-              console.log(`✅ Webhook verified with account: ${account.name}`);
-              verificationSuccess = true;
-              break;
-            } catch (accountErr: any) {
-              console.log(
-                `❌ Webhook verification failed for account ${account.name}: ${accountErr.message}`,
-              );
-            }
+            console.log(`✅ Webhook verified with account: ${account.name}`);
+            accountId = (account._id as any).toString();
+            break;
+          } catch (accountErr: any) {
+            console.log(
+              `❌ Webhook verification failed for account ${account.name}: ${accountErr.message}`,
+            );
           }
         }
-      } catch (importErr: any) {
-        console.error(
-          "Error importing StripeAccounts schema:",
-          importErr.message,
-        );
       }
+    } catch (importErr: any) {
+      console.error(
+        "Error importing StripeAccounts schema:",
+        importErr.message,
+      );
     }
 
-    if (!verificationSuccess || !event) {
-      console.error(
-        "Webhook signature verification failed for all accounts:",
-        verificationError,
-      );
-      res.status(400).send(`Webhook Error: Signature verification failed`);
-      return;
+    // If account-specific verification failed, try with default webhook secret
+    if (!event) {
+      try {
+        event = constructWebhookEvent(payload, sig);
+        console.log("✅ Webhook verified with default secret");
+      } catch (err: any) {
+        console.error("Webhook signature verification failed:", err.message);
+        res.status(400).send(`Webhook Error: Signature verification failed`);
+        return;
+      }
     }
 
     console.log("🔔 Processing webhook event:", {
       type: event.type,
       id: (event as any).id,
       created: (event as any).created,
+      accountId,
       data: {
         object: (event.data.object as any).id,
         objectType: (event.data.object as any).object,
@@ -503,13 +484,13 @@ export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
 
     switch (event.type) {
       case "payment_intent.succeeded":
-        await handlePaymentSuccess(event.data.object);
+        await handlePaymentSuccess(event.data.object, accountId);
         break;
       case "payment_intent.payment_failed":
-        await handlePaymentFailure(event.data.object);
+        await handlePaymentFailure(event.data.object, accountId);
         break;
       case "payment_intent.canceled":
-        await handlePaymentCanceled(event.data.object);
+        await handlePaymentCanceled(event.data.object, accountId);
         break;
       case "payment_intent.processing":
         console.log("Payment processing...");
@@ -534,33 +515,4 @@ export const handleWebhook = catchAsync(async (req: Request, res: Response) => {
     console.error("Webhook error:", error);
     res.status(400).send(`Webhook Error: ${error.message || "Unknown error"}`);
   }
-});
-
-// Create webhook for a specific Stripe account
-export const createWebhook = catchAsync(async (req: Request, res: Response) => {
-  const { accountId } = req.params;
-  const { webhookUrl } = req.body;
-
-  if (!webhookUrl) {
-    return sendResponse(res, {
-      statusCode: httpStatus.BAD_REQUEST,
-      success: false,
-      message: "Webhook URL is required",
-      data: null,
-    });
-  }
-
-  const webhook = await createWebhookEndpoint(accountId, webhookUrl);
-
-  sendResponse(res, {
-    statusCode: httpStatus.CREATED,
-    success: true,
-    message: "Webhook created successfully",
-    data: {
-      id: webhook.id,
-      url: webhook.url,
-      status: webhook.status,
-      enabled_events: webhook.enabled_events,
-    },
-  });
 });

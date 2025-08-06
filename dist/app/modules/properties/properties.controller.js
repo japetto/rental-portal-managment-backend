@@ -62,13 +62,13 @@ PropertiesController.getAllPropertiesWithStripeDetails = (0, catchAsync_1.defaul
         .populate("availableSpots", "status")
         .sort({ createdAt: -1 });
     // Get all Stripe accounts with their property assignments
-    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe-accounts.schema")));
+    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
     const stripeAccounts = yield StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select("name description stripeAccountId isActive isVerified businessName businessEmail isGlobalAccount isDefaultAccount propertyIds");
     // Create a map of property ID to Stripe account
     const propertyToStripeMap = new Map();
-    stripeAccounts.forEach(account => {
+    stripeAccounts.forEach((account) => {
         account.propertyIds.forEach((propertyId) => {
             propertyToStripeMap.set(propertyId._id.toString(), {
                 _id: account._id,
@@ -117,7 +117,7 @@ PropertiesController.getPropertiesWithAvailableStripeAccounts = (0, catchAsync_1
         .populate("availableSpots", "status")
         .sort({ createdAt: -1 });
     // Get all Stripe accounts with their property assignments
-    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe-accounts.schema")));
+    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
     const stripeAccounts = yield StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select("name description stripeAccountId isActive isVerified isGlobalAccount isDefaultAccount propertyIds");
@@ -130,7 +130,7 @@ PropertiesController.getPropertiesWithAvailableStripeAccounts = (0, catchAsync_1
     }).select("name description stripeAccountId");
     // Create a map of property ID to Stripe account
     const propertyToStripeMap = new Map();
-    stripeAccounts.forEach(account => {
+    stripeAccounts.forEach((account) => {
         account.propertyIds.forEach((propertyId) => {
             propertyToStripeMap.set(propertyId._id.toString(), {
                 _id: account._id,
@@ -166,7 +166,7 @@ PropertiesController.getPropertiesWithAvailableStripeAccounts = (0, catchAsync_1
             stripeAccount: propertyStripeAccount,
             availableStripeAccounts: {
                 propertySpecific: propertyStripeAccount,
-                globalAccounts: globalAccounts.map(account => ({
+                globalAccounts: globalAccounts.map((account) => ({
                     _id: account._id,
                     name: account.name,
                     description: account.description,
@@ -193,13 +193,13 @@ PropertiesController.getPropertiesWithoutStripeAccounts = (0, catchAsync_1.defau
         .populate("availableSpots", "status")
         .sort({ createdAt: -1 });
     // Get all Stripe accounts with their property assignments
-    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe-accounts.schema")));
+    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
     const stripeAccounts = yield StripeAccounts.find({ isDeleted: false })
         .populate("propertyIds", "name address")
         .select("propertyIds");
     // Create a set of property IDs that have Stripe accounts
     const propertiesWithStripe = new Set();
-    stripeAccounts.forEach(account => {
+    stripeAccounts.forEach((account) => {
         account.propertyIds.forEach((propertyId) => {
             propertiesWithStripe.add(propertyId._id.toString());
         });

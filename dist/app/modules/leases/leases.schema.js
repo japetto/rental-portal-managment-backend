@@ -117,12 +117,8 @@ exports.leasesSchema.pre("save", function (next) {
         (!this.pets.petDetails || this.pets.petDetails.length === 0)) {
         return next(new Error("Pet details are required when hasPets is true"));
     }
-    // Set default lease status based on start date
-    const now = new Date();
-    if (!this.leaseStatus || this.leaseStatus === payment_enums_1.LeaseStatus.PENDING) {
-        this.leaseStatus =
-            this.leaseStart <= now ? payment_enums_1.LeaseStatus.ACTIVE : payment_enums_1.LeaseStatus.PENDING;
-    }
+    // Set lease status to ACTIVE when saving lease data
+    this.leaseStatus = payment_enums_1.LeaseStatus.ACTIVE;
     next();
 });
 // Pre-save middleware for cross-schema validation

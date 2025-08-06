@@ -112,10 +112,11 @@ export const createWebhookEndpoint = async (
       status: webhook.status,
     });
 
-    // Update the account with webhook information
+    // Update the account with webhook information including the secret
     await StripeAccounts.findByIdAndUpdate(accountId, {
       webhookId: webhook.id,
       webhookUrl: webhook.url,
+      webhookSecret: webhook.secret, // Store the webhook secret
       webhookStatus: "ACTIVE",
       webhookCreatedAt: new Date(),
     });

@@ -14,8 +14,13 @@ export interface IStripeAccount extends Document {
   // Webhook information
   webhookId?: string;
   webhookUrl?: string;
+  webhookSecret?: string; // Webhook secret for verification
   webhookStatus?: "ACTIVE" | "INACTIVE" | "FAILED";
   webhookCreatedAt?: Date;
+
+  // Essential Stripe account info
+  stripePublishableKey?: string; // Publishable key for frontend
+  stripeCurrency?: string;
 
   // Metadata
   metadata?: any;

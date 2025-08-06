@@ -27,6 +27,7 @@ export const paymentsSchema = new Schema<IPayment>(
       required: true,
       default: PaymentStatus.PENDING,
     },
+    dueDate: { type: Date, required: true },
     paidDate: { type: Date },
     paymentMethod: {
       type: String,
@@ -39,10 +40,11 @@ export const paymentsSchema = new Schema<IPayment>(
     lateFeeAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     createdBy: { type: String, required: true },
-    // Stripe transaction fields
+    // Essential Stripe fields only
     stripeTransactionId: { type: String }, // From Stripe webhook
     stripePaymentLinkId: { type: String }, // Payment link ID from Stripe
     stripeAccountId: { type: Schema.Types.ObjectId, ref: "StripeAccounts" }, // Stripe account used for this payment
+    stripePaymentIntentId: { type: String }, // Payment intent ID from Stripe
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

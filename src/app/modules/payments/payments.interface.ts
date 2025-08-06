@@ -24,10 +24,11 @@ export interface IPayment extends Document {
   lateFeeAmount?: number;
   totalAmount: number; // amount + lateFeeAmount
   createdBy: string; // Admin who created the payment record
-  // Stripe transaction fields
+  // Essential Stripe fields only
   stripeTransactionId?: string; // From Stripe webhook
   stripePaymentLinkId?: string; // Payment link ID from Stripe
   stripeAccountId?: Types.ObjectId; // Stripe account used for this payment
+  stripePaymentIntentId?: string; // Payment intent ID from Stripe
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;

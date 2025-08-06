@@ -5,12 +5,10 @@ import sendResponse from "../../../shared/sendResponse";
 import {
   createPaymentLink as createPaymentLinkService,
   createPaymentWithLinkEnhanced,
-  getPaymentLinkDetails as getPaymentLinkDetailsService,
-  getTenantPaymentStatusEnhanced,
-} from "../stripe/stripe.service";
-import {
   getPaymentHistory as getPaymentHistoryService,
+  getPaymentLinkDetails as getPaymentLinkDetailsService,
   getRentSummary as getRentSummaryService,
+  getTenantPaymentStatusEnhanced,
 } from "./payment.service";
 import { Payments } from "./payments.schema";
 

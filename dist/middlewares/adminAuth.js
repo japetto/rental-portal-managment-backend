@@ -35,10 +35,14 @@ const adminAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function
         // Verify token
         const verifiedToken = jwtHelpers_1.jwtHelpers.jwtVerify(token, config_1.default.jwt_secret);
         // console.log("🚀 ~ verifiedToken:", verifiedToken);
-        // Check if user exists
-        const user = yield users_schema_1.Users.findById(verifiedToken.id).select("+password");
+        // Check if user exists and is active
+        const user = yield users_schema_1.Users.findOne({
+            _id: verifiedToken.id,
+            isDeleted: false,
+            isActive: true
+        }).select("+password");
         if (!user) {
-            throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "User not found");
+            throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "User not found or account is deactivated");
         }
         // Check if user is admin
         if (user.role !== "SUPER_ADMIN") {
