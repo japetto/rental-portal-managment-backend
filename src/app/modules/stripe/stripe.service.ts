@@ -5,41 +5,7 @@ import { Payments } from "../payments/payments.schema";
 import { Properties } from "../properties/properties.schema";
 import { Users } from "../users/users.schema";
 import { StripeAccounts } from "./stripe.schema";
-
-// Helper function to ensure URL has proper scheme
-const getValidRedirectUrl = (path: string): string => {
-  const baseUrl = config.client_url || "http://localhost:3000";
-
-  // If baseUrl already has a scheme, use it as is
-  if (baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
-    return `${baseUrl}${path}`;
-  }
-
-  // If no scheme, default to https
-  return `https://${baseUrl}${path}`;
-};
-
-// Helper function to format address object to string
-const formatAddress = (address: any): string => {
-  if (!address) return "N/A";
-
-  // If address is already a string, return it
-  if (typeof address === "string") return address;
-
-  // If address is an object, format it
-  if (typeof address === "object") {
-    const parts = [];
-    if (address.street) parts.push(address.street);
-    if (address.city) parts.push(address.city);
-    if (address.state) parts.push(address.state);
-    if (address.zip) parts.push(address.zip);
-    if (address.country) parts.push(address.country);
-
-    return parts.length > 0 ? parts.join(", ") : "N/A";
-  }
-
-  return "N/A";
-};
+import { formatAddress, getValidRedirectUrl } from "./stripe.utils";
 
 // Create Stripe instance with account-specific secret key
 export const createStripeInstance = (secretKey: string): Stripe => {
@@ -118,67 +84,6 @@ export const verifyStripeAccountId = async (
       );
     }
     throw new Error(`Stripe account verification failed: ${error.message}`);
-  }
-};
-
-// Verify only the secret key (without account ID)
-export const verifySecretKey = async (secretKey: string) => {
-  try {
-    // Validate the secret key format
-    if (!secretKey.startsWith("sk_")) {
-      throw new Error(
-        "Invalid Stripe secret key format. Must start with 'sk_'",
-      );
-    }
-
-    // Create Stripe instance with the secret key
-    const stripe = createStripeInstance(secretKey);
-
-    // Test the secret key by making a simple API call to balance
-    // This is more reliable than paymentLinks.list()
-    await stripe.balance.retrieve();
-
-    return {
-      isValid: true,
-      message: "Stripe secret key is valid",
-    };
-  } catch (error: any) {
-    if (error.code === "authentication_error") {
-      throw new Error(
-        "Invalid Stripe secret key. Please check your credentials",
-      );
-    }
-    throw new Error(`Secret key verification failed: ${error.message}`);
-  }
-};
-
-// Verify secret key and get account details for STANDARD accounts
-export const verifySecretKeyAndGetAccount = async (secretKey: string) => {
-  try {
-    const stripe = createStripeInstance(secretKey);
-
-    // For STANDARD accounts, we can retrieve the account details directly
-    const account = await stripe.accounts.retrieve();
-
-    return {
-      isValid: true,
-      accountId: account.id,
-      accountType: account.object,
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
-      country: account.country,
-      businessType: account.business_type,
-      capabilities: account.capabilities,
-      detailsSubmitted: account.details_submitted,
-      message: "Stripe secret key is valid",
-    };
-  } catch (error: any) {
-    if (error.code === "authentication_error") {
-      throw new Error(
-        "Invalid Stripe secret key. Please check your credentials",
-      );
-    }
-    throw new Error(`Secret key verification failed: ${error.message}`);
   }
 };
 
@@ -367,7 +272,6 @@ export const createPaymentLink = async (paymentData: {
   }
 };
 
-// // Create a payment record and generate a unique payment link
 // async createPaymentWithLink(paymentData: {
 //   tenantId: string;
 //   propertyId?: string;
@@ -811,20 +715,6 @@ export const createPaymentWithLinkEnhanced = async (paymentData: {
   }
 };
 
-// Validate payment link exists in Stripe
-export const validatePaymentLink = async (
-  paymentLinkId: string,
-  secretKey: string,
-): Promise<boolean> => {
-  try {
-    const stripe = createStripeInstance(secretKey);
-    const paymentLink = await stripe.paymentLinks.retrieve(paymentLinkId);
-    return paymentLink.active;
-  } catch (error) {
-    return false;
-  }
-};
-
 // Get payment link details
 export const getPaymentLinkDetails = async (
   paymentLinkId: string,
@@ -843,36 +733,6 @@ export const getPaymentLinkTransactions = async (
   return await stripe.paymentIntents.list({
     limit: 100,
   });
-};
-
-// Cancel payment intent (for error handling)
-export const cancelPaymentIntent = async (
-  paymentIntentId: string,
-  secretKey: string,
-) => {
-  const stripe = createStripeInstance(secretKey);
-  return await stripe.paymentIntents.cancel(paymentIntentId);
-};
-
-// Sync existing payments from Stripe to database
-export const syncStripePayments = async (
-  paymentLinkId: string,
-  tenantId: string,
-  secretKey: string,
-) => {
-  const payments = await getPaymentLinkTransactions(paymentLinkId, secretKey);
-
-  for (const payment of payments.data) {
-    // Check if payment already exists in database
-    const existingPayment = await Payments.findOne({
-      stripeTransactionId: payment.id,
-    });
-
-    if (!existingPayment && payment.status === "succeeded") {
-      // Create payment record
-      await createPaymentFromStripe(payment, tenantId);
-    }
-  }
 };
 
 // Create payment record from Stripe data
@@ -1330,13 +1190,10 @@ export const createStripeAccount = async (accountData: any) => {
     // Verify the Stripe secret key with Stripe API
     try {
       if (accountData.accountType === "STANDARD") {
-        // For STANDARD accounts, verify the secret key and get account details
-        const verification = await verifySecretKeyAndGetAccount(
-          accountData.stripeSecretKey,
-        );
-
-        // Update account data with the retrieved account ID
-        accountData.stripeAccountId = verification.accountId;
+        // For STANDARD accounts, verify the secret key
+        const stripe = createStripeInstance(accountData.stripeSecretKey);
+        const account = await stripe.accounts.retrieve();
+        accountData.stripeAccountId = account.id;
       } else {
         // For CONNECT accounts, verify with account ID
         await verifyStripeAccountId(
@@ -1531,19 +1388,6 @@ export const getAllStripeAccounts = async () => {
   return response;
 };
 
-export const getStripeAccountById = async (accountId: string) => {
-  const account = await StripeAccounts.findById(accountId).populate(
-    "propertyIds",
-    "name address",
-  );
-
-  if (!account) {
-    throw new Error("Stripe account not found");
-  }
-
-  return account;
-};
-
 export const getDefaultAccount = async () => {
   const defaultAccount = await StripeAccounts.findOne({
     isDefaultAccount: true,
@@ -1651,43 +1495,6 @@ export const unlinkPropertiesFromAccount = async (
   ).populate("propertyIds", "name address");
 };
 
-export const getStripeAccountsByProperty = async (propertyId: string) => {
-  return await StripeAccounts.find({
-    propertyIds: propertyId,
-    isDeleted: false,
-  }).populate("propertyIds", "name address");
-};
-
-export const updateStripeAccount = async (
-  accountId: string,
-  updateData: any,
-) => {
-  // If setting as default, ensure no other default exists
-  if (updateData.isDefaultAccount) {
-    const existingDefault = await StripeAccounts.findOne({
-      isDefaultAccount: true,
-      isDeleted: false,
-      _id: { $ne: accountId },
-    });
-
-    if (existingDefault) {
-      throw new Error("Another account is already set as default");
-    }
-  }
-
-  const account = await StripeAccounts.findByIdAndUpdate(
-    accountId,
-    updateData,
-    { new: true },
-  ).populate("propertyIds", "name address");
-
-  if (!account) {
-    throw new Error("Stripe account not found");
-  }
-
-  return account;
-};
-
 export const deleteStripeAccount = async (accountId: string) => {
   const account = await StripeAccounts.findByIdAndUpdate(
     accountId,
@@ -1700,213 +1507,6 @@ export const deleteStripeAccount = async (accountId: string) => {
   }
 
   return account;
-};
-
-export const getAvailableStripeAccounts = async (propertyId: string) => {
-  // Validate that property exists
-  const { Properties } = await import("../properties/properties.schema");
-  const property = await Properties.findById(propertyId);
-  if (!property) {
-    throw new Error("Property not found");
-  }
-
-  // Get property-specific accounts
-  const propertyAccounts = await StripeAccounts.find({
-    propertyIds: propertyId,
-    isDeleted: false,
-  }).populate("propertyIds", "name address");
-
-  // Get global accounts
-  const globalAccounts = await StripeAccounts.find({
-    isGlobalAccount: true,
-    isDeleted: false,
-  }).populate("propertyIds", "name address");
-
-  // Get default account
-  const defaultAccount = await StripeAccounts.findOne({
-    isDefaultAccount: true,
-    isDeleted: false,
-  }).populate("propertyIds", "name address");
-
-  return {
-    propertyAccounts,
-    globalAccounts,
-    defaultAccount,
-    hasPropertyAccounts: propertyAccounts.length > 0,
-    hasGlobalAccounts: globalAccounts.length > 0,
-    hasDefaultAccount: !!defaultAccount,
-  };
-};
-
-// Get unassigned properties (properties not linked to any Stripe account)
-export const getUnassignedProperties = async () => {
-  const { Properties } = await import("../properties/properties.schema");
-
-  // Get all non-deleted properties
-  const allProperties = await Properties.find({ isDeleted: false });
-
-  // Get all properties that are assigned to any Stripe account
-  const assignedProperties = await StripeAccounts.aggregate([
-    { $match: { isDeleted: false } },
-    { $unwind: "$propertyIds" },
-    { $group: { _id: "$propertyIds" } },
-  ]);
-
-  // Extract assigned property IDs
-  const assignedPropertyIds = assignedProperties.map(item =>
-    item._id.toString(),
-  );
-
-  // Filter out assigned properties
-  const unassignedProperties = allProperties.filter(
-    property => !assignedPropertyIds.includes((property as any)._id.toString()),
-  );
-
-  return unassignedProperties;
-};
-
-// Get account statistics for debugging
-export const getAccountStatistics = async () => {
-  const totalAccounts = await StripeAccounts.countDocuments({
-    isDeleted: false,
-  });
-  const activeAccounts = await StripeAccounts.countDocuments({
-    isDeleted: false,
-    isActive: true,
-  });
-  const verifiedAccounts = await StripeAccounts.countDocuments({
-    isDeleted: false,
-    isVerified: true,
-  });
-  const defaultAccounts = await StripeAccounts.countDocuments({
-    isDeleted: false,
-    isDefaultAccount: true,
-  });
-  const standardAccounts = await StripeAccounts.countDocuments({
-    isDeleted: false,
-    accountType: "STANDARD",
-  });
-  const connectAccounts = await StripeAccounts.countDocuments({
-    isDeleted: false,
-    accountType: "CONNECT",
-  });
-
-  return {
-    totalAccounts,
-    activeAccounts,
-    verifiedAccounts,
-    defaultAccounts,
-    standardAccounts,
-    connectAccounts,
-  };
-};
-
-// Get properties that can be assigned to a specific Stripe account
-export const getAssignablePropertiesForAccount = async (accountId: string) => {
-  // Validate that Stripe account exists
-  const stripeAccount = await StripeAccounts.findById(accountId);
-  if (!stripeAccount) {
-    throw new Error("Stripe account not found");
-  }
-
-  const { Properties } = await import("../properties/properties.schema");
-
-  // Get all non-deleted properties
-  const allProperties = await Properties.find({ isDeleted: false });
-
-  // Get all properties that are assigned to OTHER Stripe accounts
-  const assignedToOtherAccounts = await StripeAccounts.aggregate([
-    { $match: { isDeleted: false, _id: { $ne: stripeAccount._id } } },
-    { $unwind: "$propertyIds" },
-    { $group: { _id: "$propertyIds" } },
-  ]);
-
-  // Extract property IDs assigned to other accounts
-  const assignedToOtherIds = assignedToOtherAccounts.map(item =>
-    item._id.toString(),
-  );
-
-  // Filter properties that are either unassigned or already assigned to this account
-  const assignableProperties = allProperties.filter(property => {
-    const propertyId = (property as any)._id.toString();
-    // Include if not assigned to other accounts OR already assigned to this account
-    return (
-      !assignedToOtherIds.includes(propertyId) ||
-      stripeAccount.propertyIds.some(id => id.toString() === propertyId)
-    );
-  });
-
-  return assignableProperties;
-};
-
-export const verifyStripeAccount = async (accountId: string) => {
-  const account = await StripeAccounts.findById(accountId);
-
-  if (!account) {
-    throw new Error("Stripe account not found");
-  }
-
-  // Verify the account with Stripe API
-  try {
-    await verifyStripeAccountId(
-      account.stripeAccountId,
-      account.stripeSecretKey,
-      account.accountType || "STANDARD",
-    );
-
-    // Update the account as verified
-    const updatedAccount = await StripeAccounts.findByIdAndUpdate(
-      accountId,
-      { isVerified: true },
-      { new: true },
-    ).populate("propertyIds", "name address");
-
-    if (!updatedAccount) {
-      throw new Error("Failed to update account verification status");
-    }
-
-    return {
-      ...(updatedAccount as any).toObject(),
-      verificationStatus: "VERIFIED",
-      message: "Stripe account verified successfully",
-    };
-  } catch (error: any) {
-    throw new Error(`Account verification failed: ${error.message}`);
-  }
-};
-
-// Update Stripe account secret key (for debugging/fixing existing accounts)
-export const updateStripeAccountSecretKey = async (
-  accountId: string,
-  secretKey: string,
-) => {
-  try {
-    // Verify the secret key first
-    const verification = await verifySecretKeyAndGetAccount(secretKey);
-
-    // Update the account with the new secret key
-    const updatedAccount = await StripeAccounts.findByIdAndUpdate(
-      accountId,
-      {
-        stripeSecretKey: secretKey,
-        stripeAccountId: verification.accountId,
-        isVerified: true,
-        isActive: true,
-      },
-      { new: true },
-    ).select("+stripeSecretKey");
-
-    if (!updatedAccount) {
-      throw new Error("Stripe account not found");
-    }
-
-    return {
-      ...updatedAccount.toObject(),
-      message: "Stripe account secret key updated successfully",
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to update secret key: ${error.message}`);
-  }
 };
 
 // Create webhook endpoint for a Stripe account
@@ -1965,210 +1565,5 @@ export const createWebhookEndpoint = async (
   } catch (error: any) {
     console.error("Error creating webhook endpoint:", error);
     throw new Error(`Failed to create webhook: ${error.message}`);
-  }
-};
-
-// Create webhooks based on account type
-export const createWebhooksByAccountType = async (webhookUrl: string) => {
-  try {
-    // Get all active and verified Stripe accounts
-    const stripeAccounts = await StripeAccounts.find({
-      isActive: true,
-      isVerified: true,
-      isDeleted: false,
-    }).select("+stripeSecretKey");
-
-    const results = [];
-    let accountsToProcess = [];
-
-    // Determine which accounts to process based on account types
-    const connectAccounts = stripeAccounts.filter(
-      account => account.accountType === "CONNECT",
-    );
-    const standardAccounts = stripeAccounts.filter(
-      account => account.accountType === "STANDARD",
-    );
-
-    console.log(`📊 Account analysis:`, {
-      totalAccounts: stripeAccounts.length,
-      connectAccounts: connectAccounts.length,
-      standardAccounts: standardAccounts.length,
-    });
-
-    // If there are CONNECT accounts, only process CONNECT accounts
-    if (connectAccounts.length > 0) {
-      accountsToProcess = connectAccounts;
-      console.log(
-        `🔗 Processing CONNECT accounts only: ${connectAccounts.length} accounts`,
-      );
-    } else {
-      // If no CONNECT accounts, process all STANDARD accounts
-      accountsToProcess = standardAccounts;
-      console.log(
-        `🏢 Processing all STANDARD accounts: ${standardAccounts.length} accounts`,
-      );
-    }
-
-    for (const account of accountsToProcess) {
-      try {
-        if (!account.stripeSecretKey) {
-          console.warn(`⚠️ Skipping account ${account.name} - no secret key`);
-          continue;
-        }
-
-        const webhook = await createWebhookEndpoint(
-          (account as any)._id.toString(),
-          webhookUrl,
-        );
-        results.push({
-          accountId: account._id,
-          accountName: account.name,
-          accountType: account.accountType,
-          success: true,
-          webhookId: webhook.id,
-          webhookUrl: webhook.url,
-        });
-      } catch (error: any) {
-        console.error(
-          `❌ Failed to create webhook for account ${account.name}:`,
-          error.message,
-        );
-        results.push({
-          accountId: account._id,
-          accountName: account.name,
-          accountType: account.accountType,
-          success: false,
-          error: error.message,
-        });
-      }
-    }
-
-    return {
-      totalAccounts: stripeAccounts.length,
-      connectAccounts: connectAccounts.length,
-      standardAccounts: standardAccounts.length,
-      processedAccounts: accountsToProcess.length,
-      successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
-      accountTypeProcessed: connectAccounts.length > 0 ? "CONNECT" : "STANDARD",
-      results,
-    };
-  } catch (error: any) {
-    console.error("Error creating webhooks by account type:", error);
-    throw error;
-  }
-};
-
-// List webhook endpoints for a Stripe account
-export const listWebhookEndpoints = async (accountId: string) => {
-  try {
-    const stripeAccount =
-      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
-
-    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
-      throw new Error("Stripe account not found or missing secret key");
-    }
-
-    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-    const webhooks = await stripe.webhookEndpoints.list();
-
-    return webhooks.data.map(webhook => ({
-      id: webhook.id,
-      url: webhook.url,
-      status: webhook.status,
-      enabled_events: webhook.enabled_events,
-      metadata: webhook.metadata,
-      created: webhook.created,
-    }));
-  } catch (error: any) {
-    console.error("Error listing webhook endpoints:", error);
-    throw error;
-  }
-};
-
-// Delete webhook endpoint
-export const deleteWebhookEndpoint = async (
-  accountId: string,
-  webhookId: string,
-) => {
-  try {
-    const stripeAccount =
-      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
-
-    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
-      throw new Error("Stripe account not found or missing secret key");
-    }
-
-    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-    const deletedWebhook = await stripe.webhookEndpoints.del(webhookId);
-
-    console.log(`✅ Webhook deleted: ${webhookId}`);
-    return deletedWebhook;
-  } catch (error: any) {
-    console.error("Error deleting webhook endpoint:", error);
-    throw error;
-  }
-};
-
-// Update webhook endpoint
-export const updateWebhookEndpoint = async (
-  accountId: string,
-  webhookId: string,
-  updateData: {
-    url?: string;
-    enabled_events?: Stripe.WebhookEndpointUpdateParams.EnabledEvent[];
-    metadata?: Record<string, string>;
-  },
-) => {
-  try {
-    const stripeAccount =
-      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
-
-    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
-      throw new Error("Stripe account not found or missing secret key");
-    }
-
-    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-    const updatedWebhook = await stripe.webhookEndpoints.update(
-      webhookId,
-      updateData,
-    );
-
-    console.log(`✅ Webhook updated: ${webhookId}`);
-    return updatedWebhook;
-  } catch (error: any) {
-    console.error("Error updating webhook endpoint:", error);
-    throw error;
-  }
-};
-
-// Get webhook endpoint details
-export const getWebhookEndpoint = async (
-  accountId: string,
-  webhookId: string,
-) => {
-  try {
-    const stripeAccount =
-      await StripeAccounts.findById(accountId).select("+stripeSecretKey");
-
-    if (!stripeAccount || !stripeAccount.stripeSecretKey) {
-      throw new Error("Stripe account not found or missing secret key");
-    }
-
-    const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-    const webhook = await stripe.webhookEndpoints.retrieve(webhookId);
-
-    return {
-      id: webhook.id,
-      url: webhook.url,
-      status: webhook.status,
-      enabled_events: webhook.enabled_events,
-      metadata: webhook.metadata,
-      created: webhook.created,
-      api_version: webhook.api_version,
-    };
-  } catch (error: any) {
-    console.error("Error getting webhook endpoint:", error);
-    throw error;
   }
 };
