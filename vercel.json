@@ -1,16 +1,22 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    }
+  ],
   "routes": [
     {
       "src": "/api/v1.0/stripe/webhook",
-      "dest": "dist/server.js",
+      "dest": "/api/index.js",
       "headers": {
         "Content-Type": "application/json"
       }
     },
     {
       "src": "/(.*)",
-      "dest": "dist/server.js"
+      "dest": "/api/index.js"
     }
   ]
 }
