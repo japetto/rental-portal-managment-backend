@@ -32,7 +32,6 @@ export const userAuth = async (
 
     // Verify token
     const verifiedToken = jwtHelpers.jwtVerify(token, config.jwt_secret);
-    console.log("🚀 ~ verifiedToken.id:", verifiedToken.id);
 
     // Check if user exists and is active
     const user = await Users.findOne({
@@ -40,7 +39,6 @@ export const userAuth = async (
       isDeleted: false,
       isActive: true,
     });
-    console.log("🚀 ~ user:", user);
     if (!user) {
       throw new ApiError(
         httpStatus.UNAUTHORIZED,

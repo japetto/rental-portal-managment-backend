@@ -152,8 +152,10 @@ const createStripeAccount = (accountData) => __awaiter(void 0, void 0, void 0, f
         // Automatically create webhook for this account after successful creation
         let webhookResult = null;
         try {
-            const webhookUrl = `${config_1.default.backend_url}/api/v1.0/stripe/webhook`;
+            const webhookUrl = `${config_1.default.backend_url}/stripe/webhook`;
+            console.log("🚀 ~ webhookUrl:", webhookUrl);
             const webhook = yield (0, stripe_utils_1.createWebhookEndpoint)(createdAccount._id.toString(), webhookUrl);
+            console.log("🚀 ~ webhook:", webhook);
             // Update the account with webhook information
             yield stripe_schema_1.StripeAccounts.findByIdAndUpdate(createdAccount._id, {
                 webhookId: webhook.id,
