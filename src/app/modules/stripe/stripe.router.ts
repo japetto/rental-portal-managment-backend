@@ -9,6 +9,7 @@ import {
   handleWebhook,
   linkPropertiesToAccount,
   setDefaultAccount,
+  testWebhook,
   unlinkPropertiesFromAccount,
 } from "./stripe.controller";
 import {
@@ -78,6 +79,9 @@ router.post(
 // ========================================
 // WEBHOOK ROUTES
 // ========================================
+
+// Test webhook endpoint (No auth required)
+router.get("/webhook/test", testWebhook);
 
 // Handle Stripe webhooks (No auth required)
 router.post("/webhook", handleWebhook);

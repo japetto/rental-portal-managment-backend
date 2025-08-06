@@ -14,8 +14,16 @@ app.use(express.urlencoded({ extended: true }));
 // Configure JSON parsing for all routes except webhooks
 app.use((req, res, next) => {
   if (req.path.includes("/stripe/webhook")) {
-    // Skip JSON parsing for webhook routes
-    next();
+    // For webhook routes, capture raw body as string
+    let data = "";
+    req.setEncoding("utf8");
+    req.on("data", chunk => {
+      data += chunk;
+    });
+    req.on("end", () => {
+      req.body = data;
+      next();
+    });
   } else {
     express.json()(req, res, next);
   }

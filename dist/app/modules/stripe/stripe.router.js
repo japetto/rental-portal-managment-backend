@@ -33,6 +33,8 @@ router.post("/accounts/unlink-properties", adminAuth_1.adminAuth, (0, zodValidat
 // ========================================
 // WEBHOOK ROUTES
 // ========================================
+// Test webhook endpoint (No auth required)
+router.get("/webhook/test", stripe_controller_1.testWebhook);
 // Handle Stripe webhooks (No auth required)
 router.post("/webhook", stripe_controller_1.handleWebhook);
 exports.stripeRoutes = router;

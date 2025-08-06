@@ -121,12 +121,15 @@ const createPaymentWithLink = (0, catchAsync_1.default)((req, res) => __awaiter(
         statusCode: http_status_1.default.CREATED,
         success: true,
         message: result.isFirstTimePayment
-            ? "First-time rent payment link created successfully"
-            : "Rent payment link created successfully",
+            ? "First-time rent payment intent created successfully"
+            : "Rent payment intent created successfully",
         data: {
-            paymentLink: {
-                id: result.paymentLink.id,
-                url: result.paymentLink.url,
+            paymentIntent: {
+                id: result.paymentIntent.id,
+                client_secret: result.paymentIntent.client_secret,
+                amount: result.paymentIntent.amount,
+                currency: result.paymentIntent.currency,
+                status: result.paymentIntent.status,
             },
             receiptNumber: result.receiptNumber,
             lease: result.lease,

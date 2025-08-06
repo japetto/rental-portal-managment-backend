@@ -41,8 +41,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTenantPaymentStatusEnhanced = exports.createPaymentFromStripe = exports.getPaymentLinkTransactions = exports.getPaymentLinkDetails = exports.createPaymentWithLinkEnhanced = exports.createPaymentWithLink = exports.createPaymentLink = exports.getRentSummary = exports.getPaymentSummary = exports.calculateSummary = exports.mergePaymentData = exports.getPaymentHistory = void 0;
+const stripe_1 = __importDefault(require("stripe"));
 const leases_schema_1 = require("../leases/leases.schema");
 const properties_schema_1 = require("../properties/properties.schema");
 const spots_schema_1 = require("../spots/spots.schema");
@@ -421,7 +425,7 @@ const createPaymentLink = (paymentData) => __awaiter(void 0, void 0, void 0, fun
             stripeAccount = yield StripeAccounts.findOne({
                 propertyIds: paymentData.propertyId,
                 isActive: true,
-                isVerified: true,
+                webhookStatus: "ACTIVE",
             }).select("+stripeSecretKey");
         }
         else {
@@ -443,7 +447,7 @@ const createPaymentLink = (paymentData) => __awaiter(void 0, void 0, void 0, fun
             stripeAccount = yield StripeAccounts.findOne({
                 propertyIds: property._id,
                 isActive: true,
-                isVerified: true,
+                webhookStatus: "ACTIVE",
             }).select("+stripeSecretKey");
         }
         if (!stripeAccount) {
@@ -563,8 +567,9 @@ const createPaymentLink = (paymentData) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.createPaymentLink = createPaymentLink;
-// Create a payment record and generate a unique payment link
+// Create a payment record and generate a unique payment intent (with metadata)
 const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
     try {
         // Generate receipt number
         const receiptNumber = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -586,7 +591,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             stripeAccount = yield StripeAccounts.findOne({
                 propertyIds: paymentData.propertyId,
                 isActive: true,
-                isVerified: true,
+                webhookStatus: "ACTIVE",
             }).select("+stripeSecretKey");
         }
         else {
@@ -604,7 +609,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             stripeAccount = yield StripeAccounts.findOne({
                 propertyIds: activeLease.propertyId._id,
                 isActive: true,
-                isVerified: true,
+                webhookStatus: "ACTIVE",
             }).select("+stripeSecretKey");
         }
         if (!stripeAccount) {
@@ -613,28 +618,130 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         if (!stripeAccount.stripeSecretKey) {
             throw new Error("Stripe secret key is missing for this account");
         }
-        // Create unique payment link first
-        const paymentLink = yield (0, exports.createPaymentLink)(Object.assign(Object.assign({}, paymentData), { receiptNumber }));
-        console.log("✅ Payment link created successfully:", {
-            id: paymentLink.id,
-            url: paymentLink.url,
+        console.log("🔍 DEBUG: Using Stripe account for payment:", {
+            accountId: stripeAccount._id,
+            accountName: stripeAccount.name,
+            isActive: stripeAccount.isActive,
+            isVerified: stripeAccount.isVerified,
+            webhookStatus: stripeAccount.webhookStatus,
+        });
+        // Get user details
+        const user = yield users_schema_1.Users.findById(paymentData.tenantId);
+        if (!user) {
+            throw new Error("User not found");
+        }
+        // Get property details
+        const property = yield properties_schema_1.Properties.findById(paymentData.propertyId || (activeLease === null || activeLease === void 0 ? void 0 : activeLease.propertyId)._id);
+        if (!property) {
+            throw new Error("Property not found");
+        }
+        // Calculate total amount including late fees
+        const totalAmount = paymentData.amount + (paymentData.lateFeeAmount || 0);
+        // Create Stripe instance
+        const stripe = new stripe_1.default(stripeAccount.stripeSecretKey, {
+            apiVersion: "2025-06-30.basil",
+        });
+        // Helper function to format address
+        const formatAddress = (address) => {
+            if (!address)
+                return "N/A";
+            const parts = [];
+            if (address.street)
+                parts.push(address.street);
+            if (address.city)
+                parts.push(address.city);
+            if (address.state)
+                parts.push(address.state);
+            if (address.zipCode)
+                parts.push(address.zipCode);
+            return parts.length > 0 ? parts.join(", ") : "N/A";
+        };
+        // Helper function to get valid redirect URL
+        const getValidRedirectUrl = (path) => {
+            const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+            return `${baseUrl}${path}`;
+        };
+        // Prepare metadata object
+        const metadata = {
+            // Core payment information
+            tenantId: paymentData.tenantId,
+            propertyId: paymentData.propertyId || property._id.toString(),
+            spotId: paymentData.spotId,
+            leaseId: activeLease._id.toString(),
+            paymentType: paymentData.type,
+            dueDate: paymentData.dueDate.toISOString(),
+            receiptNumber: receiptNumber,
+            // Property and tenant details
+            propertyName: property.name,
+            propertyAddress: formatAddress(property.address) || "N/A",
+            propertyType: property.propertyType || "N/A",
+            lotNumber: property.lotNumber || "N/A",
+            unitNumber: property.unitNumber || "N/A",
+            // Tenant information
+            tenantName: user.name,
+            tenantEmail: user.email || "N/A",
+            tenantPhone: user.phone || "N/A",
+            // Payment details
+            amount: totalAmount.toString(),
+            baseAmount: paymentData.amount.toString(),
+            lateFeeAmount: (paymentData.lateFeeAmount || 0).toString(),
+            paymentMonth: paymentData.dueDate.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+            }),
+            paymentYear: paymentData.dueDate.getFullYear().toString(),
+            // Lease information
+            leaseStartDate: ((_a = activeLease.leaseStart) === null || _a === void 0 ? void 0 : _a.toISOString()) || "N/A",
+            leaseEndDate: ((_b = activeLease.leaseEnd) === null || _b === void 0 ? void 0 : _b.toISOString()) || "N/A",
+            rentAmount: ((_c = activeLease.rentAmount) === null || _c === void 0 ? void 0 : _c.toString()) || "N/A",
+            // Stripe account information
+            stripeAccountName: stripeAccount.name,
+            // Additional context
+            paymentDescription: paymentData.description,
+            createdAt: new Date().toISOString(),
+        };
+        console.log("🔍 DEBUG: Metadata being sent to Stripe:", metadata);
+        // Create payment intent with metadata
+        const paymentIntent = yield stripe.paymentIntents.create({
+            amount: Math.round(totalAmount * 100), // Convert to cents
+            currency: "usd",
+            metadata,
+            description: `${paymentData.type} Payment - ${paymentData.dueDate.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+            })} - ${user.name}`,
+            receipt_email: user.email,
+            return_url: getValidRedirectUrl(`/payment-success?receipt=${receiptNumber}&amount=${paymentData.amount}&type=${paymentData.type}`),
+        });
+        console.log("✅ Payment intent created successfully:", {
+            id: paymentIntent.id,
+            client_secret: paymentIntent.client_secret,
             receiptNumber,
+            metadata: paymentIntent.metadata,
+            accountId: stripeAccount._id,
+            accountName: stripeAccount.name,
+            webhookStatus: stripeAccount.webhookStatus,
         });
         // Create a pending payment record that the webhook can update
         const paymentRecord = yield payments_schema_1.Payments.create({
             tenantId: paymentData.tenantId,
-            propertyId: paymentData.propertyId || activeLease.propertyId._id,
+            propertyId: paymentData.propertyId || (activeLease === null || activeLease === void 0 ? void 0 : activeLease.propertyId)._id,
             spotId: paymentData.spotId,
             amount: paymentData.amount,
             type: paymentData.type,
             status: "PENDING", // Will be updated to PAID by webhook
             dueDate: paymentData.dueDate,
+            paidDate: null,
             paymentMethod: "ONLINE",
+            transactionId: paymentIntent.id,
+            stripeTransactionId: paymentIntent.id,
+            stripePaymentIntentId: paymentIntent.id,
             receiptNumber: receiptNumber,
             description: paymentData.description,
-            totalAmount: paymentData.amount + (paymentData.lateFeeAmount || 0),
-            createdBy: paymentData.createdBy,
+            lateFeeAmount: paymentData.lateFeeAmount || 0,
+            totalAmount: totalAmount,
             stripeAccountId: stripeAccount._id,
+            createdBy: paymentData.createdBy,
         });
         console.log("✅ Payment record created with PENDING status:", {
             id: paymentRecord._id,
@@ -643,12 +750,18 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         });
         return {
             payment: paymentRecord,
-            paymentLink,
-            receiptNumber, // Pass receipt number for webhook to use
+            paymentIntent: {
+                id: paymentIntent.id,
+                client_secret: paymentIntent.client_secret,
+                amount: paymentIntent.amount,
+                currency: paymentIntent.currency,
+                status: paymentIntent.status,
+            },
+            receiptNumber,
         };
     }
     catch (error) {
-        console.error("Error creating payment with link:", error);
+        console.error("Error creating payment with intent:", error);
         throw error;
     }
 });
@@ -974,8 +1087,8 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
                         createdBy: paymentData.createdBy,
                     });
                     paymentLink = {
-                        id: newPayment.paymentLink.id,
-                        url: newPayment.paymentLink.url,
+                        id: newPayment.paymentIntent.id,
+                        url: `https://checkout.stripe.com/pay/${newPayment.paymentIntent.id}#fid=${newPayment.paymentIntent.id}`,
                     };
                 }
                 catch (error) {
@@ -999,8 +1112,8 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
                         createdBy: paymentData.createdBy,
                     });
                     paymentLink = {
-                        id: newPayment.paymentLink.id,
-                        url: newPayment.paymentLink.url,
+                        id: newPayment.paymentIntent.id,
+                        url: `https://checkout.stripe.com/pay/${newPayment.paymentIntent.id}#fid=${newPayment.paymentIntent.id}`,
                     };
                 }
                 catch (error) {
