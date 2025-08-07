@@ -4,12 +4,16 @@ import httpStatus from "http-status";
 import router from "./app/routes/router";
 import pathNotFoundErrorHandler from "./errors/pathNotFoundErrorHandler";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
+import { rawBodyMiddleware } from "./middlewares/rawBodyMiddleware";
 
 const app: Application = express();
 
 // ? Middlewares:
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
+
+// Raw body middleware for Stripe webhooks (must come before JSON parsing)
+app.use(rawBodyMiddleware);
 
 // JSON parsing for all other routes
 app.use(express.json());

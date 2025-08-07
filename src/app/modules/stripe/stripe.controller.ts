@@ -634,8 +634,8 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
   const signature = req.headers["stripe-signature"];
 
   try {
-    // Extract accountId - either from URL path, query param, or metadata
-    const accountId = req.query.accountId || req.params.accountId;
+    // Extract accountId from query parameters or headers
+    const accountId = req.query.accountId || req.headers["stripe-account-id"];
 
     if (!accountId) {
       console.error("No accountId provided in webhook request");
@@ -657,57 +657,40 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       apiVersion: "2025-06-30.basil",
     });
 
-    // For serverless environments, we need to handle the body differently
+    // For Vercel serverless environments, handle body reconstruction
     let rawBody: Buffer;
 
-    console.log("🔍 Serverless webhook - Request body type:", typeof req.body);
-    console.log(
-      "🔍 Serverless webhook - Request body is Buffer:",
-      Buffer.isBuffer(req.body),
-    );
-
-    console.log("🔍 Serverless webhook - Request body:", req.body);
+    console.log("🔍 Vercel webhook - Request body type:", typeof req.body);
+    console.log("🔍 Vercel webhook - Request body is Buffer:", Buffer.isBuffer(req.body));
 
     if (Buffer.isBuffer(req.body)) {
       // Raw buffer (ideal case)
       rawBody = req.body;
-      console.log("🔧 Serverless: Using raw buffer for webhook verification");
+      console.log("🔧 Vercel: Using raw buffer for webhook verification");
     } else if (typeof req.body === "string") {
       // String body
       rawBody = Buffer.from(req.body, "utf8");
-      console.log(
-        "🔧 Serverless: Using string converted to buffer for webhook verification",
-      );
+      console.log("🔧 Vercel: Using string converted to buffer for webhook verification");
     } else if (typeof req.body === "object" && req.body !== null) {
-      // Parsed JSON object - reconstruct the raw body
-      const jsonString = JSON.stringify(req.body);
+      // Parsed JSON object - reconstruct the raw body with proper formatting
+      const jsonString = JSON.stringify(req.body, null, 0); // No pretty formatting
       rawBody = Buffer.from(jsonString, "utf8");
-      console.log(
-        "🔧 Serverless: Using reconstructed buffer from parsed JSON for webhook verification",
-      );
-      console.log("🔧 Serverless: JSON string length:", jsonString.length);
+      console.log("🔧 Vercel: Using reconstructed buffer from parsed JSON for webhook verification");
+      console.log("🔧 Vercel: JSON string length:", jsonString.length);
     } else {
-      console.error(
-        "❌ Serverless: Invalid request body type:",
-        typeof req.body,
-      );
-      console.error("❌ Serverless: Request body:", req.body);
+      console.error("❌ Vercel: Invalid request body type:", typeof req.body);
       return res.status(400).json({
-        error:
-          "Invalid request body for serverless webhook. Expected Buffer, string, or object.",
+        error: "Invalid request body for Vercel webhook. Expected Buffer, string, or object.",
       });
     }
 
     if (!signature) {
-      console.error("❌ Serverless: No Stripe signature found in headers");
+      console.error("❌ Vercel: No Stripe signature found in headers");
       return res.status(400).json({ error: "Missing Stripe signature" });
     }
 
-    console.log("🔧 Serverless: Raw body length:", rawBody.length);
-    console.log(
-      "🔧 Serverless: Signature:",
-      signature.substring(0, 20) + "...",
-    );
+    console.log("🔧 Vercel: Raw body length:", rawBody.length);
+    console.log("🔧 Vercel: Signature:", signature.substring(0, 20) + "...");
 
     // Verify the webhook signature using the raw buffer
     event = stripe.webhooks.constructEvent(
@@ -716,9 +699,7 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       stripeAccount.webhookSecret,
     );
 
-    console.log(
-      `🔔 SERVERLESS WEBHOOK RECEIVED: ${event.type} for account ${accountId}`,
-    );
+    console.log(`🔔 VERCEL WEBHOOK RECEIVED: ${event.type} for account ${accountId}`);
 
     // Handle the event based on type
     switch (event.type) {
@@ -736,17 +717,14 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
 
       // Add other event types as needed
       default:
-        console.log(`Serverless: Unhandled event type: ${event.type}`);
+        console.log(`Vercel: Unhandled event type: ${event.type}`);
     }
 
-    // Return a success response
-    return res.status(200).json({ received: true });
+    res.json({ received: true });
   } catch (error: any) {
-    console.error(`Serverless webhook error: ${error.message}`);
-    console.error(`Serverless error stack: ${error.stack}`);
-    return res
-      .status(400)
-      .json({ error: `Serverless Webhook Error: ${error.message}` });
+    console.error(`Vercel webhook error: ${error.message}`);
+    console.error(`Vercel error stack: ${error.stack}`);
+    return res.status(400).json({ error: `Vercel Webhook Error: ${error.message}` });
   }
 };
 
