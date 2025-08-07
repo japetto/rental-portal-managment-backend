@@ -65,5 +65,5 @@ Make sure to set these environment variables in your Vercel project:
 - Check that your MongoDB instance allows connections from Vercel's IP ranges
 
 ### Stripe Webhook Issues
-- Verify webhook URL points to `/api/v1.0/stripe/webhook`
+- Verify webhook URL points to `/api/v1.0/stripe/webhook-vercel`
 - Ensure webhook secret is set correctly in environment variables

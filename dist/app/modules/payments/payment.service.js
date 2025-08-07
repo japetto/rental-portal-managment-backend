@@ -41,8 +41,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentService = void 0;
+const config_1 = __importDefault(require("../../../config/config"));
 const leases_schema_1 = require("../leases/leases.schema");
 const properties_schema_1 = require("../properties/properties.schema");
 const spots_schema_1 = require("../spots/spots.schema");
@@ -809,7 +813,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             after_completion: {
                 type: "redirect",
                 redirect: {
-                    url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/payment-success?payment_intent={CHECKOUT_SESSION_ID}`,
+                    url: `${config_1.default.client_url || "https://beckrow.netlify.app"}/payment-success?payment_intent={CHECKOUT_SESSION_ID}`,
                 },
             },
         });

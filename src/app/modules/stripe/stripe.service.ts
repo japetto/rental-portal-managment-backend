@@ -143,7 +143,7 @@ export const createStripeAccount = async (accountData: any) => {
     // Automatically create webhook for this account after successful creation
     let webhookResult = null;
     try {
-      const webhookUrl = `${config.backend_url}/stripe/webhook`;
+      const webhookUrl = `${config.backend_url}/stripe/webhook-vercel`;
 
       const webhook = await createWebhookEndpoint(
         (createdAccount as any)._id.toString(),
@@ -417,13 +417,13 @@ export const createWebhookEndpoint = async (
     // Create Stripe instance with account-specific secret key
     const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
 
-    // Use the legacy webhook endpoint to match existing webhooks in Stripe
-    const legacyWebhookUrl = webhookUrl; // Keep the original /webhook endpoint
+    // Use the new webhook endpoint for Vercel deployment
+    const newWebhookUrl = webhookUrl.replace("/webhook", "/webhook-vercel");
 
     // Make sure the webhookUrl includes the accountId as a query parameter
-    const webhookUrlWithId = legacyWebhookUrl.includes("?")
-      ? `${legacyWebhookUrl}&accountId=${accountId}`
-      : `${legacyWebhookUrl}?accountId=${accountId}`;
+    const webhookUrlWithId = newWebhookUrl.includes("?")
+      ? `${newWebhookUrl}&accountId=${accountId}`
+      : `${newWebhookUrl}?accountId=${accountId}`;
 
     // Create webhook endpoint
     const webhook = await stripe.webhookEndpoints.create({
