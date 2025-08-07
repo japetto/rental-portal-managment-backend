@@ -11,6 +11,7 @@ import {
   linkPropertiesToAccount,
   setDefaultAccount,
   testWebhook,
+  testWebhookSecret,
   unlinkPropertiesFromAccount,
 } from "./stripe.controller";
 import {
@@ -83,6 +84,9 @@ router.post(
 
 // Test webhook endpoint (No auth required)
 router.get("/webhook/test", testWebhook);
+
+// Test webhook secret endpoint (Admin only)
+router.get("/webhook/test-secret/:accountId", adminAuth, testWebhookSecret);
 
 // Handle Stripe webhooks (No auth required)
 // Use express.raw() for development and handle parsed JSON for production

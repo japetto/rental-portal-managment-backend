@@ -628,6 +628,32 @@ export const testWebhook = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Test endpoint to verify webhook secrets
+export const testWebhookSecret = catchAsync(async (req: Request, res: Response) => {
+  const { accountId } = req.params;
+  
+  try {
+    const stripeAccount = await StripeAccounts.findById(accountId).select(
+      "+stripeSecretKey +webhookSecret",
+    );
+
+    if (!stripeAccount) {
+      return res.status(404).json({ error: "Account not found" });
+    }
+
+    res.json({
+      message: "Webhook secret verification",
+      accountId: stripeAccount._id,
+      accountName: stripeAccount.name,
+      hasWebhookSecret: !!stripeAccount.webhookSecret,
+      webhookSecretLength: stripeAccount.webhookSecret?.length,
+      webhookSecretPrefix: stripeAccount.webhookSecret?.substring(0, 10) + "...",
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Add this new webhook handler specifically for serverless environments
 export const handleStripeWebhookServerless = async (req: any, res: any) => {
   let event;
@@ -635,22 +661,45 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
 
   try {
     // Extract accountId from query parameters or headers
-    const accountId = req.query.accountId || req.headers["stripe-account-id"];
+    let accountId = req.query.accountId || req.headers["stripe-account-id"];
 
+    console.log("🔧 Vercel: Webhook request details:", {
+      url: req.url,
+      query: req.query,
+      headers: {
+        "stripe-signature": req.headers["stripe-signature"]?.substring(0, 20) + "...",
+        "stripe-account-id": req.headers["stripe-account-id"],
+        "content-type": req.headers["content-type"],
+      },
+      extractedAccountId: accountId,
+    });
+
+    // If no accountId found, we'll need to identify it from the webhook endpoint
     if (!accountId) {
-      console.error("No accountId provided in webhook request");
-      return res.status(400).json({ error: "Missing accountId" });
+      console.log("🔧 Vercel: No accountId found in request, will identify from webhook endpoint");
     }
 
     // Get the account with the webhook secret
-    const stripeAccount = await StripeAccounts.findById(accountId).select(
-      "+stripeSecretKey +webhookSecret",
-    );
+    let stripeAccount = null;
+    
+    if (accountId) {
+      stripeAccount = await StripeAccounts.findById(accountId).select(
+        "+stripeSecretKey +webhookSecret",
+      );
+    }
 
     if (!stripeAccount || !stripeAccount.webhookSecret) {
       console.error(`No webhook secret found for account ${accountId}`);
       return res.status(400).json({ error: "Invalid account configuration" });
     }
+
+    console.log("🔧 Vercel: Account found:", {
+      accountId: stripeAccount._id,
+      accountName: stripeAccount.name,
+      hasWebhookSecret: !!stripeAccount.webhookSecret,
+      webhookSecretLength: stripeAccount.webhookSecret?.length,
+      webhookSecretPrefix: stripeAccount.webhookSecret?.substring(0, 10) + "...",
+    });
 
     // Create Stripe instance with account-specific secret key
     const stripe = new Stripe(stripeAccount.stripeSecretKey, {
@@ -693,11 +742,23 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
     console.log("🔧 Vercel: Signature:", signature.substring(0, 20) + "...");
 
     // Verify the webhook signature using the raw buffer
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      stripeAccount.webhookSecret,
-    );
+    try {
+      event = stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        stripeAccount.webhookSecret,
+      );
+      console.log("✅ Vercel: Webhook signature verification successful");
+    } catch (verificationError: any) {
+      console.error("❌ Vercel: Webhook signature verification failed:", {
+        error: verificationError.message,
+        accountId: stripeAccount._id,
+        webhookSecretLength: stripeAccount.webhookSecret?.length,
+        signatureLength: signature?.length,
+        rawBodyLength: rawBody.length,
+      });
+      throw verificationError;
+    }
 
     console.log(`🔔 VERCEL WEBHOOK RECEIVED: ${event.type} for account ${accountId}`);
 
