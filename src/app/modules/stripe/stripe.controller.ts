@@ -853,24 +853,50 @@ export const handleStripeWebhook = async (req: any, res: any) => {
 
   try {
     // Extract accountId - either from URL path, query param, or metadata
-    const accountId = req.query.accountId || req.params.accountId;
+    let accountId = req.query.accountId || req.params.accountId;
 
+    console.log("🔧 Legacy webhook request details:", {
+      url: req.url,
+      query: req.query,
+      headers: {
+        "stripe-signature":
+          req.headers["stripe-signature"]?.substring(0, 20) + "...",
+        "stripe-account-id": req.headers["stripe-account-id"],
+        "content-type": req.headers["content-type"],
+      },
+      extractedAccountId: accountId,
+    });
+
+    // If no accountId found, we'll need to identify it from the webhook endpoint
     if (!accountId) {
-      console.error("No accountId provided in webhook request");
-      return res.status(400).json({ error: "Missing accountId" });
+      console.log(
+        "🔧 Legacy: No accountId found in request, will identify from webhook endpoint",
+      );
     }
 
     // Get the account with the webhook secret
-    const stripeAccount = await StripeAccounts.findById(accountId).select(
-      "+stripeSecretKey +webhookSecret",
-    );
+    let stripeAccount = null;
 
-    if (!stripeAccount || !stripeAccount.webhookSecret) {
-      console.error(`No webhook secret found for account ${accountId}`);
-      return res.status(400).json({ error: "Invalid account configuration" });
+    if (accountId) {
+      stripeAccount = await StripeAccounts.findById(accountId).select(
+        "+stripeSecretKey +webhookSecret",
+      );
+      console.log("🔧 Legacy: Account lookup result:", {
+        accountId,
+        found: !!stripeAccount,
+        hasWebhookSecret: !!stripeAccount?.webhookSecret,
+        accountName: stripeAccount?.name,
+      });
+    } else {
+      console.log("🔧 Legacy: No accountId provided, will try all accounts");
     }
 
     // Create Stripe instance with account-specific secret key
+    if (!stripeAccount) {
+      console.error("No stripe account found");
+      return res.status(400).json({ error: "No stripe account found" });
+    }
+
     const stripe = new Stripe(stripeAccount.stripeSecretKey, {
       apiVersion: "2025-06-30.basil",
     });
@@ -878,50 +904,116 @@ export const handleStripeWebhook = async (req: any, res: any) => {
     // Handle different request body types for different environments
     let rawBody: Buffer;
 
-    console.log("🔍 Request body type:", typeof req.body);
-    console.log("🔍 Request body is Buffer:", Buffer.isBuffer(req.body));
+    console.log("🔍 Legacy webhook - Request body type:", typeof req.body);
+    console.log(
+      "🔍 Legacy webhook - Request body is Buffer:",
+      Buffer.isBuffer(req.body),
+    );
 
     if (Buffer.isBuffer(req.body)) {
       // Development environment - raw buffer from express.raw()
       rawBody = req.body;
-      console.log("🔧 Using raw buffer for webhook verification");
+      console.log("🔧 Legacy: Using raw buffer for webhook verification");
     } else if (typeof req.body === "string") {
       // Production environment - string that needs to be converted to buffer
       rawBody = Buffer.from(req.body, "utf8");
       console.log(
-        "🔧 Using string converted to buffer for webhook verification",
+        "🔧 Legacy: Using string converted to buffer for webhook verification",
       );
     } else if (typeof req.body === "object" && req.body !== null) {
       // Production environment - parsed JSON object
       // We need to reconstruct the raw body from the parsed object
-      rawBody = Buffer.from(JSON.stringify(req.body), "utf8");
+      const jsonString = JSON.stringify(req.body, null, 0); // No pretty formatting
+      rawBody = Buffer.from(jsonString, "utf8");
       console.log(
-        "🔧 Using reconstructed buffer from parsed JSON for webhook verification",
+        "🔧 Legacy: Using reconstructed buffer from parsed JSON for webhook verification",
       );
     } else {
-      console.error("❌ Invalid request body type:", typeof req.body);
-      console.error("❌ Request body:", req.body);
+      console.error("❌ Legacy: Invalid request body type:", typeof req.body);
+      console.error("❌ Legacy: Request body:", req.body);
       return res.status(400).json({
         error: "Invalid request body. Expected Buffer, string, or object.",
       });
     }
 
     if (!signature) {
-      console.error("❌ No Stripe signature found in headers");
+      console.error("❌ Legacy: No Stripe signature found in headers");
       return res.status(400).json({ error: "Missing Stripe signature" });
     }
 
-    console.log("🔧 Raw body length:", rawBody.length);
-    console.log("🔧 Signature:", signature.substring(0, 20) + "...");
+    // If no webhook secret, try to find the correct account
+    if (!stripeAccount.webhookSecret) {
+      console.log("🔧 Legacy: No webhook secret found, trying all accounts");
+
+      // Try to find the account by trying all accounts with webhook secrets
+      const allAccounts = await StripeAccounts.find({
+        webhookSecret: { $exists: true, $ne: null },
+      }).select("+stripeSecretKey +webhookSecret");
+
+      console.log(
+        `🔧 Legacy: Found ${allAccounts.length} accounts with webhook secrets`,
+      );
+
+      // We'll try each account's webhook secret
+      for (const account of allAccounts) {
+        try {
+          const testStripe = new Stripe(account.stripeSecretKey, {
+            apiVersion: "2025-06-30.basil",
+          });
+
+          // Try to verify with this account's webhook secret
+          const testEvent = testStripe.webhooks.constructEvent(
+            rawBody,
+            signature,
+            account.webhookSecret!,
+          );
+
+          // If we get here, the verification succeeded
+          console.log(
+            `✅ Legacy: Found matching account: ${(account as any)._id} (${account.name})`,
+          );
+          stripeAccount = account;
+          accountId = (account as any)._id.toString();
+          break;
+        } catch (verificationError: any) {
+          console.log(
+            `❌ Legacy: Account ${(account as any)._id} verification failed: ${verificationError.message}`,
+          );
+          continue;
+        }
+      }
+    }
+
+    if (!stripeAccount.webhookSecret) {
+      console.error(`No webhook secret found for account ${accountId}`);
+      return res.status(400).json({ error: "Invalid account configuration" });
+    }
+
+    console.log("🔧 Legacy: Raw body length:", rawBody.length);
+    console.log("🔧 Legacy: Signature:", signature.substring(0, 20) + "...");
 
     // Verify the webhook signature using the raw buffer
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      stripeAccount.webhookSecret,
-    );
+    try {
+      event = stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        stripeAccount.webhookSecret,
+      );
+      console.log("✅ Legacy: Webhook signature verification successful");
+    } catch (verificationError: any) {
+      console.error("❌ Legacy: Webhook signature verification failed:", {
+        error: verificationError.message,
+        accountId: stripeAccount._id,
+        webhookSecretLength: stripeAccount.webhookSecret?.length,
+        signatureLength: signature?.length,
+        rawBodyLength: rawBody.length,
+      });
+      throw verificationError;
+    }
 
-    console.log(`🔔 WEBHOOK RECEIVED: ${event.type} for account ${accountId}`);
+    console.log(
+      `🔔 LEGACY WEBHOOK RECEIVED: ${event.type} for account ${accountId}`,
+    );
 
     // Handle the event based on type
     switch (event.type) {
@@ -939,15 +1031,17 @@ export const handleStripeWebhook = async (req: any, res: any) => {
 
       // Add other event types as needed
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`Legacy: Unhandled event type: ${event.type}`);
     }
 
     // Return a success response
     return res.status(200).json({ received: true });
   } catch (error: any) {
-    console.error(`Webhook error: ${error.message}`);
-    console.error(`Error stack: ${error.stack}`);
-    return res.status(400).json({ error: `Webhook Error: ${error.message}` });
+    console.error(`Legacy webhook error: ${error.message}`);
+    console.error(`Legacy error stack: ${error.stack}`);
+    return res
+      .status(400)
+      .json({ error: `Legacy Webhook Error: ${error.message}` });
   }
 };
 
