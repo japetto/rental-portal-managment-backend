@@ -346,12 +346,12 @@ const createWebhookEndpoint = (accountId, webhookUrl) => __awaiter(void 0, void 
         }
         // Create Stripe instance with account-specific secret key
         const stripe = (0, exports.createStripeInstance)(stripeAccount.stripeSecretKey);
-        // Use the serverless webhook endpoint for better production compatibility
-        const serverlessWebhookUrl = webhookUrl.replace("/webhook", "/webhook-serverless");
+        // Use the Vercel-specific webhook endpoint for better production compatibility
+        const vercelWebhookUrl = webhookUrl.replace("/webhook", "/webhook-vercel");
         // Make sure the webhookUrl includes the accountId as a query parameter
-        const webhookUrlWithId = serverlessWebhookUrl.includes("?")
-            ? `${serverlessWebhookUrl}&accountId=${accountId}`
-            : `${serverlessWebhookUrl}?accountId=${accountId}`;
+        const webhookUrlWithId = vercelWebhookUrl.includes("?")
+            ? `${vercelWebhookUrl}&accountId=${accountId}`
+            : `${vercelWebhookUrl}?accountId=${accountId}`;
         // Create webhook endpoint
         const webhook = yield stripe.webhookEndpoints.create({
             url: webhookUrlWithId,

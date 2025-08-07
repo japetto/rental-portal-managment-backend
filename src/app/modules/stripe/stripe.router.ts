@@ -102,9 +102,9 @@ router.post("/webhook-serverless", handleStripeWebhookServerless);
 // Vercel-specific webhook handler - no body parsing to preserve raw body
 router.post("/webhook-vercel", (req, res) => {
   // Ensure no body parsing middleware is applied
-  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
     // If body is already parsed, we need to reconstruct it
-    const rawBody = Buffer.from(JSON.stringify(req.body), 'utf8');
+    const rawBody = Buffer.from(JSON.stringify(req.body), "utf8");
     req.body = rawBody;
   }
   handleStripeWebhookServerless(req, res);

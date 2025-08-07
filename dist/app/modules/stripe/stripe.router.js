@@ -68,9 +68,21 @@ router.post("/accounts/unlink-properties", adminAuth_1.adminAuth, (0, zodValidat
 // ========================================
 // Test webhook endpoint (No auth required)
 router.get("/webhook/test", stripe_controller_1.testWebhook);
+// Test webhook secret endpoint (Admin only)
+router.get("/webhook/test-secret/:accountId", adminAuth_1.adminAuth, stripe_controller_1.testWebhookSecret);
 // Handle Stripe webhooks (No auth required)
 // Use express.raw() for development and handle parsed JSON for production
 router.post("/webhook", express_1.default.raw({ type: "application/json" }), stripe_controller_1.handleStripeWebhook);
 // Serverless webhook handler for production environments
 router.post("/webhook-serverless", stripe_controller_1.handleStripeWebhookServerless);
+// Vercel-specific webhook handler - no body parsing to preserve raw body
+router.post("/webhook-vercel", (req, res) => {
+    // Ensure no body parsing middleware is applied
+    if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+        // If body is already parsed, we need to reconstruct it
+        const rawBody = Buffer.from(JSON.stringify(req.body), "utf8");
+        req.body = rawBody;
+    }
+    (0, stripe_controller_1.handleStripeWebhookServerless)(req, res);
+});
 exports.stripeRoutes = router;

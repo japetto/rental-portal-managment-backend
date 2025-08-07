@@ -629,30 +629,33 @@ export const testWebhook = catchAsync(async (req: Request, res: Response) => {
 });
 
 // Test endpoint to verify webhook secrets
-export const testWebhookSecret = catchAsync(async (req: Request, res: Response) => {
-  const { accountId } = req.params;
-  
-  try {
-    const stripeAccount = await StripeAccounts.findById(accountId).select(
-      "+stripeSecretKey +webhookSecret",
-    );
+export const testWebhookSecret = catchAsync(
+  async (req: Request, res: Response) => {
+    const { accountId } = req.params;
 
-    if (!stripeAccount) {
-      return res.status(404).json({ error: "Account not found" });
+    try {
+      const stripeAccount = await StripeAccounts.findById(accountId).select(
+        "+stripeSecretKey +webhookSecret",
+      );
+
+      if (!stripeAccount) {
+        return res.status(404).json({ error: "Account not found" });
+      }
+
+      res.json({
+        message: "Webhook secret verification",
+        accountId: stripeAccount._id,
+        accountName: stripeAccount.name,
+        hasWebhookSecret: !!stripeAccount.webhookSecret,
+        webhookSecretLength: stripeAccount.webhookSecret?.length,
+        webhookSecretPrefix:
+          stripeAccount.webhookSecret?.substring(0, 10) + "...",
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
-
-    res.json({
-      message: "Webhook secret verification",
-      accountId: stripeAccount._id,
-      accountName: stripeAccount.name,
-      hasWebhookSecret: !!stripeAccount.webhookSecret,
-      webhookSecretLength: stripeAccount.webhookSecret?.length,
-      webhookSecretPrefix: stripeAccount.webhookSecret?.substring(0, 10) + "...",
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
+  },
+);
 
 // Add this new webhook handler specifically for serverless environments
 export const handleStripeWebhookServerless = async (req: any, res: any) => {
@@ -667,7 +670,8 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       url: req.url,
       query: req.query,
       headers: {
-        "stripe-signature": req.headers["stripe-signature"]?.substring(0, 20) + "...",
+        "stripe-signature":
+          req.headers["stripe-signature"]?.substring(0, 20) + "...",
         "stripe-account-id": req.headers["stripe-account-id"],
         "content-type": req.headers["content-type"],
       },
@@ -676,32 +680,26 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
 
     // If no accountId found, we'll need to identify it from the webhook endpoint
     if (!accountId) {
-      console.log("🔧 Vercel: No accountId found in request, will identify from webhook endpoint");
+      console.log(
+        "🔧 Vercel: No accountId found in request, will identify from webhook endpoint",
+      );
     }
 
     // Get the account with the webhook secret
     let stripeAccount = null;
-    
+
     if (accountId) {
       stripeAccount = await StripeAccounts.findById(accountId).select(
         "+stripeSecretKey +webhookSecret",
       );
     }
 
-    if (!stripeAccount || !stripeAccount.webhookSecret) {
-      console.error(`No webhook secret found for account ${accountId}`);
-      return res.status(400).json({ error: "Invalid account configuration" });
+    // Create Stripe instance with account-specific secret key
+    if (!stripeAccount) {
+      console.error("No stripe account found");
+      return res.status(400).json({ error: "No stripe account found" });
     }
 
-    console.log("🔧 Vercel: Account found:", {
-      accountId: stripeAccount._id,
-      accountName: stripeAccount.name,
-      hasWebhookSecret: !!stripeAccount.webhookSecret,
-      webhookSecretLength: stripeAccount.webhookSecret?.length,
-      webhookSecretPrefix: stripeAccount.webhookSecret?.substring(0, 10) + "...",
-    });
-
-    // Create Stripe instance with account-specific secret key
     const stripe = new Stripe(stripeAccount.stripeSecretKey, {
       apiVersion: "2025-06-30.basil",
     });
@@ -710,7 +708,10 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
     let rawBody: Buffer;
 
     console.log("🔍 Vercel webhook - Request body type:", typeof req.body);
-    console.log("🔍 Vercel webhook - Request body is Buffer:", Buffer.isBuffer(req.body));
+    console.log(
+      "🔍 Vercel webhook - Request body is Buffer:",
+      Buffer.isBuffer(req.body),
+    );
 
     if (Buffer.isBuffer(req.body)) {
       // Raw buffer (ideal case)
@@ -719,23 +720,76 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
     } else if (typeof req.body === "string") {
       // String body
       rawBody = Buffer.from(req.body, "utf8");
-      console.log("🔧 Vercel: Using string converted to buffer for webhook verification");
+      console.log(
+        "🔧 Vercel: Using string converted to buffer for webhook verification",
+      );
     } else if (typeof req.body === "object" && req.body !== null) {
       // Parsed JSON object - reconstruct the raw body with proper formatting
       const jsonString = JSON.stringify(req.body, null, 0); // No pretty formatting
       rawBody = Buffer.from(jsonString, "utf8");
-      console.log("🔧 Vercel: Using reconstructed buffer from parsed JSON for webhook verification");
+      console.log(
+        "🔧 Vercel: Using reconstructed buffer from parsed JSON for webhook verification",
+      );
       console.log("🔧 Vercel: JSON string length:", jsonString.length);
     } else {
       console.error("❌ Vercel: Invalid request body type:", typeof req.body);
       return res.status(400).json({
-        error: "Invalid request body for Vercel webhook. Expected Buffer, string, or object.",
+        error:
+          "Invalid request body for Vercel webhook. Expected Buffer, string, or object.",
       });
     }
 
     if (!signature) {
       console.error("❌ Vercel: No Stripe signature found in headers");
       return res.status(400).json({ error: "Missing Stripe signature" });
+    }
+
+    // If no webhook secret, try to find the correct account
+    if (!stripeAccount.webhookSecret) {
+      console.log("🔧 Vercel: No webhook secret found, trying all accounts");
+
+      // Try to find the account by trying all accounts with webhook secrets
+      const allAccounts = await StripeAccounts.find({
+        webhookSecret: { $exists: true, $ne: null },
+      }).select("+stripeSecretKey +webhookSecret");
+
+      console.log(
+        `🔧 Vercel: Found ${allAccounts.length} accounts with webhook secrets`,
+      );
+
+      // We'll try each account's webhook secret
+      for (const account of allAccounts) {
+        try {
+          const testStripe = new Stripe(account.stripeSecretKey, {
+            apiVersion: "2025-06-30.basil",
+          });
+
+          // Try to verify with this account's webhook secret
+          const testEvent = testStripe.webhooks.constructEvent(
+            rawBody,
+            signature,
+            account.webhookSecret!,
+          );
+
+          // If we get here, the verification succeeded
+          console.log(
+            `✅ Vercel: Found matching account: ${(account as any)._id} (${account.name})`,
+          );
+          stripeAccount = account;
+          accountId = (account as any)._id.toString();
+          break;
+        } catch (verificationError: any) {
+          console.log(
+            `❌ Vercel: Account ${(account as any)._id} verification failed: ${verificationError.message}`,
+          );
+          continue;
+        }
+      }
+    }
+
+    if (!stripeAccount.webhookSecret) {
+      console.error(`No webhook secret found for account ${accountId}`);
+      return res.status(400).json({ error: "Invalid account configuration" });
     }
 
     console.log("🔧 Vercel: Raw body length:", rawBody.length);
@@ -760,7 +814,9 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       throw verificationError;
     }
 
-    console.log(`🔔 VERCEL WEBHOOK RECEIVED: ${event.type} for account ${accountId}`);
+    console.log(
+      `🔔 VERCEL WEBHOOK RECEIVED: ${event.type} for account ${accountId}`,
+    );
 
     // Handle the event based on type
     switch (event.type) {
@@ -785,7 +841,9 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
   } catch (error: any) {
     console.error(`Vercel webhook error: ${error.message}`);
     console.error(`Vercel error stack: ${error.stack}`);
-    return res.status(400).json({ error: `Vercel Webhook Error: ${error.message}` });
+    return res
+      .status(400)
+      .json({ error: `Vercel Webhook Error: ${error.message}` });
   }
 };
 
