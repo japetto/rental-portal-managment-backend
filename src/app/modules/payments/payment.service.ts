@@ -1,3 +1,4 @@
+import config from "../../../config/config";
 import { Leases } from "../leases/leases.schema";
 import { Properties } from "../properties/properties.schema";
 import { Spots } from "../spots/spots.schema";
@@ -964,7 +965,7 @@ const createPaymentWithLink = async (paymentData: {
       after_completion: {
         type: "redirect",
         redirect: {
-          url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/payment-success?payment_intent={CHECKOUT_SESSION_ID}`,
+          url: `${config.client_url || "https://beckrow.netlify.app"}/payment-success?payment_intent={CHECKOUT_SESSION_ID}`,
         },
       },
     });
