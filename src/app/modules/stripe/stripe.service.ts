@@ -10,21 +10,7 @@ export const createStripeInstance = (secretKey: string): Stripe => {
   });
 };
 
-// Construct webhook event for verification
-export const constructWebhookEvent = (
-  payload: any,
-  signature: string | string[] | undefined,
-) => {
-  const stripe = new Stripe(config.stripe_secret_key, {
-    apiVersion: "2025-06-30.basil",
-  });
-
-  return stripe.webhooks.constructEvent(
-    payload,
-    signature as string,
-    config.stripe_webhook_secret,
-  );
-};
+// Note: Webhook verification is handled in dedicated handlers; no shared construct function needed
 
 // Check if account exists by name
 export const checkAccountExists = async (name: string) => {

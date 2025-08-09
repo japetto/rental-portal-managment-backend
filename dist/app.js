@@ -18,13 +18,11 @@ const http_status_1 = __importDefault(require("http-status"));
 const router_1 = __importDefault(require("./app/routes/router"));
 const pathNotFoundErrorHandler_1 = __importDefault(require("./errors/pathNotFoundErrorHandler"));
 const globalErrorHandler_1 = __importDefault(require("./middlewares/globalErrorHandler"));
-const rawBodyMiddleware_1 = require("./middlewares/rawBodyMiddleware");
 const app = (0, express_1.default)();
 // ? Middlewares:
 app.use((0, cors_1.default)());
 app.use(express_1.default.urlencoded({ extended: true }));
-// Raw body middleware for Stripe webhooks (must come before JSON parsing)
-app.use(rawBodyMiddleware_1.rawBodyMiddleware);
+// Webhook is handled by Vercel function; no need for raw body here
 // JSON parsing for all other routes
 app.use(express_1.default.json());
 // * Basic Page

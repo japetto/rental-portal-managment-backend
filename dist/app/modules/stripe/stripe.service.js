@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createWebhookEndpoint = exports.deleteStripeAccount = exports.unlinkPropertiesFromAccount = exports.linkPropertiesToAccount = exports.setDefaultAccount = exports.getDefaultAccount = exports.getAllStripeAccounts = exports.createStripeAccount = exports.autoAssignPropertyToDefaultAccount = exports.checkAccountExists = exports.constructWebhookEvent = exports.createStripeInstance = void 0;
+exports.createWebhookEndpoint = exports.deleteStripeAccount = exports.unlinkPropertiesFromAccount = exports.linkPropertiesToAccount = exports.setDefaultAccount = exports.getDefaultAccount = exports.getAllStripeAccounts = exports.createStripeAccount = exports.autoAssignPropertyToDefaultAccount = exports.checkAccountExists = exports.createStripeInstance = void 0;
 const stripe_1 = __importDefault(require("stripe"));
 const config_1 = __importDefault(require("../../../config/config"));
 const stripe_schema_1 = require("./stripe.schema");
@@ -57,14 +57,7 @@ const createStripeInstance = (secretKey) => {
     });
 };
 exports.createStripeInstance = createStripeInstance;
-// Construct webhook event for verification
-const constructWebhookEvent = (payload, signature) => {
-    const stripe = new stripe_1.default(config_1.default.stripe_secret_key, {
-        apiVersion: "2025-06-30.basil",
-    });
-    return stripe.webhooks.constructEvent(payload, signature, config_1.default.stripe_webhook_secret);
-};
-exports.constructWebhookEvent = constructWebhookEvent;
+// Note: Webhook verification is handled in dedicated handlers; no shared construct function needed
 // Check if account exists by name
 const checkAccountExists = (name) => __awaiter(void 0, void 0, void 0, function* () {
     const existingByName = yield stripe_schema_1.StripeAccounts.findOne({

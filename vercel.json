@@ -4,15 +4,16 @@
     {
       "src": "api/index.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/stripe-webhook.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/v1.0/stripe/webhook-vercel",
-      "dest": "/api/index.js",
-      "headers": {
-        "Content-Type": "application/json"
-      }
+      "dest": "/api/stripe-webhook.js"
     },
     {
       "src": "/(.*)",

@@ -1,4 +1,4 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
@@ -6,11 +6,8 @@ import {
   deleteStripeAccount,
   getAllStripeAccounts,
   getDefaultAccount,
-  handleStripeWebhookServerless,
   linkPropertiesToAccount,
   setDefaultAccount,
-  testWebhook,
-  testWebhookSecret,
   unlinkPropertiesFromAccount,
 } from "./stripe.controller";
 import {
@@ -75,25 +72,6 @@ router.post(
   adminAuth,
   zodValidationRequest(unlinkPropertiesFromAccountSchema),
   unlinkPropertiesFromAccount,
-);
-
-// ========================================
-// WEBHOOK ROUTES
-// ========================================
-
-// Test webhook endpoint (No auth required)
-router.get("/webhook/test", testWebhook);
-
-// Test webhook secret endpoint (Admin only)
-router.get("/webhook/test-secret/:accountId", adminAuth, testWebhookSecret);
-
-// Vercel-specific webhook handler - use raw body to preserve exact payload
-router.post(
-  "/webhook-vercel",
-  express.raw({ type: "application/json" }),
-  (req, res) => {
-    handleStripeWebhookServerless(req, res);
-  },
 );
 
 export const stripeRoutes = router;

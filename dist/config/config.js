@@ -26,6 +26,4 @@ exports.default = {
     mailjet_sender_email: process.env.MAILJET_SENDER_EMAIL,
     client_url: process.env.CLIENT_URL,
     backend_url: process.env.BACKEND_URL,
-    stripe_secret_key: process.env.STRIPE_SECRET_KEY,
-    stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
 };
