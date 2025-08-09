@@ -545,19 +545,11 @@ const handleStripeWebhookServerless = (req, res) => __awaiter(void 0, void 0, vo
         if (!accountId) {
             console.log("🔧 Vercel: No accountId found in request, will identify from webhook endpoint");
         }
-        // Get the account with the webhook secret
+        // Try to fetch account if provided, but don't return early; we might identify it during verification
         let stripeAccount = null;
         if (accountId) {
             stripeAccount = yield stripe_schema_1.StripeAccounts.findById(accountId).select("+stripeSecretKey +webhookSecret");
         }
-        // Create Stripe instance with account-specific secret key
-        if (!stripeAccount) {
-            console.error("No stripe account found");
-            return res.status(400).json({ error: "No stripe account found" });
-        }
-        const stripe = new stripe_1.default(stripeAccount.stripeSecretKey, {
-            apiVersion: "2025-06-30.basil",
-        });
         // For Vercel serverless environments, handle body reconstruction
         let rawBody;
         console.log("🔍 Vercel webhook - Request body type:", typeof req.body);
@@ -589,8 +581,8 @@ const handleStripeWebhookServerless = (req, res) => __awaiter(void 0, void 0, vo
             console.error("❌ Vercel: No Stripe signature found in headers");
             return res.status(400).json({ error: "Missing Stripe signature" });
         }
-        // If no webhook secret, try to find the correct account
-        if (!stripeAccount.webhookSecret) {
+        // If we don't yet know the account or it has no webhook secret, try to find the correct account
+        if (!stripeAccount || !stripeAccount.webhookSecret) {
             console.log("🔧 Vercel: No webhook secret found, trying all accounts");
             // Try to find the account by trying all accounts with webhook secrets
             const allAccounts = yield stripe_schema_1.StripeAccounts.find({
@@ -600,11 +592,8 @@ const handleStripeWebhookServerless = (req, res) => __awaiter(void 0, void 0, vo
             // We'll try each account's webhook secret
             for (const account of allAccounts) {
                 try {
-                    const testStripe = new stripe_1.default(account.stripeSecretKey, {
-                        apiVersion: "2025-06-30.basil",
-                    });
                     // Try to verify with this account's webhook secret
-                    const testEvent = testStripe.webhooks.constructEvent(rawBody, signature, account.webhookSecret);
+                    const testEvent = stripe_1.default.webhooks.constructEvent(rawBody, signature, account.webhookSecret);
                     // If we get here, the verification succeeded
                     console.log(`✅ Vercel: Found matching account: ${account._id} (${account.name})`);
                     stripeAccount = account;
@@ -617,7 +606,7 @@ const handleStripeWebhookServerless = (req, res) => __awaiter(void 0, void 0, vo
                 }
             }
         }
-        if (!stripeAccount.webhookSecret) {
+        if (!stripeAccount || !stripeAccount.webhookSecret) {
             console.error(`No webhook secret found for account ${accountId}`);
             return res.status(400).json({ error: "Invalid account configuration" });
         }
@@ -625,7 +614,7 @@ const handleStripeWebhookServerless = (req, res) => __awaiter(void 0, void 0, vo
         console.log("🔧 Vercel: Signature:", signature.substring(0, 20) + "...");
         // Verify the webhook signature using the raw buffer
         try {
-            event = stripe.webhooks.constructEvent(rawBody, signature, stripeAccount.webhookSecret);
+            event = stripe_1.default.webhooks.constructEvent(rawBody, signature, stripeAccount.webhookSecret);
             console.log("✅ Vercel: Webhook signature verification successful");
         }
         catch (verificationError) {

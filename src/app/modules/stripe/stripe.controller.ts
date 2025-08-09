@@ -685,24 +685,16 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       );
     }
 
-    // Get the account with the webhook secret
-    let stripeAccount = null;
+    // Try to fetch account if provided, but don't return early; we might identify it during verification
+    let stripeAccount = null as
+      | (typeof StripeAccounts extends infer T ? any : any)
+      | null;
 
     if (accountId) {
       stripeAccount = await StripeAccounts.findById(accountId).select(
         "+stripeSecretKey +webhookSecret",
       );
     }
-
-    // Create Stripe instance with account-specific secret key
-    if (!stripeAccount) {
-      console.error("No stripe account found");
-      return res.status(400).json({ error: "No stripe account found" });
-    }
-
-    const stripe = new Stripe(stripeAccount.stripeSecretKey, {
-      apiVersion: "2025-06-30.basil",
-    });
 
     // For Vercel serverless environments, handle body reconstruction
     let rawBody: Buffer;
@@ -744,8 +736,8 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       return res.status(400).json({ error: "Missing Stripe signature" });
     }
 
-    // If no webhook secret, try to find the correct account
-    if (!stripeAccount.webhookSecret) {
+    // If we don't yet know the account or it has no webhook secret, try to find the correct account
+    if (!stripeAccount || !stripeAccount.webhookSecret) {
       console.log("🔧 Vercel: No webhook secret found, trying all accounts");
 
       // Try to find the account by trying all accounts with webhook secrets
@@ -760,12 +752,8 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       // We'll try each account's webhook secret
       for (const account of allAccounts) {
         try {
-          const testStripe = new Stripe(account.stripeSecretKey, {
-            apiVersion: "2025-06-30.basil",
-          });
-
           // Try to verify with this account's webhook secret
-          const testEvent = testStripe.webhooks.constructEvent(
+          const testEvent = Stripe.webhooks.constructEvent(
             rawBody,
             signature,
             account.webhookSecret!,
@@ -787,7 +775,7 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
       }
     }
 
-    if (!stripeAccount.webhookSecret) {
+    if (!stripeAccount || !stripeAccount.webhookSecret) {
       console.error(`No webhook secret found for account ${accountId}`);
       return res.status(400).json({ error: "Invalid account configuration" });
     }
@@ -797,7 +785,7 @@ export const handleStripeWebhookServerless = async (req: any, res: any) => {
 
     // Verify the webhook signature using the raw buffer
     try {
-      event = stripe.webhooks.constructEvent(
+      event = Stripe.webhooks.constructEvent(
         rawBody,
         signature,
         stripeAccount.webhookSecret,

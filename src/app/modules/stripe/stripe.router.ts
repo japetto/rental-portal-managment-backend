@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import {
@@ -87,15 +87,13 @@ router.get("/webhook/test", testWebhook);
 // Test webhook secret endpoint (Admin only)
 router.get("/webhook/test-secret/:accountId", adminAuth, testWebhookSecret);
 
-// Vercel-specific webhook handler - no body parsing to preserve raw body
-router.post("/webhook-vercel", (req, res) => {
-  // Ensure no body parsing middleware is applied
-  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
-    // If body is already parsed, we need to reconstruct it
-    const rawBody = Buffer.from(JSON.stringify(req.body), "utf8");
-    req.body = rawBody;
-  }
-  handleStripeWebhookServerless(req, res);
-});
+// Vercel-specific webhook handler - use raw body to preserve exact payload
+router.post(
+  "/webhook-vercel",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    handleStripeWebhookServerless(req, res);
+  },
+);
 
 export const stripeRoutes = router;
