@@ -50,6 +50,7 @@ const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const softDeleteUtils_1 = require("../../../shared/softDeleteUtils");
+const payments_schema_1 = require("../payments/payments.schema");
 const properties_schema_1 = require("../properties/properties.schema");
 const properties_service_1 = require("../properties/properties.service");
 const service_requests_schema_1 = require("../service-requests/service-requests.schema");
@@ -974,4 +975,105 @@ exports.AdminService = {
     getArchivedProperties,
     getArchivedSpots,
     createTestLease,
+    getPayments,
 };
+// Get all payments with filters/pagination (Admin)
+function getPayments(filters, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const page = options.page || 1;
+        const limit = options.limit || 10;
+        const skip = (page - 1) * limit;
+        const sortBy = options.sortBy || "createdAt";
+        const sortOrder = options.sortOrder === "asc" ? 1 : -1;
+        const query = { isDeleted: false };
+        if (filters.status && typeof filters.status === "string") {
+            query.status = filters.status;
+        }
+        if (filters.type && typeof filters.type === "string") {
+            query.type = filters.type;
+        }
+        if (filters.propertyId && typeof filters.propertyId === "string") {
+            query.propertyId = filters.propertyId;
+        }
+        if (filters.tenantId && typeof filters.tenantId === "string") {
+            query.tenantId = filters.tenantId;
+        }
+        if (filters.spotId && typeof filters.spotId === "string") {
+            query.spotId = filters.spotId;
+        }
+        if (filters.startDate || filters.endDate) {
+            const dateFilter = {};
+            if (typeof filters.startDate === "string") {
+                dateFilter.$gte = new Date(filters.startDate);
+            }
+            if (typeof filters.endDate === "string") {
+                dateFilter.$lte = new Date(filters.endDate);
+            }
+            query.createdAt = dateFilter;
+        }
+        const sortConditions = {};
+        sortConditions[sortBy] = sortOrder;
+        const payments = yield payments_schema_1.Payments.find(query)
+            .populate("tenantId", "name email phoneNumber")
+            .populate("propertyId", "name address")
+            .populate("spotId", "spotNumber spotIdentifier")
+            .sort(sortConditions)
+            .skip(skip)
+            .limit(limit);
+        const total = yield payments_schema_1.Payments.countDocuments(query);
+        // Transform results for admin UI convenience
+        const data = payments.map(p => {
+            const payment = p.toObject();
+            return {
+                id: payment._id,
+                type: payment.type,
+                status: payment.status,
+                amount: payment.amount,
+                lateFeeAmount: payment.lateFeeAmount || 0,
+                totalAmount: payment.totalAmount,
+                dueDate: payment.dueDate,
+                paidDate: payment.paidDate,
+                receiptNumber: payment.receiptNumber,
+                description: payment.description,
+                createdAt: payment.createdAt,
+                updatedAt: payment.updatedAt,
+                tenant: payment.tenantId
+                    ? {
+                        id: payment.tenantId._id,
+                        name: payment.tenantId.name,
+                        email: payment.tenantId.email,
+                        phoneNumber: payment.tenantId.phoneNumber,
+                    }
+                    : null,
+                property: payment.propertyId
+                    ? {
+                        id: payment.propertyId._id,
+                        name: payment.propertyId.name,
+                        address: payment.propertyId.address,
+                    }
+                    : null,
+                spot: payment.spotId
+                    ? {
+                        id: payment.spotId._id,
+                        spotNumber: payment.spotId.spotNumber,
+                        spotIdentifier: payment.spotId.spotIdentifier,
+                    }
+                    : null,
+                stripe: {
+                    paymentLinkId: payment.stripePaymentLinkId,
+                    paymentIntentId: payment.stripePaymentIntentId,
+                    transactionId: payment.stripeTransactionId,
+                },
+            };
+        });
+        return {
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+            data,
+        };
+    });
+}

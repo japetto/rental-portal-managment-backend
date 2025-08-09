@@ -720,6 +720,29 @@ const testEmail = catchAsync(async (req: Request, res: Response) => {
   }
 });
 
+// Get all payments (Admin)
+const getPayments = catchAsync(async (req: Request, res: Response) => {
+  const filters = req.query;
+  const options = {
+    page: Number(req.query.page) || 1,
+    limit: Number(req.query.limit) || 10,
+    sortBy: (req.query.sortBy as string) || "createdAt",
+    sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+  };
+
+  const result = await AdminService.getPayments(filters, options);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Payments retrieved successfully",
+    data: {
+      payments: result.data,
+      pagination: result.meta,
+    },
+  });
+});
+
 // Archive and Restore Controllers
 
 const archiveProperty = catchAsync(async (req: Request, res: Response) => {
@@ -856,4 +879,5 @@ export const AdminController = {
   restoreSpot,
   getArchivedProperties,
   getArchivedSpots,
+  getPayments,
 };

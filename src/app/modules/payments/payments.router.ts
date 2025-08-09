@@ -14,8 +14,8 @@ const router = express.Router();
 // PAYMENT ROUTES
 // ========================================
 
-// Get payment data by receipt number (public route for payment success page)
-router.get("/receipt/:receiptNumber", PaymentController.getPaymentByReceipt);
+// Get payment data by Stripe session ID (more secure for payment success page)
+router.get("/receipt/by-session", PaymentController.getReceiptBySessionId);
 
 // Create payment link (User authenticated)
 router.post(

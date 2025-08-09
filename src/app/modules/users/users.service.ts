@@ -678,14 +678,21 @@ const getComprehensiveUserProfile = async (userId: string) => {
     const { Payments } = await import("../payments/payments.schema");
     recentPayments = await Payments.find({
       tenantId: userId,
+      isDeleted: false,
     })
+      .populate("propertyId", "name address")
+      .populate("spotId", "spotNumber spotIdentifier")
       .sort({ createdAt: -1 })
       .limit(10);
 
     pendingPayments = await Payments.find({
       tenantId: userId,
       status: { $in: ["PENDING", "OVERDUE"] },
-    }).sort({ dueDate: 1 });
+      isDeleted: false,
+    })
+      .populate("propertyId", "name address")
+      .populate("spotId", "spotNumber spotIdentifier")
+      .sort({ dueDate: 1 });
 
     // Get user's service requests
     const { ServiceRequests } = await import(
@@ -729,6 +736,14 @@ const getComprehensiveUserProfile = async (userId: string) => {
     payment => payment.status === "OVERDUE",
   );
 
+  // Check for active payment links
+  const activePaymentLinks = pendingPayments.filter(
+    payment => payment.stripePaymentLinkId && payment.paymentLinkUrl,
+  );
+
+  // Get next payment due date
+  const nextPaymentDue = pendingPayments.length > 0 ? pendingPayments[0] : null;
+
   // Build comprehensive profile
   const comprehensiveProfile = {
     // Basic user info
@@ -771,8 +786,27 @@ const getComprehensiveUserProfile = async (userId: string) => {
         : null,
     // Payment information (only for tenants)
     payments: {
-      recent: recentPayments,
-      pending: pendingPayments,
+      recent: recentPayments.map(payment => ({
+        ...payment.toObject(),
+        status: payment.status,
+        isOverdue: payment.status === "OVERDUE",
+        isPending: payment.status === "PENDING",
+        isPaid: payment.status === "PAID",
+      })),
+      pending: pendingPayments.map(payment => ({
+        ...payment.toObject(),
+        status: payment.status,
+        isOverdue: payment.status === "OVERDUE",
+        isPending: payment.status === "PENDING",
+        isPaid: payment.status === "PAID",
+      })),
+      activePaymentLinks: activePaymentLinks.map(payment => ({
+        ...payment.toObject(),
+        status: payment.status,
+        isOverdue: payment.status === "OVERDUE",
+        isPending: payment.status === "PENDING",
+        isPaid: payment.status === "PAID",
+      })),
       summary: {
         totalPendingAmount,
         overdueCount: overduePayments.length,
@@ -780,6 +814,21 @@ const getComprehensiveUserProfile = async (userId: string) => {
           (sum, payment) => sum + payment.totalAmount,
           0,
         ),
+        hasActivePaymentLinks: activePaymentLinks.length > 0,
+        activePaymentLinksCount: activePaymentLinks.length,
+        nextPaymentDue: nextPaymentDue
+          ? {
+              dueDate: nextPaymentDue.dueDate,
+              amount: nextPaymentDue.totalAmount,
+              description: nextPaymentDue.description,
+              hasPaymentLink: !!nextPaymentDue.stripePaymentLinkId,
+            }
+          : null,
+        paymentStatus: {
+          hasOverduePayments: overduePayments.length > 0,
+          hasPendingPayments: pendingPayments.length > 0,
+          isUpToDate: pendingPayments.length === 0,
+        },
       },
     },
     // Service requests (only for tenants)

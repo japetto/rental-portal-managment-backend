@@ -18,95 +18,35 @@ const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const payment_service_1 = require("./payment.service");
 const payments_schema_1 = require("./payments.schema");
-// Get payment data by receipt number (for payment success page)
-const getPaymentByReceipt = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { receiptNumber } = req.params;
-    const payment = yield payments_schema_1.Payments.findOne({
-        receiptNumber,
-        isDeleted: false,
-    }).populate([
-        {
-            path: "tenantId",
-            select: "name email phone",
-        },
-        {
-            path: "propertyId",
-            select: "name address propertyType lotNumber unitNumber",
-        },
-        {
-            path: "spotId",
-            select: "spotNumber spotType",
-        },
-        {
-            path: "stripeAccountId",
-            select: "name stripeAccountId",
-        },
-    ]);
-    if (!payment) {
+// Get payment data by Stripe session ID (more secure for payment success page)
+const getReceiptBySessionId = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { session_id, accountId } = req.query;
+    if (!session_id || typeof session_id !== "string") {
         return (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.NOT_FOUND,
+            statusCode: http_status_1.default.BAD_REQUEST,
             success: false,
-            message: "Payment not found",
+            message: "Session ID is required",
             data: null,
         });
     }
-    // Format the payment data for the frontend
-    const paymentData = {
-        id: payment._id,
-        receiptNumber: payment.receiptNumber,
-        amount: payment.amount,
-        totalAmount: payment.totalAmount,
-        lateFeeAmount: payment.lateFeeAmount,
-        type: payment.type,
-        status: payment.status,
-        dueDate: payment.dueDate,
-        paidDate: payment.paidDate,
-        description: payment.description,
-        paymentMethod: payment.paymentMethod,
-        transactionId: payment.transactionId,
-        stripeTransactionId: payment.stripeTransactionId,
-        stripePaymentLinkId: payment.stripePaymentLinkId,
-        // Tenant information
-        tenant: {
-            id: payment.tenantId._id,
-            name: payment.tenantId.name,
-            email: payment.tenantId.email,
-            phone: payment.tenantId.phone,
-        },
-        // Property information
-        property: {
-            id: payment.propertyId._id,
-            name: payment.propertyId.name,
-            address: payment.propertyId.address,
-            propertyType: payment.propertyId.propertyType,
-            lotNumber: payment.propertyId.lotNumber,
-            unitNumber: payment.propertyId.unitNumber,
-        },
-        // Parking spot information
-        spot: payment.spotId
-            ? {
-                id: payment.spotId._id,
-                spotNumber: payment.spotId.spotNumber,
-                spotType: payment.spotId.spotType,
-            }
-            : null,
-        // Stripe account information
-        stripeAccount: payment.stripeAccountId
-            ? {
-                id: payment.stripeAccountId._id,
-                name: payment.stripeAccountId.name,
-                stripeAccountId: payment.stripeAccountId.stripeAccountId,
-            }
-            : null,
-        createdAt: payment.createdAt,
-        updatedAt: payment.updatedAt,
-    };
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_1.default.OK,
-        success: true,
-        message: "Payment data retrieved successfully",
-        data: paymentData,
-    });
+    try {
+        const paymentData = yield payment_service_1.PaymentService.getReceiptBySessionId(session_id, accountId);
+        (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.OK,
+            success: true,
+            message: "Payment data retrieved successfully",
+            data: paymentData,
+        });
+    }
+    catch (error) {
+        console.error("Error retrieving receipt by session ID:", error);
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.NOT_FOUND,
+            success: false,
+            message: error.message || "Payment not found",
+            data: null,
+        });
+    }
 }));
 // Get payment link details
 const getPaymentLinkDetails = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -332,7 +272,7 @@ const verifyPaymentLink = (0, catchAsync_1.default)((req, res) => __awaiter(void
     }
 }));
 exports.PaymentController = {
-    getPaymentByReceipt,
+    getReceiptBySessionId,
     getPaymentLinkDetails,
     getTenantPaymentStatus,
     getPaymentHistory,

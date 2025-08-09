@@ -271,6 +271,36 @@ export const adminDeleteUserValidationSchema = z.object({
   }),
 });
 
+// Admin Payments Validation
+export const adminGetPaymentsValidationSchema = z.object({
+  query: z.object({
+    status: z
+      .enum(["PENDING", "PAID", "OVERDUE", "CANCELLED", "REFUNDED", "PARTIAL"])
+      .optional(),
+    type: z.enum(["RENT", "DEPOSIT", "OTHER"]).optional(),
+    propertyId: z
+      .string()
+      .regex(objectIdRegex, "Invalid property ID format")
+      .optional(),
+    tenantId: z
+      .string()
+      .regex(objectIdRegex, "Invalid tenant ID format")
+      .optional(),
+    spotId: z
+      .string()
+      .regex(objectIdRegex, "Invalid spot ID format")
+      .optional(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
+    page: z.string().regex(/^\d+$/, "Page must be a number").optional(),
+    limit: z.string().regex(/^\d+$/, "Limit must be a number").optional(),
+    sortBy: z
+      .enum(["createdAt", "dueDate", "paidDate", "amount", "status"])
+      .optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  }),
+});
+
 export const AdminValidation = {
   inviteTenantValidationSchema,
   createSpotValidationSchema,
@@ -287,4 +317,5 @@ export const AdminValidation = {
   adminGetUserValidationSchema,
   adminUpdateUserValidationSchema,
   adminDeleteUserValidationSchema,
+  adminGetPaymentsValidationSchema,
 };

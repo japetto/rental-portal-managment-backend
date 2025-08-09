@@ -61,6 +61,7 @@ const http_status_1 = __importDefault(require("http-status"));
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const users_service_1 = require("./users.service");
+const payment_service_1 = require("../payments/payment.service");
 // User Register
 const userRegister = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const userInfo = __rest(req.body, []);
@@ -437,6 +438,26 @@ const getMyProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result,
     });
 }));
+// Get My Payment History (Tenant)
+const getMyPaymentHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    const result = yield payment_service_1.PaymentService.getPaymentHistory(userId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Payment history retrieved successfully",
+        data: result,
+    });
+}));
 exports.UserController = {
     userRegister,
     userLogin,
@@ -454,4 +475,5 @@ exports.UserController = {
     getUserAnnouncementById,
     markAnnouncementAsRead,
     getMyProfile,
+    getMyPaymentHistory,
 };

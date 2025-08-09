@@ -13,8 +13,8 @@ const router = express_1.default.Router();
 // ========================================
 // PAYMENT ROUTES
 // ========================================
-// Get payment data by receipt number (public route for payment success page)
-router.get("/receipt/:receiptNumber", payments_controller_1.PaymentController.getPaymentByReceipt);
+// Get payment data by Stripe session ID (more secure for payment success page)
+router.get("/receipt/by-session", payments_controller_1.PaymentController.getReceiptBySessionId);
 // Create payment link (User authenticated)
 router.post("/create-payment-link", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(payments_validation_1.createPaymentWithLinkSchema), payments_controller_1.PaymentController.createPaymentWithLink);
 // Verify payment link ownership

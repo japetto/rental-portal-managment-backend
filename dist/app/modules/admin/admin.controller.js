@@ -613,6 +613,26 @@ const testEmail = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
         });
     }
 }));
+// Get all payments (Admin)
+const getPayments = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const filters = req.query;
+    const options = {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        sortBy: req.query.sortBy || "createdAt",
+        sortOrder: req.query.sortOrder || "desc",
+    };
+    const result = yield admin_service_1.AdminService.getPayments(filters, options);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Payments retrieved successfully",
+        data: {
+            payments: result.data,
+            pagination: result.meta,
+        },
+    });
+}));
 // Archive and Restore Controllers
 const archiveProperty = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -734,4 +754,5 @@ exports.AdminController = {
     restoreSpot,
     getArchivedProperties,
     getArchivedSpots,
+    getPayments,
 };

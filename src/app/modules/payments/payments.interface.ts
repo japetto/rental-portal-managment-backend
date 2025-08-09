@@ -1,7 +1,5 @@
 import { Document, Types } from "mongoose";
 import {
-  LeaseStatus,
-  LeaseType,
   PaymentMethod,
   PaymentStatus,
   PaymentType,
@@ -86,81 +84,60 @@ export interface IPaymentHistory {
 export interface IRentSummaryResponse {
   hasActiveLease: boolean;
   message?: string;
-  rentSummary?: {
-    // Payment link information
-    paymentLink: {
-      id?: string;
-      url?: string;
-    };
-    property: {
-      id: any;
-      name: string;
-      address: {
-        street: string;
-        city: string;
-        state: string;
-        zip: string;
-        country?: string;
-      };
-    };
-    spot: {
-      id: any;
-      spotNumber: string;
-      spotIdentifier: string;
-      amenities: string[];
-      size?: {
-        length?: number;
-        width?: number;
-      };
-    };
-    lease: {
-      id: any;
-      leaseType: LeaseType;
-      leaseStart: Date;
-      leaseEnd?: Date;
-      rentAmount: number;
-      depositAmount: number;
-      leaseStatus: LeaseStatus;
-      paymentStatus: PaymentStatus;
-    };
-    currentMonth: {
-      dueDate: Date;
-      rentAmount: number;
-      status: PaymentStatus;
-      paidDate?: Date;
-      paymentMethod?: PaymentMethod;
-      lateFeeAmount: number;
-      totalAmount: number;
-      daysOverdue: number;
-      receiptNumber?: string;
-      amount: number;
-      depositAmount: number;
-      includesDeposit: boolean;
-      isFirstTimePayment: boolean;
-    };
-    summary: {
-      totalOverdueAmount: number;
-      totalDue: number;
-      overdueCount: number;
-      pendingCount: number;
-      totalPaidAmount: number;
-      averagePaymentAmount: number;
-    };
-    recentPayments: Array<{
-      id: any;
-      dueDate: Date;
-      paidDate?: Date;
-      amount: number;
-      paymentMethod?: PaymentMethod;
-      receiptNumber: string;
-      status: PaymentStatus;
-    }>;
-    pendingPayments: Array<{
-      id: any;
-      dueDate: Date;
-      amount: number;
-      status: PaymentStatus;
-      daysOverdue: number;
-    }>;
-  };
+
+  // Property info
+  propertyName?: string;
+  propertyAddress?: string;
+  spotNumber?: string;
+
+  // Lease info
+  rentAmount?: number;
+  depositAmount?: number;
+  leaseStart?: Date;
+  leaseEnd?: Date;
+  isLeaseExpiringSoon?: boolean;
+
+  // Payment status
+  isFirstTimePayment?: boolean;
+  currentMonthAmount?: number;
+  currentMonthDescription?: string;
+  totalOverdueAmount?: number;
+  totalDue?: number;
+
+  // Payment dates
+  currentMonthDueDate?: Date;
+  nextMonthDueDate?: Date;
+  overduePaymentsDetails?: Array<{
+    dueDate: Date;
+    amount: number;
+    description: string;
+    daysOverdue: number;
+  }>;
+
+  // Payment options
+  canPayCurrentAndOverdue?: boolean;
+  paymentOptions?: Array<{
+    type: "CURRENT_MONTH" | "OVERDUE" | "NEXT_MONTH" | "COMBINED";
+    amount: number;
+    description: string;
+    dueDate?: Date;
+  }>;
+
+  // Pro-rated payment details
+  isProRated?: boolean;
+  proRatedDays?: number;
+  proRatedRentAmount?: number;
+  fullMonthRentAmount?: number;
+
+  // Payment action
+  paymentAction?: string;
+  canPayNextMonth?: boolean;
+
+  // Warnings
+  warningMessage?: string;
+  hasOverduePayments?: boolean;
+  overdueCount?: number;
+
+  // Lease expiration warning
+  leaseExpirationWarning?: string;
 }

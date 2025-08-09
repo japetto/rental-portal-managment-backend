@@ -47,6 +47,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentService = void 0;
 const config_1 = __importDefault(require("../../../config/config"));
+const payment_enums_1 = require("../../../shared/enums/payment.enums");
 const leases_schema_1 = require("../leases/leases.schema");
 const properties_schema_1 = require("../properties/properties.schema");
 const spots_schema_1 = require("../spots/spots.schema");
@@ -174,6 +175,7 @@ const calculateSummary = (payments) => {
 };
 // Enhanced rent summary with shared payment calculation logic
 const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         // Get active lease for the tenant
         const activeLease = yield leases_schema_1.Leases.findOne({
@@ -185,7 +187,6 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             return {
                 hasActiveLease: false,
                 message: "No active lease found",
-                rentSummary: undefined,
             };
         }
         // Get tenant, property, and spot information
@@ -241,196 +242,197 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             status: { $in: ["PENDING", "OVERDUE"] },
             isDeleted: false,
         }).sort({ dueDate: 1 });
-        // Calculate overdue amounts
+        // Calculate overdue amounts and get detailed overdue info
         const overduePayments = pendingPayments.filter(payment => payment.status === "OVERDUE");
         const totalOverdueAmount = overduePayments.reduce((sum, payment) => sum + payment.totalAmount, 0);
-        // Calculate total amount due (current month + overdue)
-        let currentMonthAmount = (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || activeLease.rentAmount;
-        // For first-time payments, use the first payment amount
-        if (paymentHistory.length === 0) {
+        // Get detailed overdue payment information
+        const overduePaymentsDetails = overduePayments.map(payment => {
+            const daysOverdue = Math.floor((currentDate.getTime() - payment.dueDate.getTime()) /
+                (1000 * 60 * 60 * 24));
+            return {
+                dueDate: payment.dueDate,
+                amount: payment.totalAmount,
+                description: payment.description,
+                daysOverdue: Math.max(0, daysOverdue),
+            };
+        });
+        // Determine if this is first-time payment
+        const isFirstTimePayment = paymentHistory.length === 0;
+        // Calculate current month amount due
+        let currentMonthAmount = 0;
+        let currentMonthDescription = "";
+        let isProRated = false;
+        let proRatedDays = 0;
+        let proRatedRentAmount = 0;
+        let fullMonthRentAmount = rentAmount;
+        if (isFirstTimePayment) {
+            // First-time payment: rent + deposit
             const leaseStartDay = leaseStart.getDate();
             if (leaseStartDay > 1) {
                 // Pro-rated first month
                 const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
                 const remainingDays = daysInMonth - leaseStartDay + 1;
-                const proRatedRent = Math.round((rentAmount / daysInMonth) * remainingDays);
-                currentMonthAmount = proRatedRent + activeLease.depositAmount;
+                proRatedDays = remainingDays;
+                proRatedRentAmount = Math.round((rentAmount / daysInMonth) * remainingDays);
+                isProRated = true;
+                currentMonthAmount = proRatedRentAmount + activeLease.depositAmount;
+                currentMonthDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit`;
             }
             else {
                 // Full first month
                 currentMonthAmount = rentAmount + activeLease.depositAmount;
+                currentMonthDescription = "First Month Rent + Deposit";
             }
         }
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) !== "PAID") {
+            // Regular monthly payment
+            currentMonthAmount = rentAmount;
+            currentMonthDescription = `Monthly Rent - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+        }
+        // Calculate total amount due
         const totalDue = currentMonthAmount + totalOverdueAmount;
-        // Calculate days overdue for current payment
-        const daysOverdue = currentMonthPayment && currentMonthPayment.status === "OVERDUE"
-            ? Math.floor((currentDate.getTime() - currentMonthPayment.dueDate.getTime()) /
-                (1000 * 60 * 60 * 24))
-            : 0;
-        // Determine payment action and next payment details
+        // Determine payment action and payment options
         let paymentAction = "NONE";
-        let nextPaymentDetails = null;
-        let isFirstTimePayment = false;
         let canPayNextMonth = false;
-        if (paymentHistory.length === 0) {
-            // First-time payment scenario
-            isFirstTimePayment = true;
+        let canPayCurrentAndOverdue = false;
+        let warningMessage = "";
+        // Build payment options array
+        const paymentOptions = [];
+        // Option 1: Current month payment (if not paid)
+        if (currentMonthAmount > 0) {
+            paymentOptions.push({
+                type: "CURRENT_MONTH",
+                amount: currentMonthAmount,
+                description: `Current Month Rent - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
+                dueDate: currentMonth,
+            });
+        }
+        // Option 2: Overdue payments (if any)
+        if (overduePayments.length > 0) {
+            const overdueMonths = overduePayments
+                .map(payment => payment.dueDate.toLocaleDateString("en-US", {
+                month: "short",
+                year: "numeric",
+            }))
+                .join(", ");
+            paymentOptions.push({
+                type: "OVERDUE",
+                amount: totalOverdueAmount,
+                description: `Overdue Rent (${overdueMonths})`,
+                dueDate: (_a = overduePayments[0]) === null || _a === void 0 ? void 0 : _a.dueDate,
+            });
+        }
+        // Option 3: Combined current + overdue
+        if (currentMonthAmount > 0 && overduePayments.length > 0) {
+            const overdueMonths = overduePayments
+                .map(payment => payment.dueDate.toLocaleDateString("en-US", {
+                month: "short",
+                year: "numeric",
+            }))
+                .join(", ");
+            paymentOptions.push({
+                type: "COMBINED",
+                amount: currentMonthAmount + totalOverdueAmount,
+                description: `Current Month + Overdue (${overdueMonths})`,
+                dueDate: currentMonth,
+            });
+            canPayCurrentAndOverdue = true;
+        }
+        // Option 4: Next month (if current is paid and no next month payment)
+        if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment) {
+            paymentOptions.push({
+                type: "NEXT_MONTH",
+                amount: rentAmount,
+                description: `Next Month Rent - ${nextMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
+                dueDate: nextMonth,
+            });
+            canPayNextMonth = true;
+        }
+        if (isFirstTimePayment) {
             paymentAction = "FIRST_TIME_PAYMENT";
-            // Calculate first payment details
-            let firstPaymentAmount = rentAmount + activeLease.depositAmount;
-            let firstPaymentDescription = `First Month Rent + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
-            // Check if lease started mid-month
-            const leaseStartDay = leaseStart.getDate();
-            if (leaseStartDay > 1) {
-                const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
-                const remainingDays = daysInMonth - leaseStartDay + 1;
-                const proRatedRent = Math.round((rentAmount / daysInMonth) * remainingDays);
-                firstPaymentAmount = proRatedRent + activeLease.depositAmount;
-                firstPaymentDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
-            }
-            nextPaymentDetails = {
-                amount: firstPaymentAmount,
-                dueDate: leaseStart,
-                description: firstPaymentDescription,
-                includesDeposit: true,
-                isProRated: leaseStartDay > 1,
-                proRatedDays: leaseStartDay > 1
-                    ? (() => {
-                        const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
-                        return daysInMonth - leaseStartDay + 1;
-                    })()
-                    : null,
-            };
         }
-        else {
-            // Regular payment scenarios
-            if (!currentMonthPayment) {
-                // No payment for current month
-                paymentAction = "CURRENT_MONTH_DUE";
-                nextPaymentDetails = {
-                    amount: rentAmount,
-                    dueDate: currentMonth,
-                    description: `Monthly Rent Payment - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`,
-                    includesDeposit: false,
-                    isProRated: false,
-                };
-            }
-            else if (currentMonthPayment.status === "PAID" && !nextMonthPayment) {
-                // Current month is paid, can pay next month
-                paymentAction = "CAN_PAY_NEXT_MONTH";
-                canPayNextMonth = true;
-                nextPaymentDetails = {
-                    amount: rentAmount,
-                    dueDate: nextMonth,
-                    description: `Monthly Rent Payment (Next Month) - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`,
-                    includesDeposit: false,
-                    isProRated: false,
-                };
-            }
-            else if (currentMonthPayment.status === "PAID" && nextMonthPayment) {
-                // Already paid for current and next month - one month ahead limit reached
-                paymentAction = "PAYMENT_LIMIT_REACHED";
-                const currentMonthName = currentMonth.toLocaleDateString("en-US", {
-                    month: "long",
-                    year: "numeric",
-                });
-                const nextMonthName = nextMonth.toLocaleDateString("en-US", {
-                    month: "long",
-                    year: "numeric",
-                });
-                nextPaymentDetails = {
-                    warning: `You have already paid for ${currentMonthName} and ${nextMonthName}. You cannot pay more than one month ahead.`,
-                };
-            }
-            else if (currentMonthPayment.status === "PENDING") {
-                paymentAction = "CURRENT_MONTH_PENDING";
-                nextPaymentDetails = {
-                    amount: currentMonthPayment.totalAmount,
-                    dueDate: currentMonthPayment.dueDate,
-                    description: currentMonthPayment.description,
-                    status: "PENDING",
-                };
-            }
-            else if (currentMonthPayment.status === "OVERDUE") {
-                paymentAction = "CURRENT_MONTH_OVERDUE";
-                nextPaymentDetails = {
-                    amount: currentMonthPayment.totalAmount,
-                    dueDate: currentMonthPayment.dueDate,
-                    description: currentMonthPayment.description,
-                    status: "OVERDUE",
-                    daysOverdue: daysOverdue,
-                };
-            }
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment) {
+            // Current month is paid, can pay next month
+            paymentAction = "CAN_PAY_NEXT_MONTH";
+            canPayNextMonth = true;
         }
-        // Simplified rent summary
-        const rentSummary = {
-            // Basic property info
-            property: {
-                name: property.name,
-                address: property.address,
-            },
-            spot: {
-                spotNumber: spot.spotNumber || spot.spotIdentifier,
-            },
-            // Lease info
-            lease: {
-                rentAmount: activeLease.rentAmount,
-                depositAmount: activeLease.depositAmount,
-                leaseStart: activeLease.leaseStart,
-                leaseEnd: activeLease.leaseEnd,
-            },
-            // Current month status
-            currentMonth: {
-                status: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) || "PENDING",
-                dueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.dueDate) || currentMonth,
-                amount: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) ||
-                    (isFirstTimePayment ? currentMonthAmount : activeLease.rentAmount),
-                daysOverdue: daysOverdue,
-                // Add deposit information for first-time payments
-                rentAmount: activeLease.rentAmount,
-                depositAmount: isFirstTimePayment ? activeLease.depositAmount : 0,
-                includesDeposit: isFirstTimePayment,
-                isFirstTimePayment: isFirstTimePayment,
-            },
-            // Payment action and details
-            paymentAction,
-            canPayNextMonth,
-            isFirstTimePayment,
-            // Simple summary
-            summary: {
-                totalOverdueAmount,
-                totalDue,
-                overdueCount: overduePayments.length,
-                pendingCount: pendingPayments.length,
-            },
-            // Recent payments (last 3 only)
-            recentPayments: (yield payments_schema_1.Payments.find({
-                tenantId: tenantId,
-                type: "RENT",
-                status: "PAID",
-                isDeleted: false,
-            })
-                .sort({ dueDate: -1 })
-                .limit(3)
-                .lean()).map(payment => ({
-                dueDate: payment.dueDate,
-                amount: payment.totalAmount,
-                status: payment.status,
-            })),
-            // Pending payments
-            pendingPayments: pendingPayments.map(payment => ({
-                dueDate: payment.dueDate,
-                amount: payment.totalAmount,
-                status: payment.status,
-                daysOverdue: payment.status === "OVERDUE"
-                    ? Math.floor((currentDate.getTime() - payment.dueDate.getTime()) /
-                        (1000 * 60 * 60 * 24))
-                    : 0,
-            })),
-        };
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && nextMonthPayment) {
+            // Already paid for current and next month
+            paymentAction = "PAYMENT_LIMIT_REACHED";
+            const currentMonthName = currentMonth.toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+            });
+            const nextMonthName = nextMonth.toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+            });
+            warningMessage = `You have already paid for ${currentMonthName} and ${nextMonthName}. You cannot pay more than one month ahead.`;
+        }
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PENDING") {
+            paymentAction = "CURRENT_MONTH_PENDING";
+        }
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "OVERDUE") {
+            paymentAction = "CURRENT_MONTH_OVERDUE";
+        }
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === payment_enums_1.PaymentStatus.CANCELLED ||
+            (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === payment_enums_1.PaymentStatus.REFUNDED) {
+            // Handle cancelled/refunded payments
+            paymentAction = "CURRENT_MONTH_DUE";
+        }
+        // Check lease expiration
+        const isLeaseExpiringSoon = activeLease.leaseEnd
+            ? Math.floor((activeLease.leaseEnd.getTime() - currentDate.getTime()) /
+                (1000 * 60 * 60 * 24)) <= 30
+            : false;
+        // Return simplified single object
         return {
             hasActiveLease: true,
-            rentSummary,
+            // Property info
+            propertyName: property.name,
+            propertyAddress: property.address,
+            spotNumber: spot.spotNumber || spot.spotIdentifier,
+            // Lease info
+            rentAmount: activeLease.rentAmount,
+            depositAmount: activeLease.depositAmount,
+            leaseStart: activeLease.leaseStart,
+            leaseEnd: activeLease.leaseEnd,
+            isLeaseExpiringSoon,
+            // Payment status
+            isFirstTimePayment,
+            currentMonthAmount,
+            currentMonthDescription,
+            totalOverdueAmount,
+            totalDue,
+            // Payment dates - only show if relevant
+            currentMonthDueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" ? undefined : currentMonth,
+            nextMonthDueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment
+                ? nextMonth
+                : undefined,
+            overduePaymentsDetails,
+            // Payment options
+            canPayCurrentAndOverdue,
+            paymentOptions,
+            // Pro-rated payment details
+            isProRated,
+            proRatedDays,
+            proRatedRentAmount,
+            fullMonthRentAmount,
+            // Payment action
+            paymentAction,
+            canPayNextMonth,
+            // Warnings
+            warningMessage,
+            hasOverduePayments: overduePayments.length > 0,
+            overdueCount: overduePayments.length,
+            // Lease expiration warning
+            leaseExpirationWarning: isLeaseExpiringSoon && activeLease.leaseEnd
+                ? `Your lease expires on ${activeLease.leaseEnd.toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                })}. Please contact management to renew.`
+                : null,
         };
     }
     catch (error) {
@@ -528,7 +530,6 @@ const getPendingPaymentDetails = (tenantId) => __awaiter(void 0, void 0, void 0,
 const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log("🚀 ~ createPaymentWithLink ~ paymentData:", paymentData);
         // First, check if user already has a pending payment
         const pendingPaymentDetails = yield getPendingPaymentDetails(paymentData.tenantId);
         if (pendingPaymentDetails) {
@@ -595,23 +596,24 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             includeDeposit = true;
             paymentDueDate = new Date(leaseStart);
             paymentAmount = rentAmount + activeLease.depositAmount;
-            paymentDescription = `First Month Rent + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
-            // Check if lease started mid-month and adjust amount if needed
-            const leaseStartDay = leaseStart.getDate();
-            console.log("🔍 Lease start analysis:", {
-                leaseStart: leaseStart.toISOString(),
-                leaseStartDay,
-                rentAmount,
-                depositAmount: activeLease.depositAmount,
-                isFirstTimePayment,
+            // Create organized payment description for Stripe checkout
+            const monthYear = leaseStart.toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
             });
-            if (leaseStartDay > 1) {
+            const propertyInfo = property.address
+                ? `${property.name} - ${spot.spotNumber || spot.spotIdentifier}\n📍 Address: ${property.address}`
+                : `${property.name} - ${spot.spotNumber || spot.spotIdentifier}`;
+            if (leaseStart.getDate() > 1) {
                 // Pro-rate the first month's rent
                 const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
-                const remainingDays = daysInMonth - leaseStartDay + 1;
+                const remainingDays = daysInMonth - leaseStart.getDate() + 1;
                 const proRatedRent = Math.round((rentAmount / daysInMonth) * remainingDays);
                 paymentAmount = proRatedRent + activeLease.depositAmount;
-                paymentDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+                paymentDescription =
+                    `📅 Pro-rated First Month (${remainingDays} days): $${proRatedRent}\n` +
+                        `💰 Security Deposit: $${activeLease.depositAmount}\n` +
+                        `📍 ${propertyInfo}`;
                 console.log("📊 Pro-rated calculation:", {
                     daysInMonth,
                     remainingDays,
@@ -624,7 +626,10 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             else {
                 // If lease starts on the 1st of the month, charge full rent + deposit
                 paymentAmount = rentAmount + activeLease.depositAmount;
-                paymentDescription = `First Month Rent + Deposit - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+                paymentDescription =
+                    `📅 First Month Rent: $${rentAmount}\n` +
+                        `💰 Security Deposit: $${activeLease.depositAmount}\n` +
+                        `📍 ${propertyInfo}`;
                 console.log("💰 Full rent + deposit charged:", {
                     amount: paymentAmount,
                 });
@@ -661,7 +666,15 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 // No payment for current month - create current month payment
                 paymentDueDate = currentMonth;
                 paymentAmount = rentAmount;
-                paymentDescription = `Monthly Rent Payment - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+                const monthYear = currentMonth.toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                });
+                const propertyInfo = property.address
+                    ? `${property.name} - ${spot.spotNumber || spot.spotIdentifier}\n📍 Address: ${property.address}`
+                    : `${property.name} - ${spot.spotNumber || spot.spotIdentifier}`;
+                paymentDescription =
+                    `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
                 console.log("💰 Creating payment for current month:", {
                     amount: paymentAmount,
                     dueDate: paymentDueDate.toISOString(),
@@ -671,7 +684,15 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 // Current month is paid, no payment for next month - create next month payment
                 paymentDueDate = nextMonth;
                 paymentAmount = rentAmount;
-                paymentDescription = `Monthly Rent Payment (Next Month) - ${tenant.name} - ${property.name} (${property.address}) - ${spot.spotNumber || spot.spotIdentifier}`;
+                const monthYear = nextMonth.toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                });
+                const propertyInfo = property.address
+                    ? `${property.name} - ${spot.spotNumber || spot.spotIdentifier}\n📍 Address: ${property.address}`
+                    : `${property.name} - ${spot.spotNumber || spot.spotIdentifier}`;
+                paymentDescription =
+                    `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
                 console.log("💰 Creating payment for next month (one month ahead):", {
                     amount: paymentAmount,
                     dueDate: paymentDueDate.toISOString(),
@@ -788,7 +809,10 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     price_data: {
                         currency: "usd",
                         product_data: {
-                            name: paymentDescription,
+                            name: isFirstTimePayment
+                                ? `Rent Payment - ${paymentDueDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })} + Deposit - ${property.name}`
+                                : `Rent Payment - ${paymentDueDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })} - ${property.name}`,
+                            description: paymentDescription,
                         },
                         unit_amount: Math.round(paymentAmount * 100),
                     },
@@ -813,7 +837,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             after_completion: {
                 type: "redirect",
                 redirect: {
-                    url: `${config_1.default.client_url || "https://beckrow.netlify.app"}/payment-success?payment_intent={CHECKOUT_SESSION_ID}`,
+                    url: `${config_1.default.client_url || "https://beckrow.netlify.app"}/payment-success?session_id={CHECKOUT_SESSION_ID}&accountId=${stripeAccount._id}`,
                 },
             },
         });
@@ -864,110 +888,7 @@ const getPaymentLinkDetails = (paymentLinkId, secretKey) => __awaiter(void 0, vo
     const stripe = createStripeInstance(secretKey);
     return yield stripe.paymentLinks.retrieve(paymentLinkId);
 });
-// Get transaction history for a payment link
-const getPaymentLinkTransactions = (paymentLinkId, secretKey) => __awaiter(void 0, void 0, void 0, function* () {
-    const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
-    const stripe = createStripeInstance(secretKey);
-    return yield stripe.paymentIntents.list({
-        limit: 100,
-    });
-});
-// Create payment record from Stripe data
-const createPaymentFromStripe = (stripePayment, tenantId) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const user = yield users_schema_1.Users.findOne({
-        _id: tenantId,
-        isDeleted: false,
-        isActive: true,
-    });
-    if (!user)
-        throw new Error("User not found or account is deactivated");
-    // Find property by name from metadata
-    const propertyName = (_a = stripePayment.metadata) === null || _a === void 0 ? void 0 : _a.propertyName;
-    if (!propertyName)
-        throw new Error("Property name not found in payment metadata");
-    const property = yield properties_schema_1.Properties.findOne({ name: propertyName });
-    if (!property) {
-        // Cancel payment if property not found
-        // Note: We need the secret key to cancel, but we don't have it here
-        // This is a limitation - we'll need to handle this differently
-        throw new Error(`Property not found: ${propertyName}`);
-    }
-    // Get the Stripe account for this property
-    const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
-    const stripeAccount = yield StripeAccounts.findOne({
-        propertyIds: property._id,
-        isActive: true,
-        isVerified: true,
-    });
-    // Create payment record
-    return payments_schema_1.Payments.create({
-        tenantId,
-        propertyId: property._id,
-        spotId: user.spotId,
-        amount: stripePayment.amount / 100, // Convert from cents
-        type: "RENT",
-        status: "PAID",
-        dueDate: new Date(),
-        paidDate: new Date(stripePayment.created * 1000),
-        paymentMethod: "ONLINE",
-        transactionId: stripePayment.id,
-        stripeTransactionId: stripePayment.id,
-        stripeAccountId: stripeAccount === null || stripeAccount === void 0 ? void 0 : stripeAccount._id,
-        receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        description: "Monthly Rent Payment",
-        totalAmount: stripePayment.amount / 100,
-        createdBy: "SYSTEM",
-    });
-});
-// Handle successful payment via webhook
-const handleSuccessfulPayment = (stripePaymentIntent) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        console.log("🎉 Processing successful payment:", {
-            paymentIntentId: stripePaymentIntent.id,
-            amount: stripePaymentIntent.amount / 100,
-            metadata: stripePaymentIntent.metadata,
-        });
-        // Extract payment record ID from metadata
-        const { paymentRecordId } = stripePaymentIntent.metadata;
-        if (!paymentRecordId) {
-            console.error("❌ Missing paymentRecordId in metadata:", stripePaymentIntent.metadata);
-            throw new Error("Missing payment record ID in metadata");
-        }
-        // Find the existing payment record
-        const existingPayment = yield payments_schema_1.Payments.findById(paymentRecordId);
-        if (!existingPayment) {
-            console.error("❌ Payment record not found:", paymentRecordId);
-            throw new Error("Payment record not found");
-        }
-        // Use stored metadata if available, otherwise use PaymentIntent data
-        const storedMetadata = existingPayment.stripeMetadata || {};
-        console.log("📋 Using stored metadata:", storedMetadata);
-        // Update the payment record with successful payment details
-        const updatedPayment = yield payments_schema_1.Payments.findByIdAndUpdate(paymentRecordId, {
-            status: "PAID",
-            paidDate: new Date(stripePaymentIntent.created * 1000),
-            paymentMethod: "ONLINE",
-            transactionId: stripePaymentIntent.id,
-            stripeTransactionId: stripePaymentIntent.id,
-            stripePaymentIntentId: stripePaymentIntent.id,
-            receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            // Update description if we have stored metadata
-            description: storedMetadata.paymentDescription || existingPayment.description,
-        }, { new: true });
-        console.log("✅ Payment record updated successfully:", {
-            paymentId: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment._id,
-            amount: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.totalAmount,
-            status: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.status,
-            description: updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.description,
-        });
-        return updatedPayment;
-    }
-    catch (error) {
-        console.error("❌ Error handling successful payment:", error);
-        throw error;
-    }
-});
+// TODO: we need to check and if it not using then delete this
 // Get comprehensive tenant payment status with automatic payment creation
 const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -1174,13 +1095,163 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
         throw error;
     }
 });
+// Get receipt by Stripe session ID (more secure than receipt number)
+const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        console.log("🔍 Retrieving receipt by session ID:", {
+            sessionId,
+            accountId,
+        });
+        // Find the Stripe account to get the secret key
+        let stripeAccount;
+        if (accountId) {
+            // Use specific account if provided
+            const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
+            stripeAccount =
+                yield StripeAccounts.findById(accountId).select("+stripeSecretKey");
+            if (!stripeAccount) {
+                throw new Error("Stripe account not found");
+            }
+        }
+        else {
+            // Find account by checking all active accounts
+            const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
+            const accounts = yield StripeAccounts.find({
+                isActive: true,
+                isVerified: true,
+            }).select("+stripeSecretKey");
+            // Try to find the account that can verify this session
+            for (const account of accounts) {
+                try {
+                    const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
+                    const stripe = createStripeInstance(account.stripeSecretKey);
+                    const session = yield stripe.checkout.sessions.retrieve(sessionId);
+                    if (session) {
+                        stripeAccount = account;
+                        break;
+                    }
+                }
+                catch (error) {
+                    // Continue to next account
+                    continue;
+                }
+            }
+            if (!stripeAccount) {
+                throw new Error("Could not find valid Stripe account for this session");
+            }
+        }
+        // Create Stripe instance and retrieve the session
+        const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
+        const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+        const session = yield stripe.checkout.sessions.retrieve(sessionId);
+        if (!session) {
+            throw new Error("Stripe session not found");
+        }
+        // Get payment intent from session
+        const paymentIntentId = session.payment_intent;
+        if (!paymentIntentId) {
+            throw new Error("No payment intent found in session");
+        }
+        // Retrieve payment intent to get metadata
+        const paymentIntent = yield stripe.paymentIntents.retrieve(paymentIntentId);
+        if (!((_a = paymentIntent.metadata) === null || _a === void 0 ? void 0 : _a.paymentRecordId)) {
+            throw new Error("Payment record ID not found in metadata");
+        }
+        // Find the payment record in our database
+        const payment = yield payments_schema_1.Payments.findById(paymentIntent.metadata.paymentRecordId).populate([
+            {
+                path: "tenantId",
+                select: "name email phone",
+            },
+            {
+                path: "propertyId",
+                select: "name address propertyType lotNumber unitNumber",
+            },
+            {
+                path: "spotId",
+                select: "spotNumber spotType",
+            },
+            {
+                path: "stripeAccountId",
+                select: "name stripeAccountId",
+            },
+        ]);
+        if (!payment) {
+            throw new Error("Payment record not found");
+        }
+        // Verify the payment is successful
+        if (payment.status !== payment_enums_1.PaymentStatus.PAID) {
+            throw new Error("Payment is not yet completed");
+        }
+        // Format the payment data for the frontend
+        const paymentData = {
+            id: payment._id,
+            receiptNumber: payment.receiptNumber,
+            amount: payment.amount,
+            totalAmount: payment.totalAmount,
+            lateFeeAmount: payment.lateFeeAmount,
+            type: payment.type,
+            status: payment.status,
+            dueDate: payment.dueDate,
+            paidDate: payment.paidDate,
+            description: payment.description,
+            paymentMethod: payment.paymentMethod,
+            transactionId: payment.transactionId,
+            stripeTransactionId: payment.stripeTransactionId,
+            stripePaymentLinkId: payment.stripePaymentLinkId,
+            // Stripe session info
+            stripeSessionId: sessionId,
+            stripePaymentIntentId: paymentIntentId,
+            // Tenant information
+            tenant: {
+                id: payment.tenantId._id,
+                name: payment.tenantId.name,
+                email: payment.tenantId.email,
+                phone: payment.tenantId.phone,
+            },
+            // Property information
+            property: {
+                id: payment.propertyId._id,
+                name: payment.propertyId.name,
+                address: payment.propertyId.address,
+                propertyType: payment.propertyId.propertyType,
+                lotNumber: payment.propertyId.lotNumber,
+                unitNumber: payment.propertyId.unitNumber,
+            },
+            // Parking spot information
+            spot: payment.spotId
+                ? {
+                    id: payment.spotId._id,
+                    spotNumber: payment.spotId.spotNumber,
+                    spotType: payment.spotId.spotType,
+                }
+                : null,
+            // Stripe account information
+            stripeAccount: payment.stripeAccountId
+                ? {
+                    id: payment.stripeAccountId._id,
+                    name: payment.stripeAccountId.name,
+                    stripeAccountId: payment.stripeAccountId.stripeAccountId,
+                }
+                : null,
+            createdAt: payment.createdAt,
+            updatedAt: payment.updatedAt,
+        };
+        return paymentData;
+    }
+    catch (error) {
+        console.error("❌ Error retrieving receipt by session ID:", error);
+        throw error;
+    }
+});
 exports.PaymentService = {
     getTenantPaymentStatusEnhanced,
-    getPaymentLinkDetails,
-    getPaymentHistory,
-    getRentSummary: getRentSummaryEnhanced, // Changed to use the enhanced function
-    createPaymentWithLink,
-    handleSuccessfulPayment,
-    verifyPaymentLinkOwnership,
     getPendingPaymentDetails,
+    createPaymentWithLink,
+    verifyPaymentLinkOwnership,
+    getPaymentLinkDetails,
+    getReceiptBySessionId,
+    getPaymentHistory,
+    getRentSummary: getRentSummaryEnhanced,
 };

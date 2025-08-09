@@ -6,105 +6,44 @@ import sendResponse from "../../../shared/sendResponse";
 import { PaymentService } from "./payment.service";
 import { Payments } from "./payments.schema";
 
-// Get payment data by receipt number (for payment success page)
-const getPaymentByReceipt = catchAsync(async (req: Request, res: Response) => {
-  const { receiptNumber } = req.params;
+// Get payment data by Stripe session ID (more secure for payment success page)
+const getReceiptBySessionId = catchAsync(
+  async (req: Request, res: Response) => {
+    const { session_id, accountId } = req.query;
 
-  const payment = await Payments.findOne({
-    receiptNumber,
-    isDeleted: false,
-  }).populate([
-    {
-      path: "tenantId",
-      select: "name email phone",
-    },
-    {
-      path: "propertyId",
-      select: "name address propertyType lotNumber unitNumber",
-    },
-    {
-      path: "spotId",
-      select: "spotNumber spotType",
-    },
-    {
-      path: "stripeAccountId",
-      select: "name stripeAccountId",
-    },
-  ]);
+    if (!session_id || typeof session_id !== "string") {
+      return sendResponse(res, {
+        statusCode: httpStatus.BAD_REQUEST,
+        success: false,
+        message: "Session ID is required",
+        data: null,
+      });
+    }
 
-  if (!payment) {
-    return sendResponse(res, {
-      statusCode: httpStatus.NOT_FOUND,
-      success: false,
-      message: "Payment not found",
-      data: null,
-    });
-  }
+    try {
+      const paymentData = await PaymentService.getReceiptBySessionId(
+        session_id,
+        accountId as string | undefined,
+      );
 
-  // Format the payment data for the frontend
-  const paymentData = {
-    id: payment._id,
-    receiptNumber: payment.receiptNumber,
-    amount: payment.amount,
-    totalAmount: payment.totalAmount,
-    lateFeeAmount: payment.lateFeeAmount,
-    type: payment.type,
-    status: payment.status,
-    dueDate: payment.dueDate,
-    paidDate: payment.paidDate,
-    description: payment.description,
-    paymentMethod: payment.paymentMethod,
-    transactionId: payment.transactionId,
-    stripeTransactionId: payment.stripeTransactionId,
-    stripePaymentLinkId: payment.stripePaymentLinkId,
+      sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Payment data retrieved successfully",
+        data: paymentData,
+      });
+    } catch (error: any) {
+      console.error("Error retrieving receipt by session ID:", error);
 
-    // Tenant information
-    tenant: {
-      id: (payment.tenantId as any)._id,
-      name: (payment.tenantId as any).name,
-      email: (payment.tenantId as any).email,
-      phone: (payment.tenantId as any).phone,
-    },
-
-    // Property information
-    property: {
-      id: (payment.propertyId as any)._id,
-      name: (payment.propertyId as any).name,
-      address: (payment.propertyId as any).address,
-      propertyType: (payment.propertyId as any).propertyType,
-      lotNumber: (payment.propertyId as any).lotNumber,
-      unitNumber: (payment.propertyId as any).unitNumber,
-    },
-
-    // Parking spot information
-    spot: payment.spotId
-      ? {
-          id: (payment.spotId as any)._id,
-          spotNumber: (payment.spotId as any).spotNumber,
-          spotType: (payment.spotId as any).spotType,
-        }
-      : null,
-
-    // Stripe account information
-    stripeAccount: payment.stripeAccountId
-      ? {
-          id: (payment.stripeAccountId as any)._id,
-          name: (payment.stripeAccountId as any).name,
-          stripeAccountId: (payment.stripeAccountId as any).stripeAccountId,
-        }
-      : null,
-
-    createdAt: payment.createdAt,
-    updatedAt: payment.updatedAt,
-  };
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Payment data retrieved successfully",
-    data: paymentData,
-  });
-});
+      return sendResponse(res, {
+        statusCode: httpStatus.NOT_FOUND,
+        success: false,
+        message: error.message || "Payment not found",
+        data: null,
+      });
+    }
+  },
+);
 
 // Get payment link details
 const getPaymentLinkDetails = catchAsync(
@@ -364,7 +303,7 @@ const verifyPaymentLink = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const PaymentController = {
-  getPaymentByReceipt,
+  getReceiptBySessionId,
   getPaymentLinkDetails,
   getTenantPaymentStatus,
   getPaymentHistory,
