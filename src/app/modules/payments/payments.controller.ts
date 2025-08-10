@@ -310,4 +310,17 @@ export const PaymentController = {
   getRentSummary,
   createPaymentWithLink,
   verifyPaymentLink,
+  // Admin: get specific tenant payment history
+  getTenantPaymentHistory: catchAsync(async (req: Request, res: Response) => {
+    const { tenantId } = req.params;
+
+    const result = await PaymentService.getPaymentHistory(tenantId);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Tenant payment history retrieved successfully",
+      data: result,
+    });
+  }),
 };

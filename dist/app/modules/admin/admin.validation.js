@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdminValidation = exports.adminGetTenantPaymentsValidationSchema = exports.adminGetPaymentsValidationSchema = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
+exports.AdminValidation = exports.adminGetPaymentsValidationSchema = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
 const zod_1 = require("zod");
 // Custom ObjectId validation
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -283,33 +283,6 @@ exports.adminGetPaymentsValidationSchema = zod_1.z.object({
         sortOrder: zod_1.z.enum(["asc", "desc"]).optional(),
     }),
 });
-exports.adminGetTenantPaymentsValidationSchema = zod_1.z.object({
-    params: zod_1.z.object({
-        tenantId: zod_1.z.string().regex(objectIdRegex, "Invalid tenant ID format"),
-    }),
-    query: zod_1.z.object({
-        status: zod_1.z
-            .enum(["PENDING", "PAID", "OVERDUE", "CANCELLED", "REFUNDED", "PARTIAL"])
-            .optional(),
-        type: zod_1.z.enum(["RENT", "DEPOSIT", "OTHER"]).optional(),
-        propertyId: zod_1.z
-            .string()
-            .regex(objectIdRegex, "Invalid property ID format")
-            .optional(),
-        spotId: zod_1.z
-            .string()
-            .regex(objectIdRegex, "Invalid spot ID format")
-            .optional(),
-        startDate: zod_1.z.string().datetime().optional(),
-        endDate: zod_1.z.string().datetime().optional(),
-        page: zod_1.z.string().regex(/^\d+$/, "Page must be a number").optional(),
-        limit: zod_1.z.string().regex(/^\d+$/, "Limit must be a number").optional(),
-        sortBy: zod_1.z
-            .enum(["createdAt", "dueDate", "paidDate", "amount", "status"])
-            .optional(),
-        sortOrder: zod_1.z.enum(["asc", "desc"]).optional(),
-    }),
-});
 exports.AdminValidation = {
     inviteTenantValidationSchema: exports.inviteTenantValidationSchema,
     createSpotValidationSchema: exports.createSpotValidationSchema,
@@ -327,5 +300,4 @@ exports.AdminValidation = {
     adminUpdateUserValidationSchema: exports.adminUpdateUserValidationSchema,
     adminDeleteUserValidationSchema: exports.adminDeleteUserValidationSchema,
     adminGetPaymentsValidationSchema: exports.adminGetPaymentsValidationSchema,
-    adminGetTenantPaymentsValidationSchema: exports.adminGetTenantPaymentsValidationSchema,
 };

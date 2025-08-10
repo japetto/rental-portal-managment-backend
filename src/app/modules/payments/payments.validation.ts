@@ -22,3 +22,10 @@ export const getTenantPaymentStatusSchema = z.object({
     tenantId: z.string().min(1, "Tenant ID is required"),
   }),
 });
+
+// Admin: Get specific tenant payment history
+export const getTenantPaymentHistorySchema = z.object({
+  params: z.object({
+    tenantId: z.string().min(1, "Tenant ID is required"),
+  }),
+});
