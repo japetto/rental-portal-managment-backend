@@ -4,8 +4,9 @@ export type SpotStatus = "AVAILABLE" | "MAINTENANCE" | "RESERVED" | "BOOKED";
 
 export interface ISpot extends Document {
   spotNumber: string;
-  spotIdentifier: string;
   propertyId: Types.ObjectId;
+  lotIdentifier: string;
+  lotType: string;
   status: SpotStatus;
   size?: {
     length?: number; // in feet
@@ -28,8 +29,9 @@ export interface ISpot extends Document {
 
 export interface ICreateSpot {
   spotNumber: string;
-  spotIdentifier: string;
   propertyId: string;
+  lotIdentifier: string;
+  lotType: string;
   size?: {
     length?: number;
     width?: number;
@@ -46,7 +48,8 @@ export interface ICreateSpot {
 
 export interface IUpdateSpot {
   spotNumber?: string;
-  spotIdentifier?: string;
+  lotIdentifier?: string;
+  lotType?: string;
   status?: SpotStatus;
   size?: {
     length?: number;

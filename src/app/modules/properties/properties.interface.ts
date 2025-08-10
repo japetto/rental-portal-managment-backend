@@ -1,5 +1,7 @@
 import { Document } from "mongoose";
 
+export type IdentifierType = "lotNumber" | "roadNumber";
+
 export interface IProperty extends Document {
   name: string;
   description: string;
@@ -8,8 +10,8 @@ export interface IProperty extends Document {
     city: string;
     state: string;
     zip: string;
-    country?: string;
   };
+  identifierType: IdentifierType;
   amenities: string[];
   images: string[];
   rules: string[];
@@ -32,8 +34,8 @@ export interface ICreateProperty {
     city: string;
     state: string;
     zip: string;
-    country?: string;
   };
+  identifierType: IdentifierType;
   amenities: string[];
   images?: string[];
   rules?: string[];
@@ -47,8 +49,8 @@ export interface IUpdateProperty {
     city?: string;
     state?: string;
     zip?: string;
-    country?: string;
   };
+  identifierType?: IdentifierType;
   amenities?: string[];
   images?: string[];
   rules?: string[];
@@ -74,8 +76,8 @@ export interface IPropertyWithStripeSummary {
     city: string;
     state: string;
     zip: string;
-    country?: string;
   };
+  identifierType: IdentifierType;
   amenities: string[];
   images: string[];
   rules: string[];

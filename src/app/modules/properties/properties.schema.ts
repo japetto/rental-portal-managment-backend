@@ -10,7 +10,11 @@ export const propertiesSchema = new Schema<IProperty>(
       city: { type: String, required: true },
       state: { type: String, required: true },
       zip: { type: String, required: true },
-      country: { type: String, required: false },
+    },
+    identifierType: {
+      type: String,
+      enum: ["lotNumber", "roadNumber"],
+      required: true,
     },
     amenities: [{ type: String, required: true }],
     images: [{ type: String }],

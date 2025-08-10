@@ -17,7 +17,8 @@ export const inviteTenantValidationSchema = z.object({
 export const createSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required"),
-    spotIdentifier: z.string().min(1, "Spot identifier is required"),
+    lotIdentifier: z.string().min(1, "Lot identifier is required"),
+    lotType: z.string().min(1, "Lot type is required"),
     propertyId: z.string().regex(objectIdRegex, "Invalid property ID format"),
     // size: z
     //   .object({
@@ -50,7 +51,8 @@ export const createSpotValidationSchema = z.object({
 export const updateSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required").optional(),
-    spotIdentifier: z.string().min(1, "Spot identifier is required").optional(),
+    lotIdentifier: z.string().min(1, "Lot identifier is required").optional(),
+    lotType: z.string().min(1, "Lot type is required").optional(),
     status: z.enum(["AVAILABLE", "MAINTENANCE"]).optional(),
     size: z
       .object({
@@ -87,7 +89,11 @@ export const createPropertyValidationSchema = z.object({
       city: z.string().min(1, "City is required"),
       state: z.string().min(1, "State is required"),
       zip: z.string().min(1, "ZIP code is required"),
-      country: z.string().optional(),
+    }),
+    identifierType: z.enum(["lotNumber", "roadNumber"], {
+      required_error: "Identifier type is required",
+      invalid_type_error:
+        "Identifier type must be either 'lotNumber' or 'roadNumber'",
     }),
     amenities: z.array(z.string()).min(1, "At least one amenity is required"),
     images: z.array(z.string()).optional(),
@@ -108,7 +114,12 @@ export const updatePropertyValidationSchema = z.object({
         city: z.string().min(1, "City is required").optional(),
         state: z.string().min(1, "State is required").optional(),
         zip: z.string().min(1, "ZIP code is required").optional(),
-        country: z.string().optional(),
+      })
+      .optional(),
+    identifierType: z
+      .enum(["lotNumber", "roadNumber"], {
+        invalid_type_error:
+          "Identifier type must be either 'lotNumber' or 'roadNumber'",
       })
       .optional(),
     amenities: z
