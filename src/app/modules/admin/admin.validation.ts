@@ -51,13 +51,13 @@ export const createSpotValidationSchema = z.object({
 export const updateSpotValidationSchema = z.object({
   body: z.object({
     spotNumber: z.string().min(1, "Spot number is required").optional(),
-    lotIdentifier: z.string().min(1, "Lot identifier is required").optional(),
-    lotType: z.string().min(1, "Lot type is required").optional(),
+    lotIdentifier: z.string().optional(),
+    lotType: z.string().optional(),
     status: z.enum(["AVAILABLE", "MAINTENANCE"]).optional(),
     size: z
       .object({
-        length: z.number().min(1, "Length must be at least 1 foot").optional(),
-        width: z.number().min(1, "Width must be at least 1 foot").optional(),
+        length: z.number().min(0, "Length must be non-negative").optional(),
+        width: z.number().min(0, "Width must be non-negative").optional(),
       })
       .optional(),
     amenities: z.array(z.string()).optional(),
