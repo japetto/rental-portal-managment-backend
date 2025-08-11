@@ -756,13 +756,31 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         }
         // Get the Stripe account for this property
         const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
-        const stripeAccount = yield StripeAccounts.findOne({
+        // First, try to find a property-specific Stripe account
+        let stripeAccount = yield StripeAccounts.findOne({
             propertyIds: propertyId,
             isActive: true,
             isVerified: true,
-        }).select("+stripeSecretKey"); // Explicitly select the secret key
+        }).select("+stripeSecretKey");
+        // If no property-specific account found, try to find a default account
         if (!stripeAccount) {
-            throw new Error("No active Stripe account found for this property");
+            console.log("🔍 No property-specific Stripe account found, looking for default account...");
+            stripeAccount = yield StripeAccounts.findOne({
+                isDefaultAccount: true,
+                isActive: true,
+                isVerified: true,
+            }).select("+stripeSecretKey");
+        }
+        // If still no account found, try to find any active and verified account
+        if (!stripeAccount) {
+            console.log("🔍 No default account found, looking for any active account...");
+            stripeAccount = yield StripeAccounts.findOne({
+                isActive: true,
+                isVerified: true,
+            }).select("+stripeSecretKey");
+        }
+        if (!stripeAccount) {
+            throw new Error("No active Stripe account found for this property or as fallback");
         }
         // Debug: Check if secret key exists
         console.log("🔍 Stripe account found:", {
@@ -770,6 +788,10 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             name: stripeAccount.name,
             hasSecretKey: !!stripeAccount.stripeSecretKey,
             secretKeyLength: ((_a = stripeAccount.stripeSecretKey) === null || _a === void 0 ? void 0 : _a.length) || 0,
+            accountType: stripeAccount.isDefaultAccount
+                ? "DEFAULT"
+                : "PROPERTY_SPECIFIC",
+            propertyIds: stripeAccount.propertyIds,
         });
         if (!stripeAccount.stripeSecretKey) {
             throw new Error("Stripe account secret key is not configured");
@@ -1103,30 +1125,34 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
             sessionId,
             accountId,
         });
+        // Import required modules
+        const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
+        const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
         // Find the Stripe account to get the secret key
         let stripeAccount;
+        let session = null;
         if (accountId) {
             // Use specific account if provided
-            const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
             stripeAccount =
                 yield StripeAccounts.findById(accountId).select("+stripeSecretKey");
             if (!stripeAccount) {
                 throw new Error("Stripe account not found");
             }
+            // Get session from the specified account
+            const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
+            session = yield stripe.checkout.sessions.retrieve(sessionId);
         }
         else {
-            // Find account by checking all active accounts
-            const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
+            // Try to find the account that can verify this session
             const accounts = yield StripeAccounts.find({
                 isActive: true,
                 isVerified: true,
             }).select("+stripeSecretKey");
-            // Try to find the account that can verify this session
+            // Try each account until we find one that can retrieve the session
             for (const account of accounts) {
                 try {
-                    const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
                     const stripe = createStripeInstance(account.stripeSecretKey);
-                    const session = yield stripe.checkout.sessions.retrieve(sessionId);
+                    session = yield stripe.checkout.sessions.retrieve(sessionId);
                     if (session) {
                         stripeAccount = account;
                         break;
@@ -1137,14 +1163,10 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
                     continue;
                 }
             }
-            if (!stripeAccount) {
+            if (!session || !stripeAccount) {
                 throw new Error("Could not find valid Stripe account for this session");
             }
         }
-        // Create Stripe instance and retrieve the session
-        const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
-        const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
-        const session = yield stripe.checkout.sessions.retrieve(sessionId);
         if (!session) {
             throw new Error("Stripe session not found");
         }
@@ -1154,6 +1176,7 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
             throw new Error("No payment intent found in session");
         }
         // Retrieve payment intent to get metadata
+        const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
         const paymentIntent = yield stripe.paymentIntents.retrieve(paymentIntentId);
         if (!((_a = paymentIntent.metadata) === null || _a === void 0 ? void 0 : _a.paymentRecordId)) {
             throw new Error("Payment record ID not found in metadata");
@@ -1232,7 +1255,6 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
                 ? {
                     id: payment.stripeAccountId._id,
                     name: payment.stripeAccountId.name,
-                    stripeAccountId: payment.stripeAccountId.stripeAccountId,
                 }
                 : null,
             createdAt: payment.createdAt,
