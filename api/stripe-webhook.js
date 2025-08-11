@@ -36,9 +36,17 @@ function readRawBody(req) {
 
 // Minimal handlers
 async function handleSucceeded(paymentIntent, stripeAccountId) {
+  console.log("🔔 Payment succeeded webhook triggered:", {
+    paymentIntentId: paymentIntent.id,
+    metadata: paymentIntent.metadata,
+    stripeAccountId,
+  });
+
   if (paymentIntent?.metadata?.paymentRecordId) {
     const paymentRecordId = paymentIntent.metadata.paymentRecordId;
-    await Payments.findByIdAndUpdate(
+    console.log("📝 Updating payment record:", paymentRecordId);
+
+    const updatedPayment = await Payments.findByIdAndUpdate(
       paymentRecordId,
       {
         status: PaymentStatus.PAID,
@@ -53,6 +61,12 @@ async function handleSucceeded(paymentIntent, stripeAccountId) {
       },
       { new: true },
     );
+
+    console.log("✅ Payment updated successfully:", {
+      paymentId: updatedPayment._id,
+      status: updatedPayment.status,
+      receiptNumber: updatedPayment.receiptNumber,
+    });
     return;
   }
 
@@ -188,19 +202,27 @@ module.exports = async (req, res) => {
       return;
     }
 
-    console.log(`🔔 Webhook event: ${event.type}`);
+    console.log(`🔔 Webhook event: ${event.type}`, {
+      eventId: event.id,
+      accountId,
+      stripeAccountName: stripeAccount?.name,
+    });
 
     switch (event.type) {
       case "payment_intent.succeeded":
+        console.log("💰 Processing payment_intent.succeeded");
         await handleSucceeded(event.data.object, accountId);
         break;
       case "payment_intent.payment_failed":
+        console.log("❌ Processing payment_intent.payment_failed");
         await handleFailed(event.data.object, accountId);
         break;
       case "payment_intent.canceled":
+        console.log("🚫 Processing payment_intent.canceled");
         await handleCanceled(event.data.object, accountId);
         break;
       default:
+        console.log(`⚠️ Unhandled event type: ${event.type}`);
         // no-op
         break;
     }
