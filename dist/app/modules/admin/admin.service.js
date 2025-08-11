@@ -292,10 +292,10 @@ const createSpot = (spotData) => __awaiter(void 0, void 0, void 0, function* () 
     if (existingSpotByNumber) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, "Spot number already exists in this property");
     }
-    // Check if spot identifier already exists in this property
+    // Check if lot identifier already exists in this property
     const existingSpotByIdentifier = yield spots_schema_1.Spots.findOne({
         propertyId: spotData.propertyId,
-        spotIdentifier: spotData.spotIdentifier,
+        lotIdentifier: spotData.lotIdentifier,
     });
     if (existingSpotByIdentifier) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, "Spot identifier already exists in this property");
@@ -370,12 +370,12 @@ const updateSpot = (spotId, updateData) => __awaiter(void 0, void 0, void 0, fun
             throw new ApiError_1.default(http_status_1.default.CONFLICT, "Spot number already exists in this property");
         }
     }
-    // If updating spot identifier, check for uniqueness within the property
-    if (updateData.spotIdentifier &&
-        updateData.spotIdentifier !== spot.spotIdentifier) {
+    // If updating lot identifier, check for uniqueness within the property
+    if (updateData.lotIdentifier &&
+        updateData.lotIdentifier !== spot.lotIdentifier) {
         const existingSpotByIdentifier = yield spots_schema_1.Spots.findOne({
             propertyId: spot.propertyId,
-            spotIdentifier: updateData.spotIdentifier,
+            lotIdentifier: updateData.lotIdentifier,
             _id: { $ne: spotId },
         });
         if (existingSpotByIdentifier) {
@@ -1016,7 +1016,7 @@ function getPayments(filters, options) {
         const payments = yield payments_schema_1.Payments.find(query)
             .populate("tenantId", "name email phoneNumber")
             .populate("propertyId", "name address")
-            .populate("spotId", "spotNumber spotIdentifier")
+            .populate("spotId", "spotNumber lotIdentifier")
             .sort(sortConditions)
             .skip(skip)
             .limit(limit);
@@ -1056,7 +1056,7 @@ function getPayments(filters, options) {
                     ? {
                         id: payment.spotId._id,
                         spotNumber: payment.spotId.spotNumber,
-                        spotIdentifier: payment.spotId.spotIdentifier,
+                        lotIdentifier: payment.spotId.lotIdentifier,
                     }
                     : null,
                 stripe: {

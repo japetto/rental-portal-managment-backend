@@ -391,7 +391,7 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             // Property info
             propertyName: property.name,
             propertyAddress: property.address,
-            spotNumber: spot.spotNumber || spot.spotIdentifier,
+            spotNumber: spot.spotNumber || spot.lotIdentifier,
             // Lease info
             rentAmount: activeLease.rentAmount,
             depositAmount: activeLease.depositAmount,
@@ -518,7 +518,7 @@ const getPendingPaymentDetails = (tenantId) => __awaiter(void 0, void 0, void 0,
                 ? { name: property.name, address: property.address }
                 : null,
             spot: spot
-                ? { spotNumber: spot.spotNumber, spotIdentifier: spot.spotIdentifier }
+                ? { spotNumber: spot.spotNumber, lotIdentifier: spot.lotIdentifier }
                 : null,
         };
     }
@@ -602,8 +602,8 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 year: "numeric",
             });
             const propertyInfo = property.address
-                ? `${property.name} - ${spot.spotNumber || spot.spotIdentifier}\n📍 Address: ${property.address}`
-                : `${property.name} - ${spot.spotNumber || spot.spotIdentifier}`;
+                ? `${property.name} - ${spot.spotNumber || spot.lotIdentifier}\n📍 Address: ${property.address}`
+                : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
             if (leaseStart.getDate() > 1) {
                 // Pro-rate the first month's rent
                 const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
@@ -671,8 +671,8 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     year: "numeric",
                 });
                 const propertyInfo = property.address
-                    ? `${property.name} - ${spot.spotNumber || spot.spotIdentifier}\n📍 Address: ${property.address}`
-                    : `${property.name} - ${spot.spotNumber || spot.spotIdentifier}`;
+                    ? `${property.name} - ${spot.spotNumber || spot.lotIdentifier}\n📍 Address: ${property.address}`
+                    : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
                 paymentDescription =
                     `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
                 console.log("💰 Creating payment for current month:", {
@@ -689,8 +689,8 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     year: "numeric",
                 });
                 const propertyInfo = property.address
-                    ? `${property.name} - ${spot.spotNumber || spot.spotIdentifier}\n📍 Address: ${property.address}`
-                    : `${property.name} - ${spot.spotNumber || spot.spotIdentifier}`;
+                    ? `${property.name} - ${spot.spotNumber || spot.lotIdentifier}\n📍 Address: ${property.address}`
+                    : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
                 paymentDescription =
                     `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
                 console.log("💰 Creating payment for next month (one month ahead):", {
