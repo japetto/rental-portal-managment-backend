@@ -17,7 +17,8 @@ exports.inviteTenantValidationSchema = zod_1.z.object({
 exports.createSpotValidationSchema = zod_1.z.object({
     body: zod_1.z.object({
         spotNumber: zod_1.z.string().min(1, "Spot number is required"),
-        spotIdentifier: zod_1.z.string().min(1, "Spot identifier is required"),
+        lotIdentifier: zod_1.z.string().min(1, "Lot identifier is required"),
+        lotType: zod_1.z.string().min(1, "Lot type is required"),
         propertyId: zod_1.z.string().regex(objectIdRegex, "Invalid property ID format"),
         // size: z
         //   .object({
@@ -46,12 +47,13 @@ exports.createSpotValidationSchema = zod_1.z.object({
 exports.updateSpotValidationSchema = zod_1.z.object({
     body: zod_1.z.object({
         spotNumber: zod_1.z.string().min(1, "Spot number is required").optional(),
-        spotIdentifier: zod_1.z.string().min(1, "Spot identifier is required").optional(),
+        lotIdentifier: zod_1.z.string().optional(),
+        lotType: zod_1.z.string().optional(),
         status: zod_1.z.enum(["AVAILABLE", "MAINTENANCE"]).optional(),
         size: zod_1.z
             .object({
-            length: zod_1.z.number().min(1, "Length must be at least 1 foot").optional(),
-            width: zod_1.z.number().min(1, "Width must be at least 1 foot").optional(),
+            length: zod_1.z.number().min(0, "Length must be non-negative").optional(),
+            width: zod_1.z.number().min(0, "Width must be non-negative").optional(),
         })
             .optional(),
         amenities: zod_1.z.array(zod_1.z.string()).optional(),
@@ -82,7 +84,10 @@ exports.createPropertyValidationSchema = zod_1.z.object({
             city: zod_1.z.string().min(1, "City is required"),
             state: zod_1.z.string().min(1, "State is required"),
             zip: zod_1.z.string().min(1, "ZIP code is required"),
-            country: zod_1.z.string().optional(),
+        }),
+        identifierType: zod_1.z.enum(["lotNumber", "roadNumber"], {
+            required_error: "Identifier type is required",
+            invalid_type_error: "Identifier type must be either 'lotNumber' or 'roadNumber'",
         }),
         amenities: zod_1.z.array(zod_1.z.string()).min(1, "At least one amenity is required"),
         images: zod_1.z.array(zod_1.z.string()).optional(),
@@ -102,7 +107,11 @@ exports.updatePropertyValidationSchema = zod_1.z.object({
             city: zod_1.z.string().min(1, "City is required").optional(),
             state: zod_1.z.string().min(1, "State is required").optional(),
             zip: zod_1.z.string().min(1, "ZIP code is required").optional(),
-            country: zod_1.z.string().optional(),
+        })
+            .optional(),
+        identifierType: zod_1.z
+            .enum(["lotNumber", "roadNumber"], {
+            invalid_type_error: "Identifier type must be either 'lotNumber' or 'roadNumber'",
         })
             .optional(),
         amenities: zod_1.z

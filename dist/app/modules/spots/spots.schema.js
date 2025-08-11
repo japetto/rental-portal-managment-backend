@@ -4,12 +4,13 @@ exports.Spots = exports.spotsSchema = void 0;
 const mongoose_1 = require("mongoose");
 exports.spotsSchema = new mongoose_1.Schema({
     spotNumber: { type: String, required: true },
-    spotIdentifier: { type: String, required: true },
     propertyId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Properties",
         required: true,
     },
+    lotIdentifier: { type: String, required: true, trim: true },
+    lotType: { type: String, required: true, trim: true },
     status: {
         type: String,
         enum: ["AVAILABLE", "MAINTENANCE", "RESERVED", "BOOKED"],

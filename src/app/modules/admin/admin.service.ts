@@ -369,10 +369,10 @@ const createSpot = async (spotData: ICreateSpot): Promise<ISpot> => {
     );
   }
 
-  // Check if spot identifier already exists in this property
+  // Check if lot identifier already exists in this property
   const existingSpotByIdentifier = await Spots.findOne({
     propertyId: spotData.propertyId,
-    spotIdentifier: spotData.spotIdentifier,
+    lotIdentifier: spotData.lotIdentifier,
   });
   if (existingSpotByIdentifier) {
     throw new ApiError(
@@ -493,14 +493,14 @@ const updateSpot = async (
     }
   }
 
-  // If updating spot identifier, check for uniqueness within the property
+  // If updating lot identifier, check for uniqueness within the property
   if (
-    updateData.spotIdentifier &&
-    updateData.spotIdentifier !== spot.spotIdentifier
+    updateData.lotIdentifier &&
+    updateData.lotIdentifier !== spot.lotIdentifier
   ) {
     const existingSpotByIdentifier = await Spots.findOne({
       propertyId: spot.propertyId,
-      spotIdentifier: updateData.spotIdentifier,
+      lotIdentifier: updateData.lotIdentifier,
       _id: { $ne: spotId },
     });
     if (existingSpotByIdentifier) {
@@ -1451,7 +1451,7 @@ async function getPayments(
   const payments = await Payments.find(query)
     .populate("tenantId", "name email phoneNumber")
     .populate("propertyId", "name address")
-    .populate("spotId", "spotNumber spotIdentifier")
+    .populate("spotId", "spotNumber lotIdentifier")
     .sort(sortConditions)
     .skip(skip)
     .limit(limit);
@@ -1493,7 +1493,7 @@ async function getPayments(
         ? {
             id: payment.spotId._id,
             spotNumber: payment.spotId.spotNumber,
-            spotIdentifier: payment.spotId.spotIdentifier,
+            lotIdentifier: payment.spotId.lotIdentifier,
           }
         : null,
       stripe: {

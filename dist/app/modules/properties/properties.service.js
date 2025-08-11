@@ -88,7 +88,7 @@ const getAllPropertiesWithStripeDetailsService = () => __awaiter(void 0, void 0,
         .select("name description stripeAccountId isActive isVerified isGlobalAccount isDefaultAccount propertyIds")
         .lean();
     const propertyToStripeMap = new Map();
-    stripeAccounts.forEach((account) => {
+    stripeAccounts.forEach(account => {
         const summary = {
             _id: account._id.toString(),
             name: account.name,
@@ -97,7 +97,7 @@ const getAllPropertiesWithStripeDetailsService = () => __awaiter(void 0, void 0,
             isVerified: account.isVerified,
             isDefaultAccount: account.isDefaultAccount,
         };
-        (account.propertyIds || []).forEach((propertyId) => {
+        (account.propertyIds || []).forEach(propertyId => {
             propertyToStripeMap.set(propertyId._id.toString(), summary);
         });
     });
@@ -107,7 +107,7 @@ const getAllPropertiesWithStripeDetailsService = () => __awaiter(void 0, void 0,
         const lotData = yield (0, exports.calculatePropertyLotData)(id);
         const base = prop.toObject();
         const stripeAccount = propertyToStripeMap.get(id) || null;
-        results.push(Object.assign(Object.assign({ _id: id, name: base.name, description: base.description, address: base.address, amenities: base.amenities, images: base.images, rules: base.rules, isActive: base.isActive, createdAt: base.createdAt, updatedAt: base.updatedAt }, lotData), { stripeAccount, hasStripeAccount: Boolean(stripeAccount) }));
+        results.push(Object.assign(Object.assign({ _id: id, name: base.name, description: base.description, address: base.address, identifierType: base.identifierType, amenities: base.amenities, images: base.images, rules: base.rules, isActive: base.isActive, createdAt: base.createdAt, updatedAt: base.updatedAt }, lotData), { stripeAccount, hasStripeAccount: Boolean(stripeAccount) }));
     }
     return results;
 });
@@ -140,7 +140,7 @@ const getPropertiesWithAvailableStripeAccountsService = () => __awaiter(void 0, 
         isDefaultAccount: Boolean(acc.isDefaultAccount),
     }));
     const propertyToStripeMap = new Map();
-    stripeAccounts.forEach((account) => {
+    stripeAccounts.forEach(account => {
         const summary = {
             _id: account._id.toString(),
             name: account.name,
@@ -149,7 +149,7 @@ const getPropertiesWithAvailableStripeAccountsService = () => __awaiter(void 0, 
             isVerified: account.isVerified,
             isDefaultAccount: account.isDefaultAccount,
         };
-        (account.propertyIds || []).forEach((propertyId) => {
+        (account.propertyIds || []).forEach(propertyId => {
             propertyToStripeMap.set(propertyId._id.toString(), summary);
         });
     });
@@ -166,7 +166,7 @@ const getPropertiesWithAvailableStripeAccountsService = () => __awaiter(void 0, 
             hasGlobalAccounts: globalAccounts.length > 0,
             totalAvailableAccounts: (propertyStripeAccount ? 1 : 0) + globalAccounts.length,
         };
-        results.push(Object.assign(Object.assign({ _id: id, name: base.name, description: base.description, address: base.address, amenities: base.amenities, images: base.images, rules: base.rules, isActive: base.isActive, createdAt: base.createdAt, updatedAt: base.updatedAt }, lotData), { stripeAccount: propertyStripeAccount, availableStripeAccounts }));
+        results.push(Object.assign(Object.assign({ _id: id, name: base.name, description: base.description, address: base.address, identifierType: base.identifierType, amenities: base.amenities, images: base.images, rules: base.rules, isActive: base.isActive, createdAt: base.createdAt, updatedAt: base.updatedAt }, lotData), { stripeAccount: propertyStripeAccount, availableStripeAccounts }));
     }
     return results;
 });
@@ -183,8 +183,8 @@ const getPropertiesWithoutStripeAccountsService = () => __awaiter(void 0, void 0
         .select("propertyIds")
         .lean();
     const propertiesWithStripe = new Set();
-    stripeAccounts.forEach((account) => {
-        (account.propertyIds || []).forEach((propertyId) => {
+    stripeAccounts.forEach(account => {
+        (account.propertyIds || []).forEach(propertyId => {
             propertiesWithStripe.add(propertyId._id.toString());
         });
     });
@@ -195,7 +195,7 @@ const getPropertiesWithoutStripeAccountsService = () => __awaiter(void 0, void 0
             continue;
         const lotData = yield (0, exports.calculatePropertyLotData)(id);
         const base = prop.toObject();
-        results.push(Object.assign(Object.assign({ _id: id, name: base.name, description: base.description, address: base.address, amenities: base.amenities, images: base.images, rules: base.rules, isActive: base.isActive, createdAt: base.createdAt, updatedAt: base.updatedAt }, lotData), { stripeAccount: null, hasStripeAccount: false }));
+        results.push(Object.assign(Object.assign({ _id: id, name: base.name, description: base.description, address: base.address, identifierType: base.identifierType, amenities: base.amenities, images: base.images, rules: base.rules, isActive: base.isActive, createdAt: base.createdAt, updatedAt: base.updatedAt }, lotData), { stripeAccount: null, hasStripeAccount: false }));
     }
     return results;
 });
