@@ -130,7 +130,7 @@ export const createStripeAccount = async (accountData: any) => {
     let webhookResult = null;
     try {
       // Point to the actual Vercel-exposed webhook route
-      const webhookUrl = `${config.backend_url}/api/v1.0/stripe/webhook-vercel`;
+      const webhookUrl = `${config.backend_url}stripe/webhook-vercel`;
 
       const webhook = await createWebhookEndpoint(
         (createdAccount as any)._id.toString(),
