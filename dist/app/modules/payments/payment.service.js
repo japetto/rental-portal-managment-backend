@@ -859,7 +859,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             after_completion: {
                 type: "redirect",
                 redirect: {
-                    url: `${config_1.default.client_url || "https://beckrow.netlify.app"}/payment-success?session_id={CHECKOUT_SESSION_ID}&accountId=${stripeAccount._id}`,
+                    url: `${config_1.default.client_url || "https://rentalportal01.netlify.app"}/payment-success?session_id={CHECKOUT_SESSION_ID}&accountId=${stripeAccount._id}`,
                 },
             },
         });
