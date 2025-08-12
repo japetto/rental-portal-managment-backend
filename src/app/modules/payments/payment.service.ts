@@ -1026,7 +1026,7 @@ const createPaymentWithLink = async (paymentData: {
       after_completion: {
         type: "redirect",
         redirect: {
-          url: `${config.client_url || "https://beckrow.netlify.app"}/payment-success?session_id={CHECKOUT_SESSION_ID}&accountId=${stripeAccount._id}`,
+          url: `${config.client_url || "https://rentalportal01.netlify.app"}/payment-success?session_id={CHECKOUT_SESSION_ID}&accountId=${stripeAccount._id}`,
         },
       },
     });

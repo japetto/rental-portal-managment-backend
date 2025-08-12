@@ -42,45 +42,94 @@ async function handleSucceeded(paymentIntent, stripeAccountId) {
     stripeAccountId,
   });
 
-  if (paymentIntent?.metadata?.paymentRecordId) {
-    const paymentRecordId = paymentIntent.metadata.paymentRecordId;
-    console.log("📝 Updating payment record:", paymentRecordId);
+  try {
+    if (paymentIntent?.metadata?.paymentRecordId) {
+      const paymentRecordId = paymentIntent.metadata.paymentRecordId;
+      console.log("📝 Updating payment record:", paymentRecordId);
 
-    const updatedPayment = await Payments.findByIdAndUpdate(
-      paymentRecordId,
-      {
-        status: PaymentStatus.PAID,
-        paidDate: new Date(paymentIntent.created * 1000),
-        paymentMethod: "ONLINE",
-        stripePaymentIntentId: paymentIntent.id,
-        stripeTransactionId:
-          paymentIntent.charges?.data?.[0]?.id || paymentIntent.latest_charge,
-        stripeMetadata: paymentIntent.metadata,
-        receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        stripeAccountId: stripeAccountId,
-      },
-      { new: true },
+      // First, check if the payment record exists
+      const existingPayment = await Payments.findById(paymentRecordId);
+      if (!existingPayment) {
+        console.error("❌ Payment record not found:", paymentRecordId);
+        return;
+      }
+
+      console.log("📋 Found existing payment:", {
+        id: existingPayment._id,
+        currentStatus: existingPayment.status,
+        amount: existingPayment.amount,
+      });
+
+      const updatedPayment = await Payments.findByIdAndUpdate(
+        paymentRecordId,
+        {
+          status: PaymentStatus.PAID,
+          paidDate: new Date(paymentIntent.created * 1000),
+          paymentMethod: "ONLINE",
+          stripePaymentIntentId: paymentIntent.id,
+          stripeTransactionId:
+            paymentIntent.charges?.data?.[0]?.id || paymentIntent.latest_charge,
+          stripeMetadata: paymentIntent.metadata,
+          receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          stripeAccountId: stripeAccountId,
+        },
+        { new: true },
+      );
+
+      if (!updatedPayment) {
+        console.error("❌ Failed to update payment record:", paymentRecordId);
+        return;
+      }
+
+      console.log("✅ Payment updated successfully:", {
+        paymentId: updatedPayment._id,
+        status: updatedPayment.status,
+        receiptNumber: updatedPayment.receiptNumber,
+        paidDate: updatedPayment.paidDate,
+      });
+      return;
+    }
+
+    // Fallback: find by PaymentIntent ID
+    console.log(
+      "🔍 Trying fallback: searching by PaymentIntent ID:",
+      paymentIntent.id,
     );
-
-    console.log("✅ Payment updated successfully:", {
-      paymentId: updatedPayment._id,
-      status: updatedPayment.status,
-      receiptNumber: updatedPayment.receiptNumber,
+    const existing = await Payments.findOne({
+      stripePaymentIntentId: paymentIntent.id,
     });
-    return;
-  }
 
-  // Fallback: find by PaymentIntent ID
-  const existing = await Payments.findOne({
-    stripePaymentIntentId: paymentIntent.id,
-  });
-  if (existing) {
-    existing.status = PaymentStatus.PAID;
-    existing.paidDate = new Date(paymentIntent.created * 1000);
-    existing.stripeTransactionId =
-      paymentIntent.charges?.data?.[0]?.id || paymentIntent.latest_charge;
-    existing.stripeAccountId = stripeAccountId;
-    await existing.save();
+    if (existing) {
+      console.log("📋 Found payment by PaymentIntent ID:", {
+        id: existing._id,
+        currentStatus: existing.status,
+      });
+
+      existing.status = PaymentStatus.PAID;
+      existing.paidDate = new Date(paymentIntent.created * 1000);
+      existing.stripeTransactionId =
+        paymentIntent.charges?.data?.[0]?.id || paymentIntent.latest_charge;
+      existing.stripeAccountId = stripeAccountId;
+
+      const savedPayment = await existing.save();
+      console.log("✅ Payment updated via fallback:", {
+        paymentId: savedPayment._id,
+        status: savedPayment.status,
+        paidDate: savedPayment.paidDate,
+      });
+    } else {
+      console.error(
+        "❌ No payment record found for PaymentIntent ID:",
+        paymentIntent.id,
+      );
+    }
+  } catch (error) {
+    console.error("❌ Error in handleSucceeded:", {
+      error: error.message,
+      stack: error.stack,
+      paymentIntentId: paymentIntent.id,
+      metadata: paymentIntent.metadata,
+    });
   }
 }
 
@@ -140,6 +189,15 @@ module.exports = async (req, res) => {
 
   try {
     await connectDB();
+
+    // Verify database connection
+    if (!mongoConnected) {
+      console.error("❌ Database not connected");
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: "Database connection failed" }));
+      return;
+    }
+    console.log("✅ Database connection verified");
 
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -211,15 +269,35 @@ module.exports = async (req, res) => {
     switch (event.type) {
       case "payment_intent.succeeded":
         console.log("💰 Processing payment_intent.succeeded");
-        await handleSucceeded(event.data.object, accountId);
+        try {
+          await handleSucceeded(event.data.object, accountId);
+          console.log("✅ payment_intent.succeeded processed successfully");
+        } catch (error) {
+          console.error("❌ Error processing payment_intent.succeeded:", error);
+        }
         break;
       case "payment_intent.payment_failed":
         console.log("❌ Processing payment_intent.payment_failed");
-        await handleFailed(event.data.object, accountId);
+        try {
+          await handleFailed(event.data.object, accountId);
+          console.log(
+            "✅ payment_intent.payment_failed processed successfully",
+          );
+        } catch (error) {
+          console.error(
+            "❌ Error processing payment_intent.payment_failed:",
+            error,
+          );
+        }
         break;
       case "payment_intent.canceled":
         console.log("🚫 Processing payment_intent.canceled");
-        await handleCanceled(event.data.object, accountId);
+        try {
+          await handleCanceled(event.data.object, accountId);
+          console.log("✅ payment_intent.canceled processed successfully");
+        } catch (error) {
+          console.error("❌ Error processing payment_intent.canceled:", error);
+        }
         break;
       default:
         console.log(`⚠️ Unhandled event type: ${event.type}`);
