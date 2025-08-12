@@ -1182,7 +1182,7 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
             throw new Error("Payment record ID not found in metadata");
         }
         // Find the payment record in our database
-        const payment = yield payments_schema_1.Payments.findById(paymentIntent.metadata.paymentRecordId).populate([
+        let payment = yield payments_schema_1.Payments.findById(paymentIntent.metadata.paymentRecordId).populate([
             {
                 path: "tenantId",
                 select: "name email phone",
@@ -1203,9 +1203,49 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
         if (!payment) {
             throw new Error("Payment record not found");
         }
-        // Verify the payment is successful
+        // Check if payment is completed or if we need to update it based on Stripe session
         if (payment.status !== payment_enums_1.PaymentStatus.PAID) {
-            throw new Error("Payment is not yet completed");
+            console.log("⚠️ Payment status is not PAID, checking Stripe session status...");
+            // Check if the Stripe session is actually successful
+            if (session.payment_status === "paid") {
+                console.log("✅ Stripe session shows payment is successful, updating database...");
+                // Update the payment status to PAID
+                const updatedPayment = yield payments_schema_1.Payments.findByIdAndUpdate(payment._id, {
+                    status: payment_enums_1.PaymentStatus.PAID,
+                    paidDate: new Date(session.created * 1000),
+                    paymentMethod: "ONLINE",
+                    stripePaymentIntentId: paymentIntentId,
+                    stripeTransactionId: session.payment_intent,
+                    receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                }, { new: true }).populate([
+                    {
+                        path: "tenantId",
+                        select: "name email phone",
+                    },
+                    {
+                        path: "propertyId",
+                        select: "name address propertyType lotNumber unitNumber",
+                    },
+                    {
+                        path: "spotId",
+                        select: "spotNumber spotType",
+                    },
+                    {
+                        path: "stripeAccountId",
+                        select: "name stripeAccountId",
+                    },
+                ]);
+                if (updatedPayment) {
+                    payment = updatedPayment;
+                    console.log("✅ Payment status updated to PAID");
+                }
+                else {
+                    throw new Error("Failed to update payment status");
+                }
+            }
+            else {
+                throw new Error("Payment is not yet completed");
+            }
         }
         // Format the payment data for the frontend
         const paymentData = {
