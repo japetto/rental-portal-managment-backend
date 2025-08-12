@@ -146,7 +146,7 @@ const createStripeAccount = (accountData) => __awaiter(void 0, void 0, void 0, f
         let webhookResult = null;
         try {
             // Point to the actual Vercel-exposed webhook route
-            const webhookUrl = `${config_1.default.backend_url}/api/v1.0/stripe/webhook-vercel`;
+            const webhookUrl = `${config_1.default.backend_url}/stripe/webhook-vercel`;
             const webhook = yield (0, exports.createWebhookEndpoint)(createdAccount._id.toString(), webhookUrl);
             // Update the account with webhook information
             yield stripe_schema_1.StripeAccounts.findByIdAndUpdate(createdAccount._id, {

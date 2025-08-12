@@ -656,6 +656,7 @@ const getComprehensiveUserProfile = async (userId: string) => {
   let recentServiceRequests: any[] = [];
   let unreadAnnouncements: any[] = [];
   let assignmentHistory: any[] = [];
+  let rentSummary: any = null;
 
   // Only fetch tenant-specific data if user is a tenant
   if (user.role === "TENANT") {
@@ -693,6 +694,15 @@ const getComprehensiveUserProfile = async (userId: string) => {
       .populate("propertyId", "name address")
       .populate("spotId", "spotNumber spotIdentifier")
       .sort({ dueDate: 1 });
+
+    // Get comprehensive rent summary using PaymentService
+    try {
+      const { PaymentService } = await import("../payments/payment.service");
+      rentSummary = await PaymentService.getRentSummary(userId);
+    } catch (error) {
+      console.error("Error getting rent summary:", error);
+      rentSummary = null;
+    }
 
     // Get user's service requests
     const { ServiceRequests } = await import(
@@ -782,6 +792,64 @@ const getComprehensiveUserProfile = async (userId: string) => {
             notes: activeLease.notes,
             durationDays: activeLease.durationDays,
             isLeaseActive: activeLease.isLeaseActive,
+          }
+        : null,
+    // Enhanced rent and payment information (only for tenants)
+    rent:
+      user.role === "TENANT"
+        ? {
+            // Current rent amount from lease
+            currentRentAmount: activeLease?.rentAmount || 0,
+            depositAmount: activeLease?.depositAmount || 0,
+
+            // Due date information
+            dueDates: {
+              currentMonthDueDate: rentSummary?.currentMonthDueDate || null,
+              nextMonthDueDate: rentSummary?.nextMonthDueDate || null,
+              // Get the earliest overdue due date
+              earliestOverdueDate:
+                rentSummary?.overduePaymentsDetails?.[0]?.dueDate || null,
+              // Get all overdue due dates
+              overdueDueDates:
+                rentSummary?.overduePaymentsDetails?.map(
+                  (payment: any) => payment.dueDate,
+                ) || [],
+              // Get next payment due date (current month or earliest overdue)
+              nextPaymentDueDate:
+                rentSummary?.currentMonthDueDate ||
+                rentSummary?.overduePaymentsDetails?.[0]?.dueDate ||
+                null,
+            },
+
+            // Rent summary with due dates and status
+            summary: rentSummary
+              ? {
+                  hasActiveLease: rentSummary.hasActiveLease,
+                  isFirstTimePayment: rentSummary.isFirstTimePayment,
+                  currentMonthAmount: rentSummary.currentMonthAmount,
+                  currentMonthDescription: rentSummary.currentMonthDescription,
+                  totalOverdueAmount: rentSummary.totalOverdueAmount,
+                  totalDue: rentSummary.totalDue,
+                  currentMonthDueDate: rentSummary.currentMonthDueDate,
+                  nextMonthDueDate: rentSummary.nextMonthDueDate,
+                  overduePaymentsDetails: rentSummary.overduePaymentsDetails,
+                  paymentAction: rentSummary.paymentAction,
+                  canPayNextMonth: rentSummary.canPayNextMonth,
+                  warningMessage: rentSummary.warningMessage,
+                  hasOverduePayments: rentSummary.hasOverduePayments,
+                  overdueCount: rentSummary.overdueCount,
+                  leaseExpirationWarning: rentSummary.leaseExpirationWarning,
+                }
+              : null,
+
+            // Payment options from rent summary
+            paymentOptions: rentSummary?.paymentOptions || [],
+
+            // Pro-rated payment details
+            isProRated: rentSummary?.isProRated || false,
+            proRatedDays: rentSummary?.proRatedDays || 0,
+            proRatedRentAmount: rentSummary?.proRatedRentAmount || 0,
+            fullMonthRentAmount: rentSummary?.fullMonthRentAmount || 0,
           }
         : null,
     // Payment information (only for tenants)

@@ -10,6 +10,8 @@ import { Payments } from "./payments.schema";
 const getReceiptBySessionId = catchAsync(
   async (req: Request, res: Response) => {
     const { session_id, accountId } = req.query;
+    console.log("🚀 ~ accountId:", accountId);
+    console.log("🚀 ~ session_id:", session_id);
 
     if (!session_id || typeof session_id !== "string") {
       return sendResponse(res, {

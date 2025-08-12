@@ -351,6 +351,33 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         if (isFirstTimePayment) {
             paymentAction = "FIRST_TIME_PAYMENT";
         }
+        else if (leaseStart > currentDate) {
+            // Lease starts in the future - check if first payments are made
+            const hasFirstMonthPayment = paymentHistory.some(payment => payment.dueDate.getTime() === leaseStart.getTime());
+            const hasSecondMonthPayment = paymentHistory.some(payment => {
+                const secondMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 1);
+                return payment.dueDate.getTime() === secondMonth.getTime();
+            });
+            if (hasFirstMonthPayment && hasSecondMonthPayment) {
+                paymentAction = "PAYMENT_LIMIT_REACHED";
+                const firstMonthName = leaseStart.toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                });
+                const secondMonthName = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 1).toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                });
+                warningMessage = `You have already paid for ${firstMonthName} and ${secondMonthName}. You cannot pay more than one month ahead.`;
+            }
+            else if (hasFirstMonthPayment && !hasSecondMonthPayment) {
+                paymentAction = "CAN_PAY_NEXT_MONTH";
+                canPayNextMonth = true;
+            }
+            else {
+                paymentAction = "CURRENT_MONTH_DUE";
+            }
+        }
         else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment) {
             // Current month is paid, can pay next month
             paymentAction = "CAN_PAY_NEXT_MONTH";
@@ -404,11 +431,29 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             currentMonthDescription,
             totalOverdueAmount,
             totalDue,
-            // Payment dates - only show if relevant
-            currentMonthDueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" ? undefined : currentMonth,
-            nextMonthDueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment
-                ? nextMonth
-                : undefined,
+            // Payment dates - handle future lease start dates
+            currentMonthDueDate: (() => {
+                // If lease starts in the future, don't show current month due date
+                if (leaseStart > currentDate) {
+                    return undefined;
+                }
+                // If current month is paid, don't show due date
+                if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID") {
+                    return undefined;
+                }
+                return currentMonth;
+            })(),
+            nextMonthDueDate: (() => {
+                // If lease starts in the future, don't show next month due date
+                if (leaseStart > currentDate) {
+                    return undefined;
+                }
+                // Only show if current month is paid and no next month payment
+                if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment) {
+                    return nextMonth;
+                }
+                return undefined;
+            })(),
             overduePaymentsDetails,
             // Payment options
             canPayCurrentAndOverdue,

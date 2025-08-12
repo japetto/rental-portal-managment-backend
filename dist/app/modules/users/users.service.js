@@ -447,6 +447,7 @@ const checkUserInvitationStatus = (email) => __awaiter(void 0, void 0, void 0, f
 });
 // Get comprehensive user profile with all related information
 const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e;
     const user = yield users_schema_1.Users.findById(userId)
         .populate("propertyId", "name description address amenities images rules")
         .populate("spotId", "spotNumber spotIdentifier status size amenities price description images");
@@ -460,6 +461,7 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
     let recentServiceRequests = [];
     let unreadAnnouncements = [];
     let assignmentHistory = [];
+    let rentSummary = null;
     // Only fetch tenant-specific data if user is a tenant
     if (user.role === "TENANT") {
         // Get user's active lease using direct reference
@@ -488,6 +490,15 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
             .populate("propertyId", "name address")
             .populate("spotId", "spotNumber spotIdentifier")
             .sort({ dueDate: 1 });
+        // Get comprehensive rent summary using PaymentService
+        try {
+            const { PaymentService } = yield Promise.resolve().then(() => __importStar(require("../payments/payment.service")));
+            rentSummary = yield PaymentService.getRentSummary(userId);
+        }
+        catch (error) {
+            console.error("Error getting rent summary:", error);
+            rentSummary = null;
+        }
         // Get user's service requests
         const { ServiceRequests } = yield Promise.resolve().then(() => __importStar(require("../service-requests/service-requests.schema")));
         recentServiceRequests = yield ServiceRequests.find({
@@ -557,6 +568,54 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
                 notes: activeLease.notes,
                 durationDays: activeLease.durationDays,
                 isLeaseActive: activeLease.isLeaseActive,
+            }
+            : null,
+        // Enhanced rent and payment information (only for tenants)
+        rent: user.role === "TENANT"
+            ? {
+                // Current rent amount from lease
+                currentRentAmount: (activeLease === null || activeLease === void 0 ? void 0 : activeLease.rentAmount) || 0,
+                depositAmount: (activeLease === null || activeLease === void 0 ? void 0 : activeLease.depositAmount) || 0,
+                // Due date information
+                dueDates: {
+                    currentMonthDueDate: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.currentMonthDueDate) || null,
+                    nextMonthDueDate: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.nextMonthDueDate) || null,
+                    // Get the earliest overdue due date
+                    earliestOverdueDate: ((_b = (_a = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.dueDate) || null,
+                    // Get all overdue due dates
+                    overdueDueDates: ((_c = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _c === void 0 ? void 0 : _c.map((payment) => payment.dueDate)) || [],
+                    // Get next payment due date (current month or earliest overdue)
+                    nextPaymentDueDate: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.currentMonthDueDate) ||
+                        ((_e = (_d = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.dueDate) ||
+                        null,
+                },
+                // Rent summary with due dates and status
+                summary: rentSummary
+                    ? {
+                        hasActiveLease: rentSummary.hasActiveLease,
+                        isFirstTimePayment: rentSummary.isFirstTimePayment,
+                        currentMonthAmount: rentSummary.currentMonthAmount,
+                        currentMonthDescription: rentSummary.currentMonthDescription,
+                        totalOverdueAmount: rentSummary.totalOverdueAmount,
+                        totalDue: rentSummary.totalDue,
+                        currentMonthDueDate: rentSummary.currentMonthDueDate,
+                        nextMonthDueDate: rentSummary.nextMonthDueDate,
+                        overduePaymentsDetails: rentSummary.overduePaymentsDetails,
+                        paymentAction: rentSummary.paymentAction,
+                        canPayNextMonth: rentSummary.canPayNextMonth,
+                        warningMessage: rentSummary.warningMessage,
+                        hasOverduePayments: rentSummary.hasOverduePayments,
+                        overdueCount: rentSummary.overdueCount,
+                        leaseExpirationWarning: rentSummary.leaseExpirationWarning,
+                    }
+                    : null,
+                // Payment options from rent summary
+                paymentOptions: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.paymentOptions) || [],
+                // Pro-rated payment details
+                isProRated: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.isProRated) || false,
+                proRatedDays: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.proRatedDays) || 0,
+                proRatedRentAmount: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.proRatedRentAmount) || 0,
+                fullMonthRentAmount: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.fullMonthRentAmount) || 0,
             }
             : null,
         // Payment information (only for tenants)

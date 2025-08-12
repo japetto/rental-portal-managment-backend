@@ -21,6 +21,8 @@ const payments_schema_1 = require("./payments.schema");
 // Get payment data by Stripe session ID (more secure for payment success page)
 const getReceiptBySessionId = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { session_id, accountId } = req.query;
+    console.log("🚀 ~ accountId:", accountId);
+    console.log("🚀 ~ session_id:", session_id);
     if (!session_id || typeof session_id !== "string") {
         return (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.BAD_REQUEST,
