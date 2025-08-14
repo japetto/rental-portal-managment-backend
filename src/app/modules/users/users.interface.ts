@@ -34,6 +34,12 @@ export interface IUser extends Document {
     length: number;
     licensePlate: string;
   };
+  // Emergency contact information
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -127,6 +133,11 @@ export interface IUpdateTenantData {
       length: number;
       licensePlate: string;
     };
+    emergencyContact?: {
+      name: string;
+      phone: string;
+      relationship: string;
+    };
   };
   lease?: {
     leaseType?: "MONTHLY" | "FIXED_TERM";
@@ -143,11 +154,6 @@ export interface IUpdateTenantData {
         name: string;
         weight: number;
       }[];
-    };
-    emergencyContact?: {
-      name: string;
-      phone: string;
-      relationship: string;
     };
     specialRequests?: string[];
     documents?: string[];

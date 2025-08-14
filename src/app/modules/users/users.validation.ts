@@ -169,6 +169,22 @@ export const updateTenantDataValidationSchema = z.object({
             licensePlate: z.string().optional(),
           })
           .optional(),
+        emergencyContact: z
+          .object({
+            name: z
+              .string()
+              .min(1, "Emergency contact name is required")
+              .optional(),
+            phone: z
+              .string()
+              .min(1, "Emergency contact phone is required")
+              .optional(),
+            relationship: z
+              .string()
+              .min(1, "Relationship is required")
+              .optional(),
+          })
+          .optional(),
       })
       .optional(),
     lease: z
@@ -194,13 +210,7 @@ export const updateTenantDataValidationSchema = z.object({
               .optional(),
           })
           .optional(),
-        emergencyContact: z
-          .object({
-            name: z.string().optional(),
-            phone: z.string().optional(),
-            relationship: z.string().optional(),
-          })
-          .optional(),
+
         specialRequests: z.array(z.string()).optional(),
         documents: z.array(z.string()).optional(),
         notes: z.string().optional(),

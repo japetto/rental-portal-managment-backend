@@ -576,7 +576,7 @@ const getAllTenants = async (adminId: string): Promise<IUser[]> => {
     .populate({
       path: "leaseId",
       select:
-        "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+        "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes",
     });
 
   return tenants;
@@ -606,7 +606,7 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     .populate({
       path: "leaseId",
       select:
-        "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+        "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes",
     });
 
   if (!user) {
@@ -768,6 +768,8 @@ const getComprehensiveUserProfile = async (userId: string) => {
       preferredLocation: user.preferredLocation,
       isVerified: user.isVerified,
       isInvited: user.isInvited,
+      rvInfo: user.rvInfo,
+      emergencyContact: user.emergencyContact,
     },
     // Property information (only for tenants)
     property: user.role === "TENANT" ? user.propertyId : null,
@@ -786,7 +788,6 @@ const getComprehensiveUserProfile = async (userId: string) => {
             leaseStatus: activeLease.leaseStatus,
             occupants: activeLease.occupants,
             rvInfo: activeLease.rvInfo,
-            emergencyContact: activeLease.emergencyContact,
             specialRequests: activeLease.specialRequests,
             documents: activeLease.documents,
             notes: activeLease.notes,

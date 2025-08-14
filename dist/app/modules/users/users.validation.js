@@ -160,6 +160,22 @@ exports.updateTenantDataValidationSchema = zod_1.z.object({
                 licensePlate: zod_1.z.string().optional(),
             })
                 .optional(),
+            emergencyContact: zod_1.z
+                .object({
+                name: zod_1.z
+                    .string()
+                    .min(1, "Emergency contact name is required")
+                    .optional(),
+                phone: zod_1.z
+                    .string()
+                    .min(1, "Emergency contact phone is required")
+                    .optional(),
+                relationship: zod_1.z
+                    .string()
+                    .min(1, "Relationship is required")
+                    .optional(),
+            })
+                .optional(),
         })
             .optional(),
         lease: zod_1.z
@@ -181,13 +197,6 @@ exports.updateTenantDataValidationSchema = zod_1.z.object({
                     weight: zod_1.z.number(),
                 }))
                     .optional(),
-            })
-                .optional(),
-            emergencyContact: zod_1.z
-                .object({
-                name: zod_1.z.string().optional(),
-                phone: zod_1.z.string().optional(),
-                relationship: zod_1.z.string().optional(),
             })
                 .optional(),
             specialRequests: zod_1.z.array(zod_1.z.string()).optional(),

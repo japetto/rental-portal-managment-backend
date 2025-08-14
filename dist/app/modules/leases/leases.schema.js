@@ -79,11 +79,6 @@ exports.leasesSchema = new mongoose_1.Schema({
             },
         ],
     },
-    emergencyContact: {
-        name: { type: String, required: false },
-        phone: { type: String, required: false },
-        relationship: { type: String, required: false },
-    },
     specialRequests: [{ type: String }],
     documents: [{ type: String }], // URLs for PDF/DOC files
     notes: { type: String, default: "" },
@@ -121,6 +116,25 @@ exports.leasesSchema.pre("save", function (next) {
     this.leaseStatus = payment_enums_1.LeaseStatus.ACTIVE;
     next();
 });
+// Method to check if lease information is complete
+exports.leasesSchema.methods.isLeaseInformationComplete = function () {
+    // Check if all required fields are filled
+    const hasRequiredFields = this.tenantId &&
+        this.spotId &&
+        this.propertyId &&
+        this.leaseType &&
+        this.leaseStart &&
+        this.occupants;
+    // Check lease type specific requirements
+    const hasValidLeaseType = (this.leaseType === payment_enums_1.LeaseType.FIXED_TERM && this.leaseEnd) ||
+        (this.leaseType === payment_enums_1.LeaseType.MONTHLY && !this.leaseEnd);
+    // Check pet information if pets are present
+    const hasValidPetInfo = !this.pets.hasPets ||
+        (this.pets.hasPets &&
+            this.pets.petDetails &&
+            this.pets.petDetails.length > 0);
+    return hasRequiredFields && hasValidLeaseType && hasValidPetInfo;
+};
 // Pre-save middleware for cross-schema validation
 exports.leasesSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {

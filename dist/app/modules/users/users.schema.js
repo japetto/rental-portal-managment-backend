@@ -117,6 +117,12 @@ exports.usersSchema = new mongoose_1.Schema({
         length: { type: Number, required: false, min: 1 },
         licensePlate: { type: String, required: false },
     },
+    // Emergency contact information
+    emergencyContact: {
+        name: { type: String, required: false },
+        phone: { type: String, required: false },
+        relationship: { type: String, required: false },
+    },
     isActive: { type: Boolean, required: true, default: true },
     isDeleted: { type: Boolean, required: true, default: false },
     deletedAt: { type: Date },

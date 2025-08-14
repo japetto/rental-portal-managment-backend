@@ -37,12 +37,6 @@ export const leasesSchema = new Schema<ILease>(
         },
       ],
     },
-
-    emergencyContact: {
-      name: { type: String, required: false },
-      phone: { type: String, required: false },
-      relationship: { type: String, required: false },
-    },
     specialRequests: [{ type: String }],
     documents: [{ type: String }], // URLs for PDF/DOC files
     notes: { type: String, default: "" },
@@ -92,6 +86,32 @@ leasesSchema.pre("save", function (next) {
 
   next();
 });
+
+// Method to check if lease information is complete
+leasesSchema.methods.isLeaseInformationComplete = function (): boolean {
+  // Check if all required fields are filled
+  const hasRequiredFields =
+    this.tenantId &&
+    this.spotId &&
+    this.propertyId &&
+    this.leaseType &&
+    this.leaseStart &&
+    this.occupants;
+
+  // Check lease type specific requirements
+  const hasValidLeaseType =
+    (this.leaseType === LeaseType.FIXED_TERM && this.leaseEnd) ||
+    (this.leaseType === LeaseType.MONTHLY && !this.leaseEnd);
+
+  // Check pet information if pets are present
+  const hasValidPetInfo =
+    !this.pets.hasPets ||
+    (this.pets.hasPets &&
+      this.pets.petDetails &&
+      this.pets.petDetails.length > 0);
+
+  return hasRequiredFields && hasValidLeaseType && hasValidPetInfo;
+};
 
 // Pre-save middleware for cross-schema validation
 leasesSchema.pre("save", async function (next) {

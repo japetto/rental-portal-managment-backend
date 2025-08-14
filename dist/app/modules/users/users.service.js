@@ -404,7 +404,7 @@ const getAllTenants = (adminId) => __awaiter(void 0, void 0, void 0, function* (
     })
         .populate({
         path: "leaseId",
-        select: "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+        select: "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes",
     });
     return tenants;
 });
@@ -426,7 +426,7 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
     })
         .populate({
         path: "leaseId",
-        select: "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+        select: "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes",
     });
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
@@ -545,6 +545,8 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
             preferredLocation: user.preferredLocation,
             isVerified: user.isVerified,
             isInvited: user.isInvited,
+            rvInfo: user.rvInfo,
+            emergencyContact: user.emergencyContact,
         },
         // Property information (only for tenants)
         property: user.role === "TENANT" ? user.propertyId : null,
@@ -562,7 +564,6 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
                 leaseStatus: activeLease.leaseStatus,
                 occupants: activeLease.occupants,
                 rvInfo: activeLease.rvInfo,
-                emergencyContact: activeLease.emergencyContact,
                 specialRequests: activeLease.specialRequests,
                 documents: activeLease.documents,
                 notes: activeLease.notes,

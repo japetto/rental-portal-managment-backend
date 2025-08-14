@@ -361,7 +361,7 @@ const getUserAnnouncements = (0, catchAsync_1.default)((req, res) => __awaiter(v
     const propertyId = queryPropertyId || userPropertyId;
     // Import the announcement service
     const { AnnouncementService } = yield Promise.resolve().then(() => __importStar(require("../announcements/announcements.service")));
-    const result = yield AnnouncementService.getActiveAnnouncements(userId, propertyId);
+    const result = yield AnnouncementService.getTenantAnnouncements(userId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,

@@ -392,10 +392,7 @@ const getUserAnnouncements = catchAsync(async (req: Request, res: Response) => {
     "../announcements/announcements.service"
   );
 
-  const result = await AnnouncementService.getActiveAnnouncements(
-    userId,
-    propertyId,
-  );
+  const result = await AnnouncementService.getTenantAnnouncements(userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

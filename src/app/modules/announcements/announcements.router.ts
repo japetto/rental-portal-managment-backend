@@ -1,27 +1,14 @@
 import express from "express";
 import { adminAuth } from "../../../middlewares/adminAuth";
+import { userAuth } from "../../../middlewares/userAuth";
 import zodValidationRequest from "../../../middlewares/zodValidationRequest";
 import { AnnouncementController } from "./announcements.controller";
 import { AnnouncementValidation } from "./announcements.validation";
 
 const router = express.Router();
 
-// Public routes (for tenants)
-router.get("/active", AnnouncementController.getActiveAnnouncements);
-
-router.get(
-  "/unread/:userId",
-  zodValidationRequest(
-    AnnouncementValidation.getUnreadAnnouncementsValidationSchema,
-  ),
-  AnnouncementController.getUnreadAnnouncements,
-);
-
-router.post(
-  "/mark-read",
-  zodValidationRequest(AnnouncementValidation.markAsReadValidationSchema),
-  AnnouncementController.markAsRead,
-);
+// Tenant routes - require user authentication
+router.get("/tenant", userAuth, AnnouncementController.getTenantAnnouncements);
 
 // Admin routes - require authentication
 router.post(

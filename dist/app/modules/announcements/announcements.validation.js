@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AnnouncementValidation = exports.getUnreadAnnouncementsValidationSchema = exports.getAnnouncementsByPriorityValidationSchema = exports.getAnnouncementsByTypeValidationSchema = exports.getAnnouncementsByPropertyValidationSchema = exports.deleteAnnouncementValidationSchema = exports.getAnnouncementByIdValidationSchema = exports.markAsReadValidationSchema = exports.updateAnnouncementValidationSchema = exports.createAnnouncementValidationSchema = void 0;
+exports.AnnouncementValidation = exports.markAsReadValidationSchema = exports.getAnnouncementsByPriorityValidationSchema = exports.getAnnouncementsByTypeValidationSchema = exports.getAnnouncementsByPropertyValidationSchema = exports.deleteAnnouncementValidationSchema = exports.getAnnouncementByIdValidationSchema = exports.updateAnnouncementValidationSchema = exports.createAnnouncementValidationSchema = void 0;
 const zod_1 = require("zod");
 // Create announcement validation schema
 exports.createAnnouncementValidationSchema = zod_1.z.object({
@@ -73,13 +73,6 @@ exports.updateAnnouncementValidationSchema = zod_1.z.object({
         tags: zod_1.z.array(zod_1.z.string().trim()).optional(),
     }),
 });
-// Mark as read validation schema
-exports.markAsReadValidationSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        userId: zod_1.z.string().min(1, "User ID is required"),
-        announcementId: zod_1.z.string().min(1, "Announcement ID is required"),
-    }),
-});
 // Get announcement by ID validation schema
 exports.getAnnouncementByIdValidationSchema = zod_1.z.object({
     params: zod_1.z.object({
@@ -123,23 +116,19 @@ exports.getAnnouncementsByPriorityValidationSchema = zod_1.z.object({
         }),
     }),
 });
-// Get unread announcements validation schema
-exports.getUnreadAnnouncementsValidationSchema = zod_1.z.object({
-    params: zod_1.z.object({
-        userId: zod_1.z.string().min(1, "User ID is required"),
-    }),
-    query: zod_1.z.object({
-        propertyId: zod_1.z.string().optional(),
+// Mark announcement as read validation schema
+exports.markAsReadValidationSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        announcementId: zod_1.z.string().min(1, "Announcement ID is required"),
     }),
 });
 exports.AnnouncementValidation = {
     createAnnouncementValidationSchema: exports.createAnnouncementValidationSchema,
     updateAnnouncementValidationSchema: exports.updateAnnouncementValidationSchema,
-    markAsReadValidationSchema: exports.markAsReadValidationSchema,
     getAnnouncementByIdValidationSchema: exports.getAnnouncementByIdValidationSchema,
     deleteAnnouncementValidationSchema: exports.deleteAnnouncementValidationSchema,
     getAnnouncementsByPropertyValidationSchema: exports.getAnnouncementsByPropertyValidationSchema,
     getAnnouncementsByTypeValidationSchema: exports.getAnnouncementsByTypeValidationSchema,
     getAnnouncementsByPriorityValidationSchema: exports.getAnnouncementsByPriorityValidationSchema,
-    getUnreadAnnouncementsValidationSchema: exports.getUnreadAnnouncementsValidationSchema,
+    markAsReadValidationSchema: exports.markAsReadValidationSchema,
 };

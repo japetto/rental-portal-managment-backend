@@ -414,7 +414,7 @@ const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
     const tenants = yield users_schema_1.Users.find({ role: "TENANT", isDeleted: false })
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
-        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes")
+        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes")
         .sort({ createdAt: -1 });
     // Transform the data to include lot number and lease info more prominently
     const tenantsWithLotNumber = tenants.map(tenant => {
@@ -451,7 +451,6 @@ const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
                 leaseStatus: tenantData.leaseId.leaseStatus,
                 occupants: tenantData.leaseId.occupants,
                 pets: tenantData.leaseId.pets,
-                emergencyContact: tenantData.leaseId.emergencyContact,
                 specialRequests: tenantData.leaseId.specialRequests,
                 documents: tenantData.leaseId.documents,
                 notes: tenantData.leaseId.notes,
@@ -746,7 +745,7 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
         .select("-password")
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
-        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes");
+        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes");
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }

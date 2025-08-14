@@ -25,11 +25,6 @@ export interface ILease extends Document {
       weight: number;
     }[];
   };
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
   specialRequests: string[];
   documents: string[]; // URLs to uploaded documents (PDF/DOC)
   notes: string;
@@ -63,11 +58,6 @@ export interface ICreateLease {
       weight: number;
     }[];
   };
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
   specialRequests?: string[];
   documents?: string[];
   notes?: string;
@@ -89,11 +79,6 @@ export interface IUpdateLease {
       name: string;
       weight: number;
     }[];
-  };
-  emergencyContact?: {
-    name?: string;
-    phone?: string;
-    relationship?: string;
   };
   specialRequests?: string[];
   documents?: string[];

@@ -20,14 +20,6 @@ const rvInfoSchema = zod_1.z.object({
     length: zod_1.z.number().min(1, "RV length must be positive"),
     licensePlate: zod_1.z.string().min(1, "License plate is required"),
 });
-// Emergency contact validation schema
-const emergencyContactSchema = zod_1.z
-    .object({
-    name: zod_1.z.string().min(1, "Emergency contact name is required").optional(),
-    phone: zod_1.z.string().min(1, "Emergency contact phone is required").optional(),
-    relationship: zod_1.z.string().min(1, "Relationship is required").optional(),
-})
-    .optional();
 // Create lease validation schema
 exports.createLeaseValidationSchema = zod_1.z.object({
     body: zod_1.z
@@ -60,7 +52,6 @@ exports.createLeaseValidationSchema = zod_1.z.object({
             petDetails: zod_1.z.array(petDetailsSchema).optional(),
         }),
         rvInfo: rvInfoSchema,
-        emergencyContact: emergencyContactSchema,
         specialRequests: zod_1.z.array(zod_1.z.string()).optional(),
         documents: zod_1.z.array(zod_1.z.string().url("Invalid document URL")).optional(),
         notes: zod_1.z.string().optional(),
@@ -130,7 +121,6 @@ exports.updateLeaseValidationSchema = zod_1.z.object({
         })
             .optional(),
         rvInfo: rvInfoSchema.partial().optional(),
-        emergencyContact: emergencyContactSchema.optional(),
         specialRequests: zod_1.z.array(zod_1.z.string()).optional(),
         documents: zod_1.z.array(zod_1.z.string().url("Invalid document URL")).optional(),
         notes: zod_1.z.string().optional(),

@@ -555,7 +555,7 @@ const getAllTenants = async (): Promise<IUser[]> => {
     .populate("spotId", "spotNumber status size price description")
     .populate(
       "leaseId",
-      "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+      "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes",
     )
     .sort({ createdAt: -1 });
 
@@ -597,7 +597,6 @@ const getAllTenants = async (): Promise<IUser[]> => {
         leaseStatus: tenantData.leaseId.leaseStatus,
         occupants: tenantData.leaseId.occupants,
         pets: tenantData.leaseId.pets,
-        emergencyContact: tenantData.leaseId.emergencyContact,
         specialRequests: tenantData.leaseId.specialRequests,
         documents: tenantData.leaseId.documents,
         notes: tenantData.leaseId.notes,
@@ -1058,7 +1057,7 @@ const getUserById = async (userId: string, adminId: string): Promise<IUser> => {
     .populate("spotId", "spotNumber status size price description")
     .populate(
       "leaseId",
-      "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets emergencyContact specialRequests documents notes",
+      "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes",
     );
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");

@@ -76,14 +76,6 @@ export const updateAnnouncementValidationSchema = z.object({
   }),
 });
 
-// Mark as read validation schema
-export const markAsReadValidationSchema = z.object({
-  body: z.object({
-    userId: z.string().min(1, "User ID is required"),
-    announcementId: z.string().min(1, "Announcement ID is required"),
-  }),
-});
-
 // Get announcement by ID validation schema
 export const getAnnouncementByIdValidationSchema = z.object({
   params: z.object({
@@ -135,24 +127,20 @@ export const getAnnouncementsByPriorityValidationSchema = z.object({
   }),
 });
 
-// Get unread announcements validation schema
-export const getUnreadAnnouncementsValidationSchema = z.object({
-  params: z.object({
-    userId: z.string().min(1, "User ID is required"),
-  }),
-  query: z.object({
-    propertyId: z.string().optional(),
+// Mark announcement as read validation schema
+export const markAsReadValidationSchema = z.object({
+  body: z.object({
+    announcementId: z.string().min(1, "Announcement ID is required"),
   }),
 });
 
 export const AnnouncementValidation = {
   createAnnouncementValidationSchema,
   updateAnnouncementValidationSchema,
-  markAsReadValidationSchema,
   getAnnouncementByIdValidationSchema,
   deleteAnnouncementValidationSchema,
   getAnnouncementsByPropertyValidationSchema,
   getAnnouncementsByTypeValidationSchema,
   getAnnouncementsByPriorityValidationSchema,
-  getUnreadAnnouncementsValidationSchema,
+  markAsReadValidationSchema,
 };

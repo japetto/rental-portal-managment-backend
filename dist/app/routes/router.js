@@ -17,6 +17,7 @@ const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const admin_router_1 = require("../modules/admin/admin.router");
 const announcements_router_1 = require("../modules/announcements/announcements.router");
+const documents_router_1 = require("../modules/documents/documents.router");
 const leases_router_1 = require("../modules/leases/leases.router");
 const payments_router_1 = require("../modules/payments/payments.router");
 const service_requests_router_1 = require("../modules/service-requests/service-requests.router");
@@ -77,6 +78,10 @@ const routes = [
     {
         path: "/announcements",
         route: announcements_router_1.AnnouncementRouter,
+    },
+    {
+        path: "/documents",
+        route: documents_router_1.DocumentsRoutes,
     },
     {
         path: "/leases",

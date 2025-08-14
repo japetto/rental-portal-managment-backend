@@ -59,19 +59,6 @@ const getAllAnnouncements = (0, catchAsync_1.default)((req, res) => __awaiter(vo
         data: result,
     });
 }));
-// Get Active Announcements (Public - for tenants)
-const getActiveAnnouncements = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    const { propertyId } = req.query;
-    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
-    const result = yield announcements_service_1.AnnouncementService.getActiveAnnouncements(userId, propertyId);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "Active announcements retrieved successfully",
-        data: result,
-    });
-}));
 // Get Announcement by ID
 const getAnnouncementById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -115,17 +102,6 @@ const deleteAnnouncement = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         success: true,
         statusCode: http_status_1.default.OK,
         message: "Announcement deleted successfully",
-        data: result,
-    });
-}));
-// Mark Announcement as Read
-const markAsRead = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const markAsReadData = __rest(req.body, []);
-    const result = yield announcements_service_1.AnnouncementService.markAsRead(markAsReadData);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "Announcement marked as read",
         data: result,
     });
 }));
@@ -177,18 +153,6 @@ const getAnnouncementsByPriority = (0, catchAsync_1.default)((req, res) => __awa
         data: result,
     });
 }));
-// Get Unread Announcements for User
-const getUnreadAnnouncements = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId } = req.params;
-    const { propertyId } = req.query;
-    const result = yield announcements_service_1.AnnouncementService.getUnreadAnnouncements(userId, propertyId);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_1.default.OK,
-        message: "Unread announcements retrieved successfully",
-        data: result,
-    });
-}));
 // Archive and Restore Controllers
 const archiveAnnouncement = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -234,19 +198,32 @@ const getArchivedAnnouncements = (0, catchAsync_1.default)((req, res) => __await
         data: result,
     });
 }));
+// Get Tenant Announcements (for tenants to get their announcements)
+const getTenantAnnouncements = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const tenantId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!tenantId) {
+        throw new Error("Tenant ID not found");
+    }
+    const result = yield announcements_service_1.AnnouncementService.getTenantAnnouncements(tenantId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: "Tenant announcements retrieved successfully",
+        data: result,
+    });
+}));
 exports.AnnouncementController = {
     createAnnouncement,
     getAllAnnouncements,
-    getActiveAnnouncements,
     getAnnouncementById,
     updateAnnouncement,
     deleteAnnouncement,
-    markAsRead,
     getAnnouncementsByProperty,
     getAnnouncementsByType,
     getAnnouncementsByPriority,
-    getUnreadAnnouncements,
     archiveAnnouncement,
     restoreAnnouncement,
     getArchivedAnnouncements,
+    getTenantAnnouncements,
 };

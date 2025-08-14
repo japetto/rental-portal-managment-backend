@@ -44,26 +44,6 @@ const getAllAnnouncements = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Get Active Announcements (Public - for tenants)
-const getActiveAnnouncements = catchAsync(
-  async (req: Request, res: Response) => {
-    const { propertyId } = req.query;
-    const userId = req.user?._id?.toString();
-
-    const result = await AnnouncementService.getActiveAnnouncements(
-      userId,
-      propertyId as string,
-    );
-
-    sendResponse(res, {
-      success: true,
-      statusCode: httpStatus.OK,
-      message: "Active announcements retrieved successfully",
-      data: result,
-    });
-  },
-);
-
 // Get Announcement by ID
 const getAnnouncementById = catchAsync(async (req: Request, res: Response) => {
   const { announcementId } = req.params;
@@ -124,20 +104,6 @@ const deleteAnnouncement = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: httpStatus.OK,
     message: "Announcement deleted successfully",
-    data: result,
-  });
-});
-
-// Mark Announcement as Read
-const markAsRead = catchAsync(async (req: Request, res: Response) => {
-  const { ...markAsReadData } = req.body;
-
-  const result = await AnnouncementService.markAsRead(markAsReadData);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: "Announcement marked as read",
     data: result,
   });
 });
@@ -214,26 +180,6 @@ const getAnnouncementsByPriority = catchAsync(
   },
 );
 
-// Get Unread Announcements for User
-const getUnreadAnnouncements = catchAsync(
-  async (req: Request, res: Response) => {
-    const { userId } = req.params;
-    const { propertyId } = req.query;
-
-    const result = await AnnouncementService.getUnreadAnnouncements(
-      userId,
-      propertyId as string,
-    );
-
-    sendResponse(res, {
-      success: true,
-      statusCode: httpStatus.OK,
-      message: "Unread announcements retrieved successfully",
-      data: result,
-    });
-  },
-);
-
 // Archive and Restore Controllers
 
 const archiveAnnouncement = catchAsync(async (req: Request, res: Response) => {
@@ -297,19 +243,37 @@ const getArchivedAnnouncements = catchAsync(
   },
 );
 
+// Get Tenant Announcements (for tenants to get their announcements)
+const getTenantAnnouncements = catchAsync(
+  async (req: Request, res: Response) => {
+    const tenantId = req.user?._id?.toString();
+
+    if (!tenantId) {
+      throw new Error("Tenant ID not found");
+    }
+
+    const result = await AnnouncementService.getTenantAnnouncements(tenantId);
+
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Tenant announcements retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const AnnouncementController = {
   createAnnouncement,
   getAllAnnouncements,
-  getActiveAnnouncements,
   getAnnouncementById,
   updateAnnouncement,
   deleteAnnouncement,
-  markAsRead,
   getAnnouncementsByProperty,
   getAnnouncementsByType,
   getAnnouncementsByPriority,
-  getUnreadAnnouncements,
   archiveAnnouncement,
   restoreAnnouncement,
   getArchivedAnnouncements,
+  getTenantAnnouncements,
 };

@@ -80,39 +80,6 @@ const getAllAnnouncements = (adminId) => __awaiter(void 0, void 0, void 0, funct
         .sort({ createdAt: -1 });
     return announcements;
 });
-//* Get Active Announcements (Public - for tenants)
-const getActiveAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0, void 0, function* () {
-    // Build the base query for active, non-expired announcements
-    const baseQuery = {
-        isActive: true,
-        isDeleted: false, // Only get non-deleted announcements
-        createdAt: { $lte: new Date() },
-        $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
-    };
-    // Build target audience conditions
-    const targetAudienceConditions = [
-        { targetAudience: "ALL" },
-        { targetAudience: "TENANTS_ONLY" },
-    ];
-    // Always include PROPERTY_SPECIFIC announcements for user's property
-    if (propertyId) {
-        targetAudienceConditions.push({
-            $and: [
-                { targetAudience: "PROPERTY_SPECIFIC" },
-                { propertyId: propertyId },
-            ],
-        });
-    }
-    // Combine all conditions
-    const query = Object.assign(Object.assign({}, baseQuery), { $or: targetAudienceConditions });
-    const announcements = yield announcements_schema_1.Announcements.find(query)
-        .populate({
-        path: "propertyId",
-        select: "name description address",
-    })
-        .sort({ priority: -1, createdAt: -1 });
-    return announcements;
-});
 //* Get Announcement by ID
 const getAnnouncementById = (announcementId, adminId) => __awaiter(void 0, void 0, void 0, function* () {
     const announcement = yield announcements_schema_1.Announcements.findOne({
@@ -171,31 +138,6 @@ const deleteAnnouncement = (announcementId, adminId) => __awaiter(void 0, void 0
     yield SoftDeleteUtils.softDelete(announcements_schema_1.Announcements, announcementId, adminId);
     return {
         message: "Announcement archived successfully",
-    };
-});
-//* Mark Announcement as Read
-const markAsRead = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId, announcementId } = payload;
-    const user = yield users_schema_1.Users.findById(userId);
-    if (!user) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
-    }
-    const announcement = yield announcements_schema_1.Announcements.findById(announcementId);
-    if (!announcement) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
-    }
-    // Check if user has already read this announcement
-    const hasRead = announcement.readBy.some(id => id.toString() === userId);
-    if (hasRead) {
-        return {
-            message: "Announcement already marked as read",
-        };
-    }
-    yield announcements_schema_1.Announcements.findByIdAndUpdate(announcementId, {
-        $addToSet: { readBy: userId },
-    });
-    return {
-        message: "Announcement marked as read",
     };
 });
 // Archive an announcement (soft delete)
@@ -312,31 +254,30 @@ const getAnnouncementsByPriority = (priority, adminId) => __awaiter(void 0, void
         .sort({ createdAt: -1 });
     return announcements;
 });
-//* Get Unread Announcements for User
-const getUnreadAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield users_schema_1.Users.findById(userId);
+//* Get Tenant Announcements (for tenants to get their announcements)
+const getTenantAnnouncements = (tenantId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const user = yield users_schema_1.Users.findById(tenantId);
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
-    // Build the base query for active, non-expired, unread announcements
+    // Get user's property ID
+    const userPropertyId = (_a = user.propertyId) === null || _a === void 0 ? void 0 : _a.toString();
+    // Build the query for announcements that are relevant to this tenant
     const baseQuery = {
-        isActive: true,
         isDeleted: false, // Only get non-deleted announcements
-        createdAt: { $lte: new Date() },
-        $or: [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }],
-        readBy: { $ne: userId },
     };
     // Build target audience conditions
     const targetAudienceConditions = [
         { targetAudience: "ALL" },
         { targetAudience: "TENANTS_ONLY" },
     ];
-    // Always include PROPERTY_SPECIFIC announcements for user's property
-    if (propertyId) {
+    // Include PROPERTY_SPECIFIC announcements for user's property
+    if (userPropertyId) {
         targetAudienceConditions.push({
             $and: [
                 { targetAudience: "PROPERTY_SPECIFIC" },
-                { propertyId: propertyId },
+                { propertyId: userPropertyId },
             ],
         });
     }
@@ -350,19 +291,47 @@ const getUnreadAnnouncements = (userId, propertyId) => __awaiter(void 0, void 0,
         .sort({ priority: -1, createdAt: -1 });
     return announcements;
 });
+//* Mark announcement as read for a user
+const markAsRead = (data) => __awaiter(void 0, void 0, void 0, function* () {
+    const { userId, announcementId } = data;
+    // Validate user exists
+    const user = yield users_schema_1.Users.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    // Validate announcement exists
+    const announcement = yield announcements_schema_1.Announcements.findById(announcementId);
+    if (!announcement) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
+    }
+    // Check if user has already read this announcement
+    if (announcement.readBy.includes(userId)) {
+        return announcement;
+    }
+    // Add user to readBy array
+    const updatedAnnouncement = yield announcements_schema_1.Announcements.findByIdAndUpdate(announcementId, {
+        $addToSet: { readBy: userId },
+    }, { new: true }).populate({
+        path: "propertyId",
+        select: "name description address",
+    });
+    if (!updatedAnnouncement) {
+        throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to mark announcement as read");
+    }
+    return updatedAnnouncement;
+});
 exports.AnnouncementService = {
     createAnnouncement,
     getAllAnnouncements,
-    getActiveAnnouncements,
     getAnnouncementById,
     updateAnnouncement,
     deleteAnnouncement,
-    markAsRead,
     getAnnouncementsByProperty,
     getAnnouncementsByType,
     getAnnouncementsByPriority,
-    getUnreadAnnouncements,
     archiveAnnouncement,
     restoreAnnouncement,
     getArchivedAnnouncements,
+    getTenantAnnouncements,
+    markAsRead,
 };

@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import mongoose from "mongoose";
 import { AdminRouter } from "../modules/admin/admin.router";
 import { AnnouncementRouter } from "../modules/announcements/announcements.router";
+import { DocumentsRoutes } from "../modules/documents/documents.router";
 import { LeasesRoutes } from "../modules/leases/leases.router";
 import { paymentRoutes } from "../modules/payments/payments.router";
 import { ServiceRequestRouter } from "../modules/service-requests/service-requests.router";
@@ -68,6 +69,10 @@ const routes = [
   {
     path: "/announcements",
     route: AnnouncementRouter,
+  },
+  {
+    path: "/documents",
+    route: DocumentsRoutes,
   },
   {
     path: "/leases",
