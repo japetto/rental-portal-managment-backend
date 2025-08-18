@@ -232,6 +232,14 @@ export const getUserAnnouncementsValidationSchema = z.object({
   }),
 });
 
+export const updateEmergencyContactValidationSchema = z.object({
+  body: z.object({
+    name: z.string().min(1, "Emergency contact name is required"),
+    phone: z.string().min(1, "Emergency contact phone is required"),
+    relationship: z.string().min(1, "Relationship is required"),
+  }),
+});
+
 export const UserValidation = {
   usersZodSchema,
   loginUserZodSchema,
@@ -240,6 +248,7 @@ export const UserValidation = {
   setPasswordValidationSchema,
   updateUserInfoValidationSchema,
   updateTenantDataValidationSchema,
+  updateEmergencyContactValidationSchema,
   deleteUserValidationSchema,
   getUserAnnouncementsValidationSchema,
 };

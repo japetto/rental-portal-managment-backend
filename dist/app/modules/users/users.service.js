@@ -903,12 +903,43 @@ const getActiveRecords = (model_1, ...args_1) => __awaiter(void 0, [model_1, ...
 const getDeletedRecords = (model_1, ...args_1) => __awaiter(void 0, [model_1, ...args_1], void 0, function* (model, query = {}) {
     return yield model.find(Object.assign(Object.assign({}, query), { isDeleted: true }));
 });
+// Update emergency contact for tenant
+const updateEmergencyContact = (userId, emergencyContactData) => __awaiter(void 0, void 0, void 0, function* () {
+    // Check if user exists and is a tenant
+    const user = yield users_schema_1.Users.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    if (user.role !== "TENANT") {
+        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only tenants can update emergency contact information");
+    }
+    // Validate emergency contact data
+    if (!emergencyContactData.name || !emergencyContactData.phone || !emergencyContactData.relationship) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Emergency contact name, phone, and relationship are required");
+    }
+    // Update the emergency contact
+    const updatedUser = yield users_schema_1.Users.findByIdAndUpdate(userId, {
+        emergencyContact: {
+            name: emergencyContactData.name.trim(),
+            phone: emergencyContactData.phone.trim(),
+            relationship: emergencyContactData.relationship.trim(),
+        },
+    }, {
+        new: true,
+        runValidators: true,
+    }).select("-password");
+    if (!updatedUser) {
+        throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to update emergency contact");
+    }
+    return updatedUser;
+});
 exports.UserService = {
     userRegister,
     userLogin,
     setPassword,
     updateUserInfo,
     updateTenantData,
+    updateEmergencyContact,
     deleteUser,
     getAllUsers,
     getAllTenants,

@@ -121,6 +121,12 @@ export interface IUpdateUserInfo {
   profileImage?: string;
 }
 
+export interface IUpdateEmergencyContact {
+  name: string;
+  phone: string;
+  relationship: string;
+}
+
 export interface IUpdateTenantData {
   user?: {
     name?: string;

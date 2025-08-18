@@ -496,12 +496,38 @@ const getMyProfile = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Update Emergency Contact (Tenant Only)
+const updateEmergencyContact = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?._id?.toString();
+
+    if (!userId) {
+      return sendResponse(res, {
+        statusCode: httpStatus.UNAUTHORIZED,
+        success: false,
+        message: "User not authenticated",
+        data: null,
+      });
+    }
+
+    const result = await UserService.updateEmergencyContact(userId, req.body);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Emergency contact updated successfully",
+      data: result,
+    });
+  },
+);
+
 export const UserController = {
   userRegister,
   userLogin,
   setPassword,
   updateUserInfo,
   updateTenantData,
+  updateEmergencyContact,
   deleteUser,
   getAllUsers,
   getAllTenants,

@@ -35,6 +35,8 @@ router.get("/announcements/:announcementId", userAuth_1.userAuth, (0, zodValidat
 router.post("/announcements/mark-read", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(announcements_validation_1.AnnouncementValidation.markAsReadValidationSchema), users_controller_1.UserController.markAnnouncementAsRead);
 // Get user's own profile
 router.get("/me", userAuth_1.userAuth, users_controller_1.UserController.getMyProfile);
+// Update emergency contact (Tenant Only)
+router.patch("/emergency-contact", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.updateEmergencyContactValidationSchema), users_controller_1.UserController.updateEmergencyContact);
 // Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth_1.adminAuth, users_controller_1.UserController.getUserById);
 // Update user info route

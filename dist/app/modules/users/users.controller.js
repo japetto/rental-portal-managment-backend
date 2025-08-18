@@ -437,12 +437,33 @@ const getMyProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result,
     });
 }));
+// Update Emergency Contact (Tenant Only)
+const updateEmergencyContact = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const userId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!userId) {
+        return (0, sendResponse_1.default)(res, {
+            statusCode: http_status_1.default.UNAUTHORIZED,
+            success: false,
+            message: "User not authenticated",
+            data: null,
+        });
+    }
+    const result = yield users_service_1.UserService.updateEmergencyContact(userId, req.body);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Emergency contact updated successfully",
+        data: result,
+    });
+}));
 exports.UserController = {
     userRegister,
     userLogin,
     setPassword,
     updateUserInfo,
     updateTenantData,
+    updateEmergencyContact,
     deleteUser,
     getAllUsers,
     getAllTenants,

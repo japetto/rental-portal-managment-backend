@@ -86,6 +86,14 @@ router.post(
 // Get user's own profile
 router.get("/me", userAuth, UserController.getMyProfile);
 
+// Update emergency contact (Tenant Only)
+router.patch(
+  "/emergency-contact",
+  userAuth,
+  zodValidationRequest(UserValidation.updateEmergencyContactValidationSchema),
+  UserController.updateEmergencyContact,
+);
+
 // Admin parameterized routes - must come after specific routes
 router.get("/:userId", adminAuth, UserController.getUserById);
 

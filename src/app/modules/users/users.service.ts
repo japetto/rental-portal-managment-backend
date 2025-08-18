@@ -10,6 +10,7 @@ import {
   IComprehensiveUserProfile,
   ILoginUser,
   ISetPassword,
+  IUpdateEmergencyContact,
   IUpdateTenantData,
   IUpdateUserInfo,
   IUser,
@@ -1250,12 +1251,69 @@ const getDeletedRecords = async (model: any, query: any = {}) => {
   });
 };
 
+// Update emergency contact for tenant
+const updateEmergencyContact = async (
+  userId: string,
+  emergencyContactData: IUpdateEmergencyContact,
+): Promise<IUser> => {
+  // Check if user exists and is a tenant
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  if (user.role !== "TENANT") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only tenants can update emergency contact information",
+    );
+  }
+
+  // Validate emergency contact data
+  if (
+    !emergencyContactData.name ||
+    !emergencyContactData.phone ||
+    !emergencyContactData.relationship
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Emergency contact name, phone, and relationship are required",
+    );
+  }
+
+  // Update the emergency contact
+  const updatedUser = await Users.findByIdAndUpdate(
+    userId,
+    {
+      emergencyContact: {
+        name: emergencyContactData.name.trim(),
+        phone: emergencyContactData.phone.trim(),
+        relationship: emergencyContactData.relationship.trim(),
+      },
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  ).select("-password");
+
+  if (!updatedUser) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to update emergency contact",
+    );
+  }
+
+  return updatedUser;
+};
+
 export const UserService = {
   userRegister,
   userLogin,
   setPassword,
   updateUserInfo,
   updateTenantData,
+  updateEmergencyContact,
   deleteUser,
   getAllUsers,
   getAllTenants,

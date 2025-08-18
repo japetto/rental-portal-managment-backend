@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserValidation = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateTenantDataValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
+exports.UserValidation = exports.updateEmergencyContactValidationSchema = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateTenantDataValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
 const zod_1 = require("zod");
 const user_constant_1 = require("./user.constant");
 const usersZodSchema = zod_1.z.object({
@@ -217,6 +217,13 @@ exports.getUserAnnouncementsValidationSchema = zod_1.z.object({
         propertyId: zod_1.z.string().optional(),
     }),
 });
+exports.updateEmergencyContactValidationSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        name: zod_1.z.string().min(1, "Emergency contact name is required"),
+        phone: zod_1.z.string().min(1, "Emergency contact phone is required"),
+        relationship: zod_1.z.string().min(1, "Relationship is required"),
+    }),
+});
 exports.UserValidation = {
     usersZodSchema,
     loginUserZodSchema,
@@ -225,6 +232,7 @@ exports.UserValidation = {
     setPasswordValidationSchema: exports.setPasswordValidationSchema,
     updateUserInfoValidationSchema: exports.updateUserInfoValidationSchema,
     updateTenantDataValidationSchema: exports.updateTenantDataValidationSchema,
+    updateEmergencyContactValidationSchema: exports.updateEmergencyContactValidationSchema,
     deleteUserValidationSchema: exports.deleteUserValidationSchema,
     getUserAnnouncementsValidationSchema: exports.getUserAnnouncementsValidationSchema,
 };
