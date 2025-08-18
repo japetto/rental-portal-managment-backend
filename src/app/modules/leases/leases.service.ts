@@ -39,11 +39,15 @@ const createLease = async (leaseData: ICreateLease): Promise<ILease> => {
   const leaseStatus: LeaseStatus =
     leaseData.leaseStart <= now ? LeaseStatus.ACTIVE : LeaseStatus.PENDING;
 
-  const lease = await Leases.create({
+  // Ensure additionalRentAmount defaults to 0 if not provided
+  const leaseDataWithDefaults = {
     ...leaseData,
+    additionalRentAmount: leaseData.additionalRentAmount || 0,
     leaseStatus,
     paymentStatus: "PENDING",
-  });
+  };
+
+  const lease = await Leases.create(leaseDataWithDefaults);
 
   return lease;
 };
@@ -374,7 +378,9 @@ const getLeaseStatistics = async (propertyId?: string) => {
         fixedTermLeases: {
           $sum: { $cond: [{ $eq: ["$leaseType", "FIXED_TERM"] }, 1, 0] },
         },
-        totalRent: { $sum: "$rentAmount" },
+        totalBaseRent: { $sum: "$rentAmount" },
+        totalAdditionalRent: { $sum: "$additionalRentAmount" },
+        totalRent: { $sum: { $add: ["$rentAmount", "$additionalRentAmount"] } },
         totalDeposits: { $sum: "$depositAmount" },
       },
     },
@@ -388,6 +394,8 @@ const getLeaseStatistics = async (propertyId?: string) => {
       expiredLeases: 0,
       monthlyLeases: 0,
       fixedTermLeases: 0,
+      totalBaseRent: 0,
+      totalAdditionalRent: 0,
       totalRent: 0,
       totalDeposits: 0,
     }

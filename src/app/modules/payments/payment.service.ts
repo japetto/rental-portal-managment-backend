@@ -213,6 +213,14 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
         ? activeLease.rentAmount
         : Number(activeLease.rentAmount);
 
+    // Calculate total rent amount (base rent + additional rent)
+    const additionalRentAmount: number =
+      typeof activeLease.additionalRentAmount === "number"
+        ? activeLease.additionalRentAmount
+        : Number(activeLease.additionalRentAmount || 0);
+
+    const totalRentAmount = rentAmount + additionalRentAmount;
+
     // Check current month payment status
     const currentMonthPayment = await Payments.findOne({
       tenantId: tenantId,
@@ -279,7 +287,7 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
     let isProRated = false;
     let proRatedDays = 0;
     let proRatedRentAmount = 0;
-    let fullMonthRentAmount = rentAmount;
+    let fullMonthRentAmount = totalRentAmount;
 
     if (isFirstTimePayment) {
       // First-time payment: rent + deposit
@@ -294,19 +302,19 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
         const remainingDays = daysInMonth - leaseStartDay + 1;
         proRatedDays = remainingDays;
         proRatedRentAmount = Math.round(
-          (rentAmount / daysInMonth) * remainingDays,
+          (totalRentAmount / daysInMonth) * remainingDays,
         );
         isProRated = true;
         currentMonthAmount = proRatedRentAmount + activeLease.depositAmount;
         currentMonthDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit`;
       } else {
         // Full first month
-        currentMonthAmount = rentAmount + activeLease.depositAmount;
+        currentMonthAmount = totalRentAmount + activeLease.depositAmount;
         currentMonthDescription = "First Month Rent + Deposit";
       }
     } else if (currentMonthPayment?.status !== "PAID") {
       // Regular monthly payment
-      currentMonthAmount = rentAmount;
+      currentMonthAmount = totalRentAmount;
       currentMonthDescription = `Monthly Rent - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
     }
 
@@ -375,7 +383,7 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
     if (currentMonthPayment?.status === "PAID" && !nextMonthPayment) {
       paymentOptions.push({
         type: "NEXT_MONTH",
-        amount: rentAmount,
+        amount: totalRentAmount,
         description: `Next Month Rent - ${nextMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
         dueDate: nextMonth,
       });
@@ -465,7 +473,7 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
       spotNumber: spot.spotNumber || spot.lotIdentifier,
 
       // Lease info
-      rentAmount: activeLease.rentAmount,
+      rentAmount: totalRentAmount, // Use total rent amount (base + additional)
       depositAmount: activeLease.depositAmount,
       leaseStart: activeLease.leaseStart,
       leaseEnd: activeLease.leaseEnd,
@@ -720,13 +728,21 @@ const createPaymentWithLink = async (paymentData: {
         ? activeLease.rentAmount
         : Number(activeLease.rentAmount);
 
+    // Calculate total rent amount (base rent + additional rent)
+    const additionalRentAmount: number =
+      typeof activeLease.additionalRentAmount === "number"
+        ? activeLease.additionalRentAmount
+        : Number(activeLease.additionalRentAmount || 0);
+
+    const totalRentAmount = rentAmount + additionalRentAmount;
+
     // Determine payment based on lease start and payment history
     if (paymentHistory.length === 0) {
       // First-time payment - use lease start date as due date
       isFirstTimePayment = true;
       includeDeposit = true;
       paymentDueDate = new Date(leaseStart);
-      paymentAmount = rentAmount + activeLease.depositAmount;
+      paymentAmount = totalRentAmount + activeLease.depositAmount;
 
       // Create organized payment description for Stripe checkout
       const monthYear = leaseStart.toLocaleDateString("en-US", {
@@ -746,7 +762,7 @@ const createPaymentWithLink = async (paymentData: {
         ).getDate();
         const remainingDays = daysInMonth - leaseStart.getDate() + 1;
         const proRatedRent = Math.round(
-          (rentAmount / daysInMonth) * remainingDays,
+          (totalRentAmount / daysInMonth) * remainingDays,
         );
         paymentAmount = proRatedRent + activeLease.depositAmount;
 
@@ -758,16 +774,16 @@ const createPaymentWithLink = async (paymentData: {
         console.log("📊 Pro-rated calculation:", {
           daysInMonth,
           remainingDays,
-          originalAmount: rentAmount,
+          originalAmount: totalRentAmount,
           proRatedAmount: proRatedRent,
           depositAmount: activeLease.depositAmount,
           totalAmount: paymentAmount,
         });
       } else {
         // If lease starts on the 1st of the month, charge full rent + deposit
-        paymentAmount = rentAmount + activeLease.depositAmount;
+        paymentAmount = totalRentAmount + activeLease.depositAmount;
         paymentDescription =
-          `📅 First Month Rent: $${rentAmount}\n` +
+          `📅 First Month Rent: $${totalRentAmount}\n` +
           `💰 Security Deposit: $${activeLease.depositAmount}\n` +
           `📍 ${propertyInfo}`;
 
@@ -830,7 +846,7 @@ const createPaymentWithLink = async (paymentData: {
       if (!currentMonthPayment) {
         // No payment for current month - create current month payment
         paymentDueDate = currentMonth;
-        paymentAmount = rentAmount;
+        paymentAmount = totalRentAmount;
         const monthYear = currentMonth.toLocaleDateString("en-US", {
           month: "long",
           year: "numeric",
@@ -840,7 +856,7 @@ const createPaymentWithLink = async (paymentData: {
           : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
 
         paymentDescription =
-          `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
+          `📅 Monthly Rent: $${totalRentAmount}\n` + `📍 ${propertyInfo}`;
 
         console.log("💰 Creating payment for current month:", {
           amount: paymentAmount,
@@ -849,7 +865,7 @@ const createPaymentWithLink = async (paymentData: {
       } else if (currentMonthPayment.status === "PAID" && !nextMonthPayment) {
         // Current month is paid, no payment for next month - create next month payment
         paymentDueDate = nextMonth;
-        paymentAmount = rentAmount;
+        paymentAmount = totalRentAmount;
         const monthYear = nextMonth.toLocaleDateString("en-US", {
           month: "long",
           year: "numeric",
@@ -859,7 +875,7 @@ const createPaymentWithLink = async (paymentData: {
           : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
 
         paymentDescription =
-          `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
+          `📅 Monthly Rent: $${totalRentAmount}\n` + `📍 ${propertyInfo}`;
 
         console.log("💰 Creating payment for next month (one month ahead):", {
           amount: paymentAmount,
@@ -1198,8 +1214,10 @@ const getTenantPaymentStatusEnhanced = async (paymentData: {
     );
 
     // Calculate total amount due (current month + overdue)
+    const totalRentAmount =
+      activeLease.rentAmount + (activeLease.additionalRentAmount || 0);
     const currentMonthAmount =
-      currentMonthPayment?.totalAmount || activeLease.rentAmount;
+      currentMonthPayment?.totalAmount || totalRentAmount;
     const totalDue = currentMonthAmount + totalOverdueAmount;
 
     // Calculate days overdue for current payment
@@ -1223,7 +1241,7 @@ const getTenantPaymentStatusEnhanced = async (paymentData: {
         // First-time payment - use lease start date as due date
         isFirstTimePayment = true;
         const paymentDueDate = new Date(activeLease.leaseStart);
-        let paymentAmount = activeLease.rentAmount;
+        let paymentAmount = totalRentAmount;
         let paymentDescription = "First Month Rent Payment";
 
         // Check if lease started mid-month and adjust amount if needed
@@ -1237,7 +1255,7 @@ const getTenantPaymentStatusEnhanced = async (paymentData: {
           ).getDate();
           const remainingDays = daysInMonth - leaseStartDay + 1;
           paymentAmount = Math.round(
-            (activeLease.rentAmount / daysInMonth) * remainingDays,
+            (totalRentAmount / daysInMonth) * remainingDays,
           );
           paymentDescription = `Pro-rated First Month Rent (${remainingDays} days)`;
         }
@@ -1327,19 +1345,19 @@ const getTenantPaymentStatusEnhanced = async (paymentData: {
       tenantId: paymentData.tenantId,
       lease: {
         id: activeLease._id,
-        rentAmount: activeLease.rentAmount,
+        rentAmount: totalRentAmount, // Use total rent amount
         leaseType: activeLease.leaseType,
         leaseStatus: activeLease.leaseStatus,
         leaseStart: activeLease.leaseStart,
       },
       currentMonth: {
         dueDate: currentMonthPayment?.dueDate || currentMonth,
-        rentAmount: activeLease.rentAmount,
+        rentAmount: totalRentAmount, // Use total rent amount
         status: currentMonthPayment?.status || "PENDING",
         paidDate: currentMonthPayment?.paidDate,
         daysOverdue: daysOverdue,
         lateFeeAmount: currentMonthPayment?.lateFeeAmount || 0,
-        totalAmount: currentMonthPayment?.totalAmount || activeLease.rentAmount,
+        totalAmount: currentMonthPayment?.totalAmount || totalRentAmount, // Use total rent amount
         receiptNumber: currentMonthPayment?.receiptNumber,
       },
       paymentAction,

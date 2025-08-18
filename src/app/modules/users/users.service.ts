@@ -782,7 +782,7 @@ const getComprehensiveUserProfile = async (userId: string) => {
             _id: activeLease._id,
             leaseStart: activeLease.leaseStart,
             leaseEnd: activeLease.leaseEnd,
-            rentAmount: activeLease.rentAmount,
+            rentAmount: activeLease.totalRentAmount, // Use total rent amount (base + additional)
             depositAmount: activeLease.depositAmount,
             paymentStatus: activeLease.paymentStatus,
             leaseStatus: activeLease.leaseStatus,
@@ -799,8 +799,8 @@ const getComprehensiveUserProfile = async (userId: string) => {
     rent:
       user.role === "TENANT"
         ? {
-            // Current rent amount from lease
-            currentRentAmount: activeLease?.rentAmount || 0,
+            // Current rent amount from lease (total amount)
+            currentRentAmount: activeLease?.totalRentAmount || 0,
             depositAmount: activeLease?.depositAmount || 0,
 
             // Due date information

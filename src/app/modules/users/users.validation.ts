@@ -193,6 +193,7 @@ export const updateTenantDataValidationSchema = z.object({
         leaseStart: z.string().optional(), // Will be converted to Date
         leaseEnd: z.string().optional(), // Will be converted to Date
         rentAmount: z.number().optional(),
+        additionalRentAmount: z.number().optional(),
         depositAmount: z.number().optional(),
         occupants: z.number().optional(),
         pets: z

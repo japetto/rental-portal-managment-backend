@@ -144,6 +144,7 @@ export interface IUpdateTenantData {
     leaseStart?: Date;
     leaseEnd?: Date;
     rentAmount?: number;
+    additionalRentAmount?: number;
     depositAmount?: number;
     occupants?: number;
     pets?: {

@@ -19,6 +19,7 @@ export const leasesSchema = new Schema<ILease>(
     leaseStart: { type: Date, required: true },
     leaseEnd: { type: Date, required: false }, // Optional for monthly leases
     rentAmount: { type: Number, required: true, min: 0 },
+    additionalRentAmount: { type: Number, required: false, min: 0, default: 0 }, // Additional rent amount (utilities, services, etc.)
     depositAmount: { type: Number, required: true, min: 0 },
     leaseStatus: {
       type: String,
@@ -81,6 +82,19 @@ leasesSchema.pre("save", function (next) {
     return next(new Error("Pet details are required when hasPets is true"));
   }
 
+  // Ensure additionalRentAmount defaults to 0 if not provided
+  if (
+    this.additionalRentAmount === undefined ||
+    this.additionalRentAmount === null
+  ) {
+    this.additionalRentAmount = 0;
+  }
+
+  // Validate that additional rent amount is not negative
+  if (this.additionalRentAmount < 0) {
+    return next(new Error("Additional rent amount cannot be negative"));
+  }
+
   // Set lease status to ACTIVE when saving lease data
   this.leaseStatus = LeaseStatus.ACTIVE;
 
@@ -110,7 +124,18 @@ leasesSchema.methods.isLeaseInformationComplete = function (): boolean {
       this.pets.petDetails &&
       this.pets.petDetails.length > 0);
 
-  return hasRequiredFields && hasValidLeaseType && hasValidPetInfo;
+  // Check that additional rent amount is valid (not negative)
+  const hasValidAdditionalRent =
+    this.additionalRentAmount !== undefined &&
+    this.additionalRentAmount !== null &&
+    this.additionalRentAmount >= 0;
+
+  return (
+    hasRequiredFields &&
+    hasValidLeaseType &&
+    hasValidPetInfo &&
+    hasValidAdditionalRent
+  );
 };
 
 // Pre-save middleware for cross-schema validation
@@ -225,6 +250,11 @@ leasesSchema.virtual("paymentStatus").get(async function (this: ILease) {
   }
 
   return PaymentStatus.PAID;
+});
+
+// Virtual for calculating total rent amount (rentAmount + additionalRentAmount)
+leasesSchema.virtual("totalRentAmount").get(function (this: ILease) {
+  return this.rentAmount + this.additionalRentAmount;
 });
 
 export const Leases = model<ILease>("Leases", leasesSchema);
