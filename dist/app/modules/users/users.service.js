@@ -445,6 +445,77 @@ const checkUserInvitationStatus = (email) => __awaiter(void 0, void 0, void 0, f
         hasPassword: !!(user.password && user.password !== ""),
     };
 });
+// Helper function to check if all tenant data is filled up by admin
+const isTenantDataComplete = (user, activeLease) => {
+    // Check if user is a tenant
+    if (user.role !== "TENANT") {
+        return false;
+    }
+    // Check required user fields
+    const hasRequiredUserFields = !!(user.name &&
+        user.email &&
+        user.phoneNumber &&
+        user.preferredLocation);
+    // Check if tenant is assigned to a property and spot
+    const hasPropertyAndSpot = !!(user.propertyId && user.spotId);
+    // Check if tenant has an active lease and it's ACTIVE status
+    const hasActiveLease = !!activeLease &&
+        (activeLease.leaseStatus === "ACTIVE" || activeLease.leaseStatus === "ACTIVE");
+    // Check if lease information is complete (if lease exists)
+    // Since this is a populated object, we need to check the fields manually
+    const hasCompleteLeaseInfo = !activeLease ||
+        (() => {
+            var _a, _b, _c, _d;
+            // Check if all required lease fields are filled
+            const hasRequiredLeaseFields = !!(activeLease.tenantId &&
+                activeLease.spotId &&
+                activeLease.propertyId &&
+                activeLease.leaseType &&
+                activeLease.leaseStart &&
+                activeLease.occupants);
+            // Check lease type specific requirements
+            const hasValidLeaseType = (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd) ||
+                (activeLease.leaseType === "MONTHLY" && !activeLease.leaseEnd);
+            // Check pet information if pets are present
+            const hasValidPetInfo = !((_a = activeLease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) ||
+                (((_b = activeLease.pets) === null || _b === void 0 ? void 0 : _b.hasPets) &&
+                    ((_c = activeLease.pets) === null || _c === void 0 ? void 0 : _c.petDetails) &&
+                    ((_d = activeLease.pets) === null || _d === void 0 ? void 0 : _d.petDetails.length) > 0);
+            // Check financial fields
+            const hasValidFinancials = typeof activeLease.rentAmount === "number" &&
+                activeLease.rentAmount >= 0 &&
+                typeof activeLease.depositAmount === "number" &&
+                activeLease.depositAmount >= 0 &&
+                (typeof activeLease.additionalRentAmount !== "number" ||
+                    activeLease.additionalRentAmount >= 0);
+            return (hasRequiredLeaseFields &&
+                hasValidLeaseType &&
+                hasValidPetInfo &&
+                hasValidFinancials);
+        })();
+    // Check if RV information is provided (optional but good to have)
+    const hasRvInfo = !!(user.rvInfo &&
+        user.rvInfo.make &&
+        user.rvInfo.model &&
+        user.rvInfo.licensePlate);
+    // Check if emergency contact is provided (optional but good to have)
+    const hasEmergencyContact = !!(user.emergencyContact &&
+        user.emergencyContact.name &&
+        user.emergencyContact.phone &&
+        user.emergencyContact.relationship);
+    // Tenant data is considered complete if:
+    // 1. All required user fields are filled
+    // 2. Tenant is assigned to property and spot
+    // 3. Tenant has an active lease with complete information
+    // 4. RV information is provided (optional)
+    // 5. Emergency contact is provided (optional)
+    // For now, we'll consider it complete if required fields and lease are complete
+    // RV info and emergency contact are nice-to-have but not required for tenant status
+    return (hasRequiredUserFields &&
+        hasPropertyAndSpot &&
+        hasActiveLease &&
+        hasCompleteLeaseInfo);
+};
 // Get comprehensive user profile with all related information
 const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e;
@@ -531,6 +602,19 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
     const activePaymentLinks = pendingPayments.filter(payment => payment.stripePaymentLinkId && payment.paymentLinkUrl);
     // Get next payment due date
     const nextPaymentDue = pendingPayments.length > 0 ? pendingPayments[0] : null;
+    // Check tenant status for tenants
+    const tenantStatus = user.role === "TENANT" ? isTenantDataComplete(user, activeLease) : null;
+    console.log(`🔍 User profile for: ${user.name} (${user.role})`);
+    if (user.role === "TENANT") {
+        console.log(`   - Tenant Status: ${tenantStatus}`);
+        console.log(`   - Has property: ${!!user.propertyId}`);
+        console.log(`   - Has spot: ${!!user.spotId}`);
+        console.log(`   - Has lease: ${!!activeLease}`);
+        if (activeLease) {
+            console.log(`   - Lease type: ${activeLease.leaseType}`);
+            console.log(`   - Lease status: ${activeLease.leaseStatus}`);
+        }
+    }
     // Build comprehensive profile
     const comprehensiveProfile = {
         // Basic user info
@@ -548,6 +632,8 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
             rvInfo: user.rvInfo,
             emergencyContact: user.emergencyContact,
         },
+        // Tenant status (only for tenants)
+        tenantStatus: tenantStatus,
         // Property information (only for tenants)
         property: user.role === "TENANT" ? user.propertyId : null,
         // Spot information (only for tenants)
@@ -558,7 +644,7 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
                 _id: activeLease._id,
                 leaseStart: activeLease.leaseStart,
                 leaseEnd: activeLease.leaseEnd,
-                rentAmount: activeLease.rentAmount,
+                rentAmount: activeLease.totalRentAmount, // Use total rent amount (base + additional)
                 depositAmount: activeLease.depositAmount,
                 paymentStatus: activeLease.paymentStatus,
                 leaseStatus: activeLease.leaseStatus,
@@ -574,8 +660,8 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
         // Enhanced rent and payment information (only for tenants)
         rent: user.role === "TENANT"
             ? {
-                // Current rent amount from lease
-                currentRentAmount: (activeLease === null || activeLease === void 0 ? void 0 : activeLease.rentAmount) || 0,
+                // Current rent amount from lease (total amount)
+                currentRentAmount: (activeLease === null || activeLease === void 0 ? void 0 : activeLease.totalRentAmount) || 0,
                 depositAmount: (activeLease === null || activeLease === void 0 ? void 0 : activeLease.depositAmount) || 0,
                 // Due date information
                 dueDates: {

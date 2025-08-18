@@ -119,20 +119,22 @@ exports.paymentsSchema.pre("save", function (next) {
                 isDeleted: false,
             });
             if (lease) {
+                // Use totalRentAmount (rentAmount + additionalRentAmount) for payment calculations
+                const totalRentAmount = lease.rentAmount + (lease.additionalRentAmount || 0);
                 // Check if this is a first-time payment (includes deposit)
                 const isFirstTimePayment = ((_a = this.description) === null || _a === void 0 ? void 0 : _a.includes("Deposit")) ||
                     ((_b = this.description) === null || _b === void 0 ? void 0 : _b.includes("First Month")) ||
-                    this.amount > lease.rentAmount + lease.depositAmount;
-                // For first-time payments, allow amount up to rent + deposit
+                    this.amount > totalRentAmount + lease.depositAmount;
+                // For first-time payments, allow amount up to total rent + deposit
                 if (isFirstTimePayment) {
-                    if (this.amount > lease.rentAmount + lease.depositAmount) {
-                        return next(new Error(`First-time payment amount (${this.amount}) cannot exceed rent + deposit (${lease.rentAmount + lease.depositAmount})`));
+                    if (this.amount > totalRentAmount + lease.depositAmount) {
+                        return next(new Error(`First-time payment amount (${this.amount}) cannot exceed total rent + deposit (${totalRentAmount + lease.depositAmount})`));
                     }
                 }
                 else {
-                    // For regular rent payments, amount should not exceed monthly rent
-                    if (this.amount > lease.rentAmount) {
-                        return next(new Error(`Rent payment amount (${this.amount}) cannot exceed lease rent amount (${lease.rentAmount})`));
+                    // For regular rent payments, amount should not exceed monthly total rent
+                    if (this.amount > totalRentAmount) {
+                        return next(new Error(`Rent payment amount (${this.amount}) cannot exceed lease total rent amount (${totalRentAmount})`));
                     }
                 }
             }

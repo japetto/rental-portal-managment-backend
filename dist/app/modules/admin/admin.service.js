@@ -411,14 +411,82 @@ const deleteSpot = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
     });
 });
 const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("🔍 Fetching all tenants...");
     const tenants = yield users_schema_1.Users.find({ role: "TENANT", isDeleted: false })
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
-        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes")
+        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount additionalRentAmount depositAmount leaseStatus occupants pets specialRequests documents notes")
         .sort({ createdAt: -1 });
+    console.log(`📊 Found ${tenants.length} tenants`);
+    if (tenants.length === 0) {
+        console.log("⚠️ No tenants found in database");
+        return [];
+    }
     // Transform the data to include lot number and lease info more prominently
     const tenantsWithLotNumber = tenants.map(tenant => {
         const tenantData = tenant.toObject();
+        // Check tenant status
+        const isTenantDataComplete = (user, activeLease) => {
+            // Check if user is a tenant
+            if (user.role !== "TENANT") {
+                return false;
+            }
+            // Check required user fields
+            const hasRequiredUserFields = !!(user.name &&
+                user.email &&
+                user.phoneNumber &&
+                user.preferredLocation);
+            // Check if tenant is assigned to a property and spot
+            const hasPropertyAndSpot = !!(user.propertyId && user.spotId);
+            // Check if tenant has an active lease and it's ACTIVE status
+            const hasActiveLease = !!activeLease &&
+                (activeLease.leaseStatus === "ACTIVE" || activeLease.leaseStatus === "ACTIVE" /* fallback */);
+            // Check if lease information is complete (if lease exists)
+            // Since this is a populated object, we need to check the fields manually
+            const hasCompleteLeaseInfo = !activeLease ||
+                (() => {
+                    var _a, _b, _c, _d;
+                    // Check if all required lease fields are filled
+                    const hasRequiredLeaseFields = !!(activeLease.tenantId &&
+                        activeLease.spotId &&
+                        activeLease.propertyId &&
+                        activeLease.leaseType &&
+                        activeLease.leaseStart &&
+                        activeLease.occupants);
+                    // Check lease type specific requirements
+                    const hasValidLeaseType = (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd) ||
+                        (activeLease.leaseType === "MONTHLY" && !activeLease.leaseEnd);
+                    // Check pet information if pets are present
+                    const hasValidPetInfo = !((_a = activeLease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) ||
+                        (((_b = activeLease.pets) === null || _b === void 0 ? void 0 : _b.hasPets) &&
+                            ((_c = activeLease.pets) === null || _c === void 0 ? void 0 : _c.petDetails) &&
+                            ((_d = activeLease.pets) === null || _d === void 0 ? void 0 : _d.petDetails.length) > 0);
+                    // Check financial fields
+                    const hasValidFinancials = typeof activeLease.rentAmount === "number" &&
+                        activeLease.rentAmount >= 0 &&
+                        typeof activeLease.depositAmount === "number" &&
+                        activeLease.depositAmount >= 0 &&
+                        (typeof activeLease.additionalRentAmount !== "number" ||
+                            activeLease.additionalRentAmount >= 0);
+                    return (hasRequiredLeaseFields &&
+                        hasValidLeaseType &&
+                        hasValidPetInfo &&
+                        hasValidFinancials);
+                })();
+            return (hasRequiredUserFields &&
+                hasPropertyAndSpot &&
+                hasActiveLease &&
+                hasCompleteLeaseInfo);
+        };
+        // Get active lease for tenant status check
+        const activeLease = tenantData.leaseId;
+        const tenantStatus = isTenantDataComplete(tenantData, activeLease);
+        // Add tenant status to the response
+        tenantData.tenantStatus = tenantStatus;
+        console.log(`👤 Tenant: ${tenantData.name} - Status: ${tenantStatus}`);
+        console.log(`   - Has property: ${!!tenantData.propertyId}`);
+        console.log(`   - Has spot: ${!!tenantData.spotId}`);
+        console.log(`   - Has lease: ${!!activeLease}`);
         // Add property info as a direct field for easier access
         if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
             tenantData.property = {
@@ -446,7 +514,10 @@ const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
                 leaseType: tenantData.leaseId.leaseType,
                 leaseStart: tenantData.leaseId.leaseStart,
                 leaseEnd: tenantData.leaseId.leaseEnd,
-                rentAmount: tenantData.leaseId.rentAmount,
+                rentAmount: tenantData.leaseId.rentAmount, // Base rent amount
+                additionalRentAmount: tenantData.leaseId.additionalRentAmount || 0, // Additional rent amount
+                totalRentAmount: (tenantData.leaseId.rentAmount || 0) +
+                    (tenantData.leaseId.additionalRentAmount || 0), // Total rent amount
                 depositAmount: tenantData.leaseId.depositAmount,
                 leaseStatus: tenantData.leaseId.leaseStatus,
                 occupants: tenantData.leaseId.occupants,
@@ -745,7 +816,7 @@ const getUserById = (userId, adminId) => __awaiter(void 0, void 0, void 0, funct
         .select("-password")
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
-        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount depositAmount leaseStatus occupants pets specialRequests documents notes");
+        .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount additionalRentAmount depositAmount leaseStatus occupants pets specialRequests documents notes");
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }

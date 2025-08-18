@@ -46,7 +46,9 @@ const createLease = (leaseData) => __awaiter(void 0, void 0, void 0, function* (
     // Set default lease status based on start date
     const now = new Date();
     const leaseStatus = leaseData.leaseStart <= now ? payment_enums_1.LeaseStatus.ACTIVE : payment_enums_1.LeaseStatus.PENDING;
-    const lease = yield leases_schema_1.Leases.create(Object.assign(Object.assign({}, leaseData), { leaseStatus, paymentStatus: "PENDING" }));
+    // Ensure additionalRentAmount defaults to 0 if not provided
+    const leaseDataWithDefaults = Object.assign(Object.assign({}, leaseData), { additionalRentAmount: leaseData.additionalRentAmount || 0, leaseStatus, paymentStatus: "PENDING" });
+    const lease = yield leases_schema_1.Leases.create(leaseDataWithDefaults);
     return lease;
 });
 const getAllLeases = (filters, paginationOptions) => __awaiter(void 0, void 0, void 0, function* () {
@@ -278,7 +280,9 @@ const getLeaseStatistics = (propertyId) => __awaiter(void 0, void 0, void 0, fun
                 fixedTermLeases: {
                     $sum: { $cond: [{ $eq: ["$leaseType", "FIXED_TERM"] }, 1, 0] },
                 },
-                totalRent: { $sum: "$rentAmount" },
+                totalBaseRent: { $sum: "$rentAmount" },
+                totalAdditionalRent: { $sum: "$additionalRentAmount" },
+                totalRent: { $sum: { $add: ["$rentAmount", "$additionalRentAmount"] } },
                 totalDeposits: { $sum: "$depositAmount" },
             },
         },
@@ -290,6 +294,8 @@ const getLeaseStatistics = (propertyId) => __awaiter(void 0, void 0, void 0, fun
         expiredLeases: 0,
         monthlyLeases: 0,
         fixedTermLeases: 0,
+        totalBaseRent: 0,
+        totalAdditionalRent: 0,
         totalRent: 0,
         totalDeposits: 0,
     });

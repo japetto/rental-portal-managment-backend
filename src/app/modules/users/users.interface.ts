@@ -165,3 +165,40 @@ export interface IUpdateTenantData {
 export interface IDeleteUser {
   userId: string;
 }
+
+// Interface for comprehensive user profile response
+export interface IComprehensiveUserProfile {
+  user: {
+    _id: any; // Using any to match mongoose document _id type
+    name: string;
+    email: string;
+    phoneNumber: string;
+    role: userRoleEnums;
+    profileImage?: string;
+    bio?: string;
+    preferredLocation: string;
+    isVerified?: boolean;
+    isInvited?: boolean;
+    rvInfo?: {
+      make: string;
+      model: string;
+      year: number;
+      length: number;
+      licensePlate: string;
+    };
+    emergencyContact?: {
+      name: string;
+      phone: string;
+      relationship: string;
+    };
+  };
+  tenantStatus?: boolean | null; // true if all tenant data is complete, false if incomplete, null if not a tenant
+  property?: any;
+  spot?: any;
+  lease?: any;
+  rent?: any;
+  payments?: any;
+  serviceRequests?: any;
+  announcements?: any;
+  assignmentHistory?: any[];
+}

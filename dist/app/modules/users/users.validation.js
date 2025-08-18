@@ -184,6 +184,7 @@ exports.updateTenantDataValidationSchema = zod_1.z.object({
             leaseStart: zod_1.z.string().optional(), // Will be converted to Date
             leaseEnd: zod_1.z.string().optional(), // Will be converted to Date
             rentAmount: zod_1.z.number().optional(),
+            additionalRentAmount: zod_1.z.number().optional(),
             depositAmount: zod_1.z.number().optional(),
             occupants: zod_1.z.number().optional(),
             pets: zod_1.z

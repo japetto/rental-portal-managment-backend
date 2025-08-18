@@ -215,6 +215,11 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         const rentAmount = typeof activeLease.rentAmount === "number"
             ? activeLease.rentAmount
             : Number(activeLease.rentAmount);
+        // Calculate total rent amount (base rent + additional rent)
+        const additionalRentAmount = typeof activeLease.additionalRentAmount === "number"
+            ? activeLease.additionalRentAmount
+            : Number(activeLease.additionalRentAmount || 0);
+        const totalRentAmount = rentAmount + additionalRentAmount;
         // Check current month payment status
         const currentMonthPayment = yield payments_schema_1.Payments.findOne({
             tenantId: tenantId,
@@ -264,7 +269,7 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         let isProRated = false;
         let proRatedDays = 0;
         let proRatedRentAmount = 0;
-        let fullMonthRentAmount = rentAmount;
+        let fullMonthRentAmount = totalRentAmount;
         if (isFirstTimePayment) {
             // First-time payment: rent + deposit
             const leaseStartDay = leaseStart.getDate();
@@ -273,20 +278,20 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
                 const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
                 const remainingDays = daysInMonth - leaseStartDay + 1;
                 proRatedDays = remainingDays;
-                proRatedRentAmount = Math.round((rentAmount / daysInMonth) * remainingDays);
+                proRatedRentAmount = Math.round((totalRentAmount / daysInMonth) * remainingDays);
                 isProRated = true;
                 currentMonthAmount = proRatedRentAmount + activeLease.depositAmount;
                 currentMonthDescription = `Pro-rated First Month Rent (${remainingDays} days) + Deposit`;
             }
             else {
                 // Full first month
-                currentMonthAmount = rentAmount + activeLease.depositAmount;
+                currentMonthAmount = totalRentAmount + activeLease.depositAmount;
                 currentMonthDescription = "First Month Rent + Deposit";
             }
         }
         else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) !== "PAID") {
             // Regular monthly payment
-            currentMonthAmount = rentAmount;
+            currentMonthAmount = totalRentAmount;
             currentMonthDescription = `Monthly Rent - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
         }
         // Calculate total amount due
@@ -342,7 +347,7 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment) {
             paymentOptions.push({
                 type: "NEXT_MONTH",
-                amount: rentAmount,
+                amount: totalRentAmount,
                 description: `Next Month Rent - ${nextMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
                 dueDate: nextMonth,
             });
@@ -420,7 +425,7 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             propertyAddress: property.address,
             spotNumber: spot.spotNumber || spot.lotIdentifier,
             // Lease info
-            rentAmount: activeLease.rentAmount,
+            rentAmount: totalRentAmount, // Use total rent amount (base + additional)
             depositAmount: activeLease.depositAmount,
             leaseStart: activeLease.leaseStart,
             leaseEnd: activeLease.leaseEnd,
@@ -634,13 +639,18 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         const rentAmount = typeof activeLease.rentAmount === "number"
             ? activeLease.rentAmount
             : Number(activeLease.rentAmount);
+        // Calculate total rent amount (base rent + additional rent)
+        const additionalRentAmount = typeof activeLease.additionalRentAmount === "number"
+            ? activeLease.additionalRentAmount
+            : Number(activeLease.additionalRentAmount || 0);
+        const totalRentAmount = rentAmount + additionalRentAmount;
         // Determine payment based on lease start and payment history
         if (paymentHistory.length === 0) {
             // First-time payment - use lease start date as due date
             isFirstTimePayment = true;
             includeDeposit = true;
             paymentDueDate = new Date(leaseStart);
-            paymentAmount = rentAmount + activeLease.depositAmount;
+            paymentAmount = totalRentAmount + activeLease.depositAmount;
             // Create organized payment description for Stripe checkout
             const monthYear = leaseStart.toLocaleDateString("en-US", {
                 month: "long",
@@ -653,7 +663,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 // Pro-rate the first month's rent
                 const daysInMonth = new Date(leaseStart.getFullYear(), leaseStart.getMonth() + 1, 0).getDate();
                 const remainingDays = daysInMonth - leaseStart.getDate() + 1;
-                const proRatedRent = Math.round((rentAmount / daysInMonth) * remainingDays);
+                const proRatedRent = Math.round((totalRentAmount / daysInMonth) * remainingDays);
                 paymentAmount = proRatedRent + activeLease.depositAmount;
                 paymentDescription =
                     `📅 Pro-rated First Month (${remainingDays} days): $${proRatedRent}\n` +
@@ -662,7 +672,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                 console.log("📊 Pro-rated calculation:", {
                     daysInMonth,
                     remainingDays,
-                    originalAmount: rentAmount,
+                    originalAmount: totalRentAmount,
                     proRatedAmount: proRatedRent,
                     depositAmount: activeLease.depositAmount,
                     totalAmount: paymentAmount,
@@ -670,9 +680,9 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             }
             else {
                 // If lease starts on the 1st of the month, charge full rent + deposit
-                paymentAmount = rentAmount + activeLease.depositAmount;
+                paymentAmount = totalRentAmount + activeLease.depositAmount;
                 paymentDescription =
-                    `📅 First Month Rent: $${rentAmount}\n` +
+                    `📅 First Month Rent: $${totalRentAmount}\n` +
                         `💰 Security Deposit: $${activeLease.depositAmount}\n` +
                         `📍 ${propertyInfo}`;
                 console.log("💰 Full rent + deposit charged:", {
@@ -710,7 +720,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             if (!currentMonthPayment) {
                 // No payment for current month - create current month payment
                 paymentDueDate = currentMonth;
-                paymentAmount = rentAmount;
+                paymentAmount = totalRentAmount;
                 const monthYear = currentMonth.toLocaleDateString("en-US", {
                     month: "long",
                     year: "numeric",
@@ -719,7 +729,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     ? `${property.name} - ${spot.spotNumber || spot.lotIdentifier}\n📍 Address: ${property.address}`
                     : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
                 paymentDescription =
-                    `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
+                    `📅 Monthly Rent: $${totalRentAmount}\n` + `📍 ${propertyInfo}`;
                 console.log("💰 Creating payment for current month:", {
                     amount: paymentAmount,
                     dueDate: paymentDueDate.toISOString(),
@@ -728,7 +738,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             else if (currentMonthPayment.status === "PAID" && !nextMonthPayment) {
                 // Current month is paid, no payment for next month - create next month payment
                 paymentDueDate = nextMonth;
-                paymentAmount = rentAmount;
+                paymentAmount = totalRentAmount;
                 const monthYear = nextMonth.toLocaleDateString("en-US", {
                     month: "long",
                     year: "numeric",
@@ -737,7 +747,7 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     ? `${property.name} - ${spot.spotNumber || spot.lotIdentifier}\n📍 Address: ${property.address}`
                     : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
                 paymentDescription =
-                    `📅 Monthly Rent: $${rentAmount}\n` + `📍 ${propertyInfo}`;
+                    `📅 Monthly Rent: $${totalRentAmount}\n` + `📍 ${propertyInfo}`;
                 console.log("💰 Creating payment for next month (one month ahead):", {
                     amount: paymentAmount,
                     dueDate: paymentDueDate.toISOString(),
@@ -999,7 +1009,8 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
         const overduePayments = pendingPayments.filter(payment => payment.status === "OVERDUE");
         const totalOverdueAmount = overduePayments.reduce((sum, payment) => sum + payment.totalAmount, 0);
         // Calculate total amount due (current month + overdue)
-        const currentMonthAmount = (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || activeLease.rentAmount;
+        const totalRentAmount = activeLease.rentAmount + (activeLease.additionalRentAmount || 0);
+        const currentMonthAmount = (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || totalRentAmount;
         const totalDue = currentMonthAmount + totalOverdueAmount;
         // Calculate days overdue for current payment
         const daysOverdue = currentMonthPayment && currentMonthPayment.status === "OVERDUE"
@@ -1017,7 +1028,7 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
                 // First-time payment - use lease start date as due date
                 isFirstTimePayment = true;
                 const paymentDueDate = new Date(activeLease.leaseStart);
-                let paymentAmount = activeLease.rentAmount;
+                let paymentAmount = totalRentAmount;
                 let paymentDescription = "First Month Rent Payment";
                 // Check if lease started mid-month and adjust amount if needed
                 const leaseStartDay = activeLease.leaseStart.getDate();
@@ -1025,7 +1036,7 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
                     // Pro-rate the first month's rent
                     const daysInMonth = new Date(activeLease.leaseStart.getFullYear(), activeLease.leaseStart.getMonth() + 1, 0).getDate();
                     const remainingDays = daysInMonth - leaseStartDay + 1;
-                    paymentAmount = Math.round((activeLease.rentAmount / daysInMonth) * remainingDays);
+                    paymentAmount = Math.round((totalRentAmount / daysInMonth) * remainingDays);
                     paymentDescription = `Pro-rated First Month Rent (${remainingDays} days)`;
                 }
                 paymentAction = "CREATE_FIRST_TIME";
@@ -1108,19 +1119,19 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
             tenantId: paymentData.tenantId,
             lease: {
                 id: activeLease._id,
-                rentAmount: activeLease.rentAmount,
+                rentAmount: totalRentAmount, // Use total rent amount
                 leaseType: activeLease.leaseType,
                 leaseStatus: activeLease.leaseStatus,
                 leaseStart: activeLease.leaseStart,
             },
             currentMonth: {
                 dueDate: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.dueDate) || currentMonth,
-                rentAmount: activeLease.rentAmount,
+                rentAmount: totalRentAmount, // Use total rent amount
                 status: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) || "PENDING",
                 paidDate: currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.paidDate,
                 daysOverdue: daysOverdue,
                 lateFeeAmount: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.lateFeeAmount) || 0,
-                totalAmount: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || activeLease.rentAmount,
+                totalAmount: (currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.totalAmount) || totalRentAmount, // Use total rent amount
                 receiptNumber: currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.receiptNumber,
             },
             paymentAction,

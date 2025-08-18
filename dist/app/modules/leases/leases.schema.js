@@ -61,6 +61,7 @@ exports.leasesSchema = new mongoose_1.Schema({
     leaseStart: { type: Date, required: true },
     leaseEnd: { type: Date, required: false }, // Optional for monthly leases
     rentAmount: { type: Number, required: true, min: 0 },
+    additionalRentAmount: { type: Number, required: false, min: 0, default: 0 }, // Additional rent amount (utilities, services, etc.)
     depositAmount: { type: Number, required: true, min: 0 },
     leaseStatus: {
         type: String,
@@ -112,6 +113,15 @@ exports.leasesSchema.pre("save", function (next) {
         (!this.pets.petDetails || this.pets.petDetails.length === 0)) {
         return next(new Error("Pet details are required when hasPets is true"));
     }
+    // Ensure additionalRentAmount defaults to 0 if not provided
+    if (this.additionalRentAmount === undefined ||
+        this.additionalRentAmount === null) {
+        this.additionalRentAmount = 0;
+    }
+    // Validate that additional rent amount is not negative
+    if (this.additionalRentAmount < 0) {
+        return next(new Error("Additional rent amount cannot be negative"));
+    }
     // Set lease status to ACTIVE when saving lease data
     this.leaseStatus = payment_enums_1.LeaseStatus.ACTIVE;
     next();
@@ -133,7 +143,14 @@ exports.leasesSchema.methods.isLeaseInformationComplete = function () {
         (this.pets.hasPets &&
             this.pets.petDetails &&
             this.pets.petDetails.length > 0);
-    return hasRequiredFields && hasValidLeaseType && hasValidPetInfo;
+    // Check that additional rent amount is valid (not negative)
+    const hasValidAdditionalRent = this.additionalRentAmount !== undefined &&
+        this.additionalRentAmount !== null &&
+        this.additionalRentAmount >= 0;
+    return (hasRequiredFields &&
+        hasValidLeaseType &&
+        hasValidPetInfo &&
+        hasValidAdditionalRent);
 };
 // Pre-save middleware for cross-schema validation
 exports.leasesSchema.pre("save", function (next) {
@@ -225,5 +242,9 @@ exports.leasesSchema.virtual("paymentStatus").get(function () {
         }
         return PaymentStatus.PAID;
     });
+});
+// Virtual for calculating total rent amount (rentAmount + additionalRentAmount)
+exports.leasesSchema.virtual("totalRentAmount").get(function () {
+    return this.rentAmount + this.additionalRentAmount;
 });
 exports.Leases = (0, mongoose_1.model)("Leases", exports.leasesSchema);

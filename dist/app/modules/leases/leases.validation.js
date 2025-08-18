@@ -45,6 +45,10 @@ exports.createLeaseValidationSchema = zod_1.z.object({
             return true; // We'll handle this in the service layer
         }),
         rentAmount: zod_1.z.number().min(0, "Rent amount must be positive"),
+        additionalRentAmount: zod_1.z
+            .number()
+            .min(0, "Additional rent amount must be positive")
+            .optional(),
         depositAmount: zod_1.z.number().min(0, "Deposit amount must be positive"),
         occupants: zod_1.z.number().int().min(1, "At least one occupant is required"),
         pets: zod_1.z.object({
@@ -99,6 +103,10 @@ exports.updateLeaseValidationSchema = zod_1.z.object({
         leaseStart: zod_1.z.coerce.date().optional(),
         leaseEnd: zod_1.z.coerce.date().optional(),
         rentAmount: zod_1.z.number().min(0, "Rent amount must be positive").optional(),
+        additionalRentAmount: zod_1.z
+            .number()
+            .min(0, "Additional rent amount must be positive")
+            .optional(),
         depositAmount: zod_1.z
             .number()
             .min(0, "Deposit amount must be positive")

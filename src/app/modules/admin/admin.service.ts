@@ -550,6 +550,8 @@ const deleteSpot = async (spotId: string): Promise<void> => {
 };
 
 const getAllTenants = async (): Promise<IUser[]> => {
+  console.log("🔍 Fetching all tenants...");
+
   const tenants = await Users.find({ role: "TENANT", isDeleted: false })
     .populate("propertyId", "name address")
     .populate("spotId", "spotNumber status size price description")
@@ -559,9 +561,160 @@ const getAllTenants = async (): Promise<IUser[]> => {
     )
     .sort({ createdAt: -1 });
 
+  console.log(`📊 Found ${tenants.length} tenants`);
+
+  if (tenants.length === 0) {
+    console.log("⚠️ No tenants found in database");
+    return [];
+  }
+
   // Transform the data to include lot number and lease info more prominently
   const tenantsWithLotNumber = tenants.map(tenant => {
     const tenantData = tenant.toObject() as any;
+
+    // Check tenant status - comprehensive validation
+    const isTenantDataComplete = (user: any, activeLease?: any): boolean => {
+      // Check if user is a tenant
+      if (user.role !== "TENANT") {
+        return false;
+      }
+
+      // 1. Check ALL required user fields are filled
+      const hasRequiredUserFields = !!(
+        user.name &&
+        user.name.trim() !== "" &&
+        user.email &&
+        user.email.trim() !== "" &&
+        user.phoneNumber &&
+        user.phoneNumber.trim() !== "" &&
+        user.preferredLocation &&
+        user.preferredLocation.trim() !== ""
+      );
+
+      // 2. Check if tenant is assigned to a property and spot
+      const hasPropertyAndSpot = !!(
+        user.propertyId &&
+        user.propertyId._id &&
+        user.spotId &&
+        user.spotId._id
+      );
+
+      // 3. Check if tenant has an active lease with ACTIVE status
+      const hasActiveLease =
+        !!activeLease && activeLease.leaseStatus === "ACTIVE";
+
+      // 4. Check if lease information is complete (if lease exists)
+      const hasCompleteLeaseInfo =
+        !activeLease ||
+        (() => {
+          // Check if ALL required lease fields are filled
+          const hasRequiredLeaseFields = !!(
+            activeLease.tenantId &&
+            activeLease.spotId &&
+            activeLease.propertyId &&
+            activeLease.leaseType &&
+            activeLease.leaseStart &&
+            activeLease.occupants &&
+            activeLease.occupants > 0
+          );
+
+          // Check lease type specific requirements
+          const hasValidLeaseType =
+            (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd) ||
+            (activeLease.leaseType === "MONTHLY" && !activeLease.leaseEnd);
+
+          // Check pet information if pets are present
+          const hasValidPetInfo =
+            !activeLease.pets?.hasPets ||
+            (activeLease.pets?.hasPets &&
+              activeLease.pets?.petDetails &&
+              activeLease.pets?.petDetails.length > 0 &&
+              activeLease.pets?.petDetails.every(
+                (pet: any) => pet.type && pet.breed && pet.name,
+              ));
+
+          // Check ALL financial fields are properly set
+          const hasValidFinancials =
+            typeof activeLease.rentAmount === "number" &&
+            activeLease.rentAmount > 0 &&
+            typeof activeLease.depositAmount === "number" &&
+            activeLease.depositAmount >= 0 &&
+            (activeLease.additionalRentAmount === undefined ||
+              activeLease.additionalRentAmount === null ||
+              (typeof activeLease.additionalRentAmount === "number" &&
+                activeLease.additionalRentAmount >= 0));
+
+          // Check if lease dates are valid
+          const hasValidDates =
+            activeLease.leaseStart &&
+            new Date(activeLease.leaseStart) > new Date() &&
+            (activeLease.leaseType === "MONTHLY" ||
+              (activeLease.leaseType === "FIXED_TERM" &&
+                activeLease.leaseEnd &&
+                new Date(activeLease.leaseEnd) >
+                  new Date(activeLease.leaseStart)));
+
+          return (
+            hasRequiredLeaseFields &&
+            hasValidLeaseType &&
+            hasValidPetInfo &&
+            hasValidFinancials &&
+            hasValidDates
+          );
+        })();
+
+      // 5. Check if RV information is provided (if user has RV)
+      const hasRvInfo =
+        !user.rvInfo ||
+        !!(
+          user.rvInfo.make &&
+          user.rvInfo.make.trim() !== "" &&
+          user.rvInfo.model &&
+          user.rvInfo.model.trim() !== "" &&
+          user.rvInfo.year &&
+          user.rvInfo.length &&
+          user.rvInfo.licensePlate &&
+          user.rvInfo.licensePlate.trim() !== ""
+        );
+
+      // 6. Check if emergency contact is provided
+      const hasEmergencyContact = !!(
+        user.emergencyContact &&
+        user.emergencyContact.name &&
+        user.emergencyContact.name.trim() !== "" &&
+        user.emergencyContact.phone &&
+        user.emergencyContact.phone.trim() !== "" &&
+        user.emergencyContact.relationship &&
+        user.emergencyContact.relationship.trim() !== ""
+      );
+
+      // ALL conditions must be met for tenant status to be true
+      return (
+        hasRequiredUserFields &&
+        hasPropertyAndSpot &&
+        hasActiveLease &&
+        hasCompleteLeaseInfo &&
+        hasRvInfo &&
+        hasEmergencyContact
+      );
+    };
+
+    // Get active lease for tenant status check
+    const activeLease = tenantData.leaseId;
+    const tenantStatus = isTenantDataComplete(tenantData, activeLease);
+
+    // Add tenant status to the response
+    tenantData.tenantStatus = tenantStatus;
+
+    console.log(`👤 Tenant: ${tenantData.name} - Status: ${tenantStatus}`);
+    console.log(`   - Has property: ${!!tenantData.propertyId}`);
+    console.log(`   - Has spot: ${!!tenantData.spotId}`);
+    console.log(`   - Has lease: ${!!activeLease}`);
+    if (activeLease) {
+      console.log(`   - Lease status: ${activeLease.leaseStatus}`);
+      console.log(`   - Rent amount: ${activeLease.rentAmount}`);
+      console.log(`   - Deposit amount: ${activeLease.depositAmount}`);
+    }
 
     // Add property info as a direct field for easier access
     if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
