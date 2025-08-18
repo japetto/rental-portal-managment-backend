@@ -842,15 +842,50 @@ const getComprehensiveUserProfile = async (
       .sort({ createdAt: -1 })
       .limit(5);
 
-    // Get user's unread announcements
+    // Get user's unread announcements using proper filtering
     const { Announcements } = await import(
       "../announcements/announcements.schema"
     );
-    unreadAnnouncements = await Announcements.find({
-      propertyId: user.propertyId,
+
+    // Get user's property ID - handle both populated object and ObjectId
+    const userPropertyId =
+      user.propertyId?._id?.toString() || user.propertyId?.toString();
+
+    // Build the query for announcements that are relevant to this tenant
+    const baseQuery: any = {
+      isDeleted: false, // Only get non-deleted announcements
       isActive: true,
-      readBy: { $ne: userId },
-    }).sort({ createdAt: -1 });
+      readBy: { $ne: userId }, // Only unread announcements
+    };
+
+    // Build target audience conditions
+    const targetAudienceConditions: any[] = [
+      { targetAudience: "ALL" },
+      { targetAudience: "TENANTS_ONLY" },
+    ];
+
+    // Include PROPERTY_SPECIFIC announcements for user's property
+    if (userPropertyId) {
+      targetAudienceConditions.push({
+        $and: [
+          { targetAudience: "PROPERTY_SPECIFIC" },
+          { propertyId: userPropertyId },
+        ],
+      });
+    }
+
+    // Combine all conditions
+    const query = {
+      ...baseQuery,
+      $or: targetAudienceConditions,
+    };
+
+    unreadAnnouncements = await Announcements.find(query)
+      .populate({
+        path: "propertyId",
+        select: "name description address",
+      })
+      .sort({ priority: -1, createdAt: -1 });
 
     // Get user's assignment history
     assignmentHistory = await getUserAssignmentHistory(userId);

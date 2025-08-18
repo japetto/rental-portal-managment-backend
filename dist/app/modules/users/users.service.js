@@ -451,28 +451,34 @@ const isTenantDataComplete = (user, activeLease) => {
     if (user.role !== "TENANT") {
         return false;
     }
-    // Check required user fields
+    // 1. Check ALL required user fields are filled
     const hasRequiredUserFields = !!(user.name &&
+        user.name.trim() !== "" &&
         user.email &&
+        user.email.trim() !== "" &&
         user.phoneNumber &&
-        user.preferredLocation);
-    // Check if tenant is assigned to a property and spot
-    const hasPropertyAndSpot = !!(user.propertyId && user.spotId);
-    // Check if tenant has an active lease and it's ACTIVE status
-    const hasActiveLease = !!activeLease &&
-        (activeLease.leaseStatus === "ACTIVE" || activeLease.leaseStatus === "ACTIVE");
-    // Check if lease information is complete (if lease exists)
-    // Since this is a populated object, we need to check the fields manually
+        user.phoneNumber.trim() !== "" &&
+        user.preferredLocation &&
+        user.preferredLocation.trim() !== "");
+    // 2. Check if tenant is assigned to a property and spot
+    const hasPropertyAndSpot = !!(user.propertyId &&
+        user.propertyId._id &&
+        user.spotId &&
+        user.spotId._id);
+    // 3. Check if tenant has an active lease with ACTIVE status
+    const hasActiveLease = !!activeLease && activeLease.leaseStatus === "ACTIVE";
+    // 4. Check if lease information is complete (if lease exists)
     const hasCompleteLeaseInfo = !activeLease ||
         (() => {
-            var _a, _b, _c, _d;
-            // Check if all required lease fields are filled
+            var _a, _b, _c, _d, _e;
+            // Check if ALL required lease fields are filled
             const hasRequiredLeaseFields = !!(activeLease.tenantId &&
                 activeLease.spotId &&
                 activeLease.propertyId &&
                 activeLease.leaseType &&
                 activeLease.leaseStart &&
-                activeLease.occupants);
+                activeLease.occupants &&
+                activeLease.occupants > 0);
             // Check lease type specific requirements
             const hasValidLeaseType = (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd) ||
                 (activeLease.leaseType === "MONTHLY" && !activeLease.leaseEnd);
@@ -480,45 +486,59 @@ const isTenantDataComplete = (user, activeLease) => {
             const hasValidPetInfo = !((_a = activeLease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) ||
                 (((_b = activeLease.pets) === null || _b === void 0 ? void 0 : _b.hasPets) &&
                     ((_c = activeLease.pets) === null || _c === void 0 ? void 0 : _c.petDetails) &&
-                    ((_d = activeLease.pets) === null || _d === void 0 ? void 0 : _d.petDetails.length) > 0);
-            // Check financial fields
+                    ((_d = activeLease.pets) === null || _d === void 0 ? void 0 : _d.petDetails.length) > 0 &&
+                    ((_e = activeLease.pets) === null || _e === void 0 ? void 0 : _e.petDetails.every((pet) => pet.type && pet.breed && pet.name)));
+            // Check ALL financial fields are properly set
             const hasValidFinancials = typeof activeLease.rentAmount === "number" &&
-                activeLease.rentAmount >= 0 &&
+                activeLease.rentAmount > 0 &&
                 typeof activeLease.depositAmount === "number" &&
                 activeLease.depositAmount >= 0 &&
-                (typeof activeLease.additionalRentAmount !== "number" ||
-                    activeLease.additionalRentAmount >= 0);
+                (activeLease.additionalRentAmount === undefined ||
+                    activeLease.additionalRentAmount === null ||
+                    (typeof activeLease.additionalRentAmount === "number" &&
+                        activeLease.additionalRentAmount >= 0));
+            // Check if lease dates are valid
+            const hasValidDates = activeLease.leaseStart &&
+                new Date(activeLease.leaseStart) > new Date() &&
+                (activeLease.leaseType === "MONTHLY" ||
+                    (activeLease.leaseType === "FIXED_TERM" &&
+                        activeLease.leaseEnd &&
+                        new Date(activeLease.leaseEnd) > new Date(activeLease.leaseStart)));
             return (hasRequiredLeaseFields &&
                 hasValidLeaseType &&
                 hasValidPetInfo &&
-                hasValidFinancials);
+                hasValidFinancials &&
+                hasValidDates);
         })();
-    // Check if RV information is provided (optional but good to have)
-    const hasRvInfo = !!(user.rvInfo &&
-        user.rvInfo.make &&
-        user.rvInfo.model &&
-        user.rvInfo.licensePlate);
-    // Check if emergency contact is provided (optional but good to have)
+    // 5. Check if RV information is provided (if user has RV)
+    const hasRvInfo = !user.rvInfo ||
+        !!(user.rvInfo.make &&
+            user.rvInfo.make.trim() !== "" &&
+            user.rvInfo.model &&
+            user.rvInfo.model.trim() !== "" &&
+            user.rvInfo.year &&
+            user.rvInfo.length &&
+            user.rvInfo.licensePlate &&
+            user.rvInfo.licensePlate.trim() !== "");
+    // 6. Check if emergency contact is provided
     const hasEmergencyContact = !!(user.emergencyContact &&
         user.emergencyContact.name &&
+        user.emergencyContact.name.trim() !== "" &&
         user.emergencyContact.phone &&
-        user.emergencyContact.relationship);
-    // Tenant data is considered complete if:
-    // 1. All required user fields are filled
-    // 2. Tenant is assigned to property and spot
-    // 3. Tenant has an active lease with complete information
-    // 4. RV information is provided (optional)
-    // 5. Emergency contact is provided (optional)
-    // For now, we'll consider it complete if required fields and lease are complete
-    // RV info and emergency contact are nice-to-have but not required for tenant status
+        user.emergencyContact.phone.trim() !== "" &&
+        user.emergencyContact.relationship &&
+        user.emergencyContact.relationship.trim() !== "");
+    // ALL conditions must be met for tenant status to be true
     return (hasRequiredUserFields &&
         hasPropertyAndSpot &&
         hasActiveLease &&
-        hasCompleteLeaseInfo);
+        hasCompleteLeaseInfo &&
+        hasRvInfo &&
+        hasEmergencyContact);
 };
 // Get comprehensive user profile with all related information
 const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const user = yield users_schema_1.Users.findById(userId)
         .populate("propertyId", "name description address amenities images rules")
         .populate("spotId", "spotNumber spotIdentifier status size amenities price description images");
@@ -577,13 +597,38 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
         })
             .sort({ createdAt: -1 })
             .limit(5);
-        // Get user's unread announcements
+        // Get user's unread announcements using proper filtering
         const { Announcements } = yield Promise.resolve().then(() => __importStar(require("../announcements/announcements.schema")));
-        unreadAnnouncements = yield Announcements.find({
-            propertyId: user.propertyId,
+        // Get user's property ID - handle both populated object and ObjectId
+        const userPropertyId = ((_b = (_a = user.propertyId) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString()) || ((_c = user.propertyId) === null || _c === void 0 ? void 0 : _c.toString());
+        // Build the query for announcements that are relevant to this tenant
+        const baseQuery = {
+            isDeleted: false, // Only get non-deleted announcements
             isActive: true,
-            readBy: { $ne: userId },
-        }).sort({ createdAt: -1 });
+            readBy: { $ne: userId }, // Only unread announcements
+        };
+        // Build target audience conditions
+        const targetAudienceConditions = [
+            { targetAudience: "ALL" },
+            { targetAudience: "TENANTS_ONLY" },
+        ];
+        // Include PROPERTY_SPECIFIC announcements for user's property
+        if (userPropertyId) {
+            targetAudienceConditions.push({
+                $and: [
+                    { targetAudience: "PROPERTY_SPECIFIC" },
+                    { propertyId: userPropertyId },
+                ],
+            });
+        }
+        // Combine all conditions
+        const query = Object.assign(Object.assign({}, baseQuery), { $or: targetAudienceConditions });
+        unreadAnnouncements = yield Announcements.find(query)
+            .populate({
+            path: "propertyId",
+            select: "name description address",
+        })
+            .sort({ priority: -1, createdAt: -1 });
         // Get user's assignment history
         assignmentHistory = yield getUserAssignmentHistory(userId);
     }
@@ -613,7 +658,11 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
         if (activeLease) {
             console.log(`   - Lease type: ${activeLease.leaseType}`);
             console.log(`   - Lease status: ${activeLease.leaseStatus}`);
+            console.log(`   - Rent amount: ${activeLease.rentAmount}`);
+            console.log(`   - Deposit amount: ${activeLease.depositAmount}`);
         }
+        console.log(`   - Has RV info: ${!!user.rvInfo}`);
+        console.log(`   - Has emergency contact: ${!!user.emergencyContact}`);
     }
     // Build comprehensive profile
     const comprehensiveProfile = {
@@ -668,12 +717,12 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
                     currentMonthDueDate: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.currentMonthDueDate) || null,
                     nextMonthDueDate: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.nextMonthDueDate) || null,
                     // Get the earliest overdue due date
-                    earliestOverdueDate: ((_b = (_a = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.dueDate) || null,
+                    earliestOverdueDate: ((_e = (_d = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.dueDate) || null,
                     // Get all overdue due dates
-                    overdueDueDates: ((_c = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _c === void 0 ? void 0 : _c.map((payment) => payment.dueDate)) || [],
+                    overdueDueDates: ((_f = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _f === void 0 ? void 0 : _f.map((payment) => payment.dueDate)) || [],
                     // Get next payment due date (current month or earliest overdue)
                     nextPaymentDueDate: (rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.currentMonthDueDate) ||
-                        ((_e = (_d = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.dueDate) ||
+                        ((_h = (_g = rentSummary === null || rentSummary === void 0 ? void 0 : rentSummary.overduePaymentsDetails) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.dueDate) ||
                         null,
                 },
                 // Rent summary with due dates and status
