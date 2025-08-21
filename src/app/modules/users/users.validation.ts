@@ -233,11 +233,13 @@ export const getUserAnnouncementsValidationSchema = z.object({
 });
 
 export const updateEmergencyContactValidationSchema = z.object({
-  body: z.object({
-    name: z.string().min(1, "Emergency contact name is required"),
-    phone: z.string().min(1, "Emergency contact phone is required"),
-    relationship: z.string().min(1, "Relationship is required"),
-  }),
+  body: z
+    .object({
+      name: z.string().optional(),
+      phone: z.string().optional(),
+      relationship: z.string().optional(),
+    })
+    .strict(),
 });
 
 export const UserValidation = {

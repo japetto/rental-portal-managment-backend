@@ -122,9 +122,9 @@ export interface IUpdateUserInfo {
 }
 
 export interface IUpdateEmergencyContact {
-  name: string;
-  phone: string;
-  relationship: string;
+  name?: string;
+  phone?: string;
+  relationship?: string;
 }
 
 export interface IUpdateTenantData {

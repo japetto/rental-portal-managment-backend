@@ -1256,6 +1256,7 @@ const updateEmergencyContact = async (
   userId: string,
   emergencyContactData: IUpdateEmergencyContact,
 ): Promise<IUser> => {
+  console.log("🚀 ~ emergencyContactData:", emergencyContactData);
   // Check if user exists and is a tenant
   const user = await Users.findById(userId);
   if (!user) {
@@ -1269,27 +1270,25 @@ const updateEmergencyContact = async (
     );
   }
 
-  // Validate emergency contact data
-  if (
-    !emergencyContactData.name ||
-    !emergencyContactData.phone ||
-    !emergencyContactData.relationship
-  ) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Emergency contact name, phone, and relationship are required",
-    );
+  // Build emergency contact update object with only provided fields
+  const emergencyContactUpdate: any = {};
+
+  if (emergencyContactData.name !== undefined) {
+    emergencyContactUpdate.name = emergencyContactData.name.trim();
+  }
+  if (emergencyContactData.phone !== undefined) {
+    emergencyContactUpdate.phone = emergencyContactData.phone.trim();
+  }
+  if (emergencyContactData.relationship !== undefined) {
+    emergencyContactUpdate.relationship =
+      emergencyContactData.relationship.trim();
   }
 
   // Update the emergency contact
   const updatedUser = await Users.findByIdAndUpdate(
     userId,
     {
-      emergencyContact: {
-        name: emergencyContactData.name.trim(),
-        phone: emergencyContactData.phone.trim(),
-        relationship: emergencyContactData.relationship.trim(),
-      },
+      emergencyContact: emergencyContactUpdate,
     },
     {
       new: true,

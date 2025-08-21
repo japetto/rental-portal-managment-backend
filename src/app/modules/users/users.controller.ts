@@ -510,6 +510,9 @@ const updateEmergencyContact = catchAsync(
       });
     }
 
+    // Debug: Log the request body
+    console.log("Emergency contact update request body:", JSON.stringify(req.body, null, 2));
+
     const result = await UserService.updateEmergencyContact(userId, req.body);
 
     sendResponse(res, {
