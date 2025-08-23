@@ -180,6 +180,87 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
       throw new Error("Tenant, property, or spot information not found");
     }
 
+    // Check tenant status - simplified validation
+    const isTenantDataComplete = (user: any, lease: any): boolean => {
+      // Check if user is a tenant
+      if (user.role !== "TENANT") {
+        return false;
+      }
+
+      // Check if tenant has an active lease
+      if (!lease || lease.leaseStatus !== "ACTIVE") {
+        return false;
+      }
+
+      // Simplified tenantStatus logic - only check lease-related fields
+      const hasLeaseType = !!lease.leaseType;
+
+      const hasLeaseDates = !!(
+        lease.leaseStart &&
+        (lease.leaseType === "MONTHLY" ||
+          (lease.leaseType === "FIXED_TERM" && lease.leaseEnd))
+      );
+
+      const hasRentAmount =
+        typeof lease.rentAmount === "number" && lease.rentAmount > 0;
+
+      const hasDepositAmount =
+        typeof lease.depositAmount === "number" && lease.depositAmount >= 0;
+
+      const hasOccupants =
+        typeof lease.occupants === "number" && lease.occupants > 0;
+
+      const hasLeaseAgreement =
+        !!lease.leaseAgreement && lease.leaseAgreement.trim() !== "";
+
+      // ALL conditions must be met for tenant status to be true
+      return (
+        hasLeaseType &&
+        hasLeaseDates &&
+        hasRentAmount &&
+        hasDepositAmount &&
+        hasOccupants &&
+        hasLeaseAgreement
+      );
+    };
+
+    // Check tenant status
+    const tenantStatus = isTenantDataComplete(tenant, activeLease);
+
+    // If tenant status is incomplete, return error
+    if (!tenantStatus) {
+      return {
+        hasActiveLease: false,
+        message:
+          "Tenant profile is incomplete. Please complete your profile before accessing rent information.",
+        tenantStatus: false,
+        missingFields: {
+          leaseType: !activeLease.leaseType,
+          leaseDates: !(
+            activeLease.leaseStart &&
+            (activeLease.leaseType === "MONTHLY" ||
+              (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd))
+          ),
+          rentAmount: !(
+            typeof activeLease.rentAmount === "number" &&
+            activeLease.rentAmount > 0
+          ),
+          depositAmount: !(
+            typeof activeLease.depositAmount === "number" &&
+            activeLease.depositAmount >= 0
+          ),
+          occupants: !(
+            typeof activeLease.occupants === "number" &&
+            activeLease.occupants > 0
+          ),
+          leaseAgreement: !(
+            !!activeLease.leaseAgreement &&
+            activeLease.leaseAgreement.trim() !== ""
+          ),
+        },
+      };
+    }
+
     // Get payment history to determine if this is a first-time payment
     const paymentHistory = await Payments.find({
       tenantId: tenantId,
@@ -466,6 +547,7 @@ const getRentSummaryEnhanced = async (tenantId: string) => {
     // Return simplified single object
     return {
       hasActiveLease: true,
+      tenantStatus: true, // Tenant status is complete
 
       // Property info
       propertyName: property.name,
@@ -662,6 +744,7 @@ const createPaymentWithLink = async (paymentData: {
       // Return the existing pending payment details instead of throwing an error
       return {
         hasPendingPayment: true,
+        tenantStatus: true, // Tenant status is complete (since they have a pending payment)
         message:
           "You already have a pending payment. You can continue with the existing payment or cancel it first.",
         pendingPayment: pendingPaymentDetails,
@@ -694,6 +777,60 @@ const createPaymentWithLink = async (paymentData: {
 
     if (!tenant || !property || !spot) {
       throw new Error("Tenant, property, or spot information not found");
+    }
+
+    // Check tenant status - simplified validation
+    const isTenantDataComplete = (user: any, lease: any): boolean => {
+      // Check if user is a tenant
+      if (user.role !== "TENANT") {
+        return false;
+      }
+
+      // Check if tenant has an active lease
+      if (!lease || lease.leaseStatus !== "ACTIVE") {
+        return false;
+      }
+
+      // Simplified tenantStatus logic - only check lease-related fields
+      const hasLeaseType = !!lease.leaseType;
+
+      const hasLeaseDates = !!(
+        lease.leaseStart &&
+        (lease.leaseType === "MONTHLY" ||
+          (lease.leaseType === "FIXED_TERM" && lease.leaseEnd))
+      );
+
+      const hasRentAmount =
+        typeof lease.rentAmount === "number" && lease.rentAmount > 0;
+
+      const hasDepositAmount =
+        typeof lease.depositAmount === "number" && lease.depositAmount >= 0;
+
+      const hasOccupants =
+        typeof lease.occupants === "number" && lease.occupants > 0;
+
+      const hasLeaseAgreement =
+        !!lease.leaseAgreement && lease.leaseAgreement.trim() !== "";
+
+      // ALL conditions must be met for tenant status to be true
+      return (
+        hasLeaseType &&
+        hasLeaseDates &&
+        hasRentAmount &&
+        hasDepositAmount &&
+        hasOccupants &&
+        hasLeaseAgreement
+      );
+    };
+
+    // Check tenant status
+    const tenantStatus = isTenantDataComplete(tenant, activeLease);
+
+    // If tenant status is incomplete, throw error
+    if (!tenantStatus) {
+      throw new Error(
+        "Tenant profile is incomplete. Please complete your profile before creating payments.",
+      );
     }
 
     // Get payment history to determine if this is a first-time payment
@@ -1116,6 +1253,7 @@ const createPaymentWithLink = async (paymentData: {
 
     return {
       hasPendingPayment: false,
+      tenantStatus: true, // Tenant status is complete
       paymentLink: {
         id: paymentLink.id,
         url: paymentLink.url,
@@ -1167,6 +1305,66 @@ const getTenantPaymentStatusEnhanced = async (paymentData: {
 
     if (!activeLease) {
       throw new Error("No active lease found for this tenant");
+    }
+
+    // Get tenant information for status validation
+    const tenant = await Users.findById(paymentData.tenantId);
+    if (!tenant) {
+      throw new Error("Tenant information not found");
+    }
+
+    // Check tenant status - simplified validation
+    const isTenantDataComplete = (user: any, lease: any): boolean => {
+      // Check if user is a tenant
+      if (user.role !== "TENANT") {
+        return false;
+      }
+
+      // Check if tenant has an active lease
+      if (!lease || lease.leaseStatus !== "ACTIVE") {
+        return false;
+      }
+
+      // Simplified tenantStatus logic - only check lease-related fields
+      const hasLeaseType = !!lease.leaseType;
+
+      const hasLeaseDates = !!(
+        lease.leaseStart &&
+        (lease.leaseType === "MONTHLY" ||
+          (lease.leaseType === "FIXED_TERM" && lease.leaseEnd))
+      );
+
+      const hasRentAmount =
+        typeof lease.rentAmount === "number" && lease.rentAmount > 0;
+
+      const hasDepositAmount =
+        typeof lease.depositAmount === "number" && lease.depositAmount >= 0;
+
+      const hasOccupants =
+        typeof lease.occupants === "number" && lease.occupants > 0;
+
+      const hasLeaseAgreement =
+        !!lease.leaseAgreement && lease.leaseAgreement.trim() !== "";
+
+      // ALL conditions must be met for tenant status to be true
+      return (
+        hasLeaseType &&
+        hasLeaseDates &&
+        hasRentAmount &&
+        hasDepositAmount &&
+        hasOccupants &&
+        hasLeaseAgreement
+      );
+    };
+
+    // Check tenant status
+    const tenantStatus = isTenantDataComplete(tenant, activeLease);
+
+    // If tenant status is incomplete, throw error
+    if (!tenantStatus) {
+      throw new Error(
+        "Tenant profile is incomplete. Please complete your profile before accessing payment information.",
+      );
     }
 
     // Get payment history to determine if this is a first-time payment
@@ -1343,6 +1541,7 @@ const getTenantPaymentStatusEnhanced = async (paymentData: {
 
     return {
       tenantId: paymentData.tenantId,
+      tenantStatus: true, // Tenant status is complete
       lease: {
         id: activeLease._id,
         rentAmount: totalRentAmount, // Use total rent amount
