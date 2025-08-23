@@ -312,6 +312,16 @@ export const adminGetPaymentsValidationSchema = z.object({
   }),
 });
 
+// Lease Management Validation Schema
+export const removeLeaseAgreementValidationSchema = z.object({
+  params: z.object({
+    leaseId: z.string().regex(objectIdRegex, "Invalid lease ID format"),
+  }),
+  body: z.object({
+    reason: z.string().min(1, "Reason for removal is required"),
+  }),
+});
+
 export const AdminValidation = {
   inviteTenantValidationSchema,
   createSpotValidationSchema,
@@ -329,4 +339,5 @@ export const AdminValidation = {
   adminUpdateUserValidationSchema,
   adminDeleteUserValidationSchema,
   adminGetPaymentsValidationSchema,
+  removeLeaseAgreementValidationSchema,
 };

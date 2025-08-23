@@ -19,6 +19,13 @@ router.post(
 // Get all tenants
 router.get("/tenants", AdminController.getAllTenants);
 
+// Lease management routes
+router.patch(
+  "/leases/:leaseId/remove-agreement",
+  zodValidationRequest(AdminValidation.removeLeaseAgreementValidationSchema),
+  AdminController.removeLeaseAgreement,
+);
+
 // Property management routes
 // Create a property
 router.post(

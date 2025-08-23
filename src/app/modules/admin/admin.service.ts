@@ -676,6 +676,7 @@ const getAllTenants = async (): Promise<IUser[]> => {
         pets: tenantData.leaseId.pets,
         specialRequests: tenantData.leaseId.specialRequests,
         documents: tenantData.leaseId.documents,
+        leaseAgreement: tenantData.leaseId.leaseAgreement, // Add lease agreement field
         notes: tenantData.leaseId.notes,
       };
       // Remove the original leaseId to avoid duplication
@@ -1442,6 +1443,77 @@ const createTestLease = async (leaseData: any) => {
   return await LeasesService.createLease(leaseData);
 };
 
+// Remove lease agreement from a lease
+const removeLeaseAgreement = async (
+  leaseId: string,
+  reason: string,
+  adminId: string,
+): Promise<{ message: string; lease: any }> => {
+  if (!mongoose.Types.ObjectId.isValid(leaseId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid lease ID format");
+  }
+
+  // Check if admin exists and is authorized
+  const admin = await Users.findById(adminId);
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only super admins can remove lease agreements",
+    );
+  }
+
+  // Import Leases schema
+  const { Leases } = await import("../leases/leases.schema");
+
+  // Find the lease
+  const lease = await Leases.findOne({
+    _id: leaseId,
+    isDeleted: false,
+  });
+
+  if (!lease) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Lease not found");
+  }
+
+  // Check if lease agreement exists
+  if (!lease.leaseAgreement) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "No lease agreement found to remove",
+    );
+  }
+
+  // Remove the lease agreement and add admin note
+  const updatedLease = await Leases.findByIdAndUpdate(
+    leaseId,
+    {
+      $unset: { leaseAgreement: 1 }, // Remove the leaseAgreement field
+      $set: {
+        notes: lease.notes
+          ? `${lease.notes}\n\n[${new Date().toISOString()}] Lease agreement removed by admin (${admin.name}). Reason: ${reason}`
+          : `[${new Date().toISOString()}] Lease agreement removed by admin (${admin.name}). Reason: ${reason}`,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+
+  if (!updatedLease) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to update lease",
+    );
+  }
+
+  console.log(
+    `🔧 Admin ${admin.name} removed lease agreement from lease ${leaseId}. Reason: ${reason}`,
+  );
+
+  return {
+    message: "Lease agreement removed successfully",
+    lease: updatedLease,
+  };
+};
+
 export const AdminService = {
   inviteTenant,
   createProperty,
@@ -1475,6 +1547,7 @@ export const AdminService = {
   getArchivedSpots,
   createTestLease,
   getPayments,
+  removeLeaseAgreement,
 };
 
 // Get all payments with filters/pagination (Admin)
