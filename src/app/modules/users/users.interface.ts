@@ -163,6 +163,7 @@ export interface IUpdateTenantData {
       }[];
     };
     specialRequests?: string[];
+    leaseAgreement?: string;
     documents?: string[];
     notes?: string;
   };

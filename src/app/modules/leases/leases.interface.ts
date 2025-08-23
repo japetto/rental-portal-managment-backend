@@ -28,6 +28,7 @@ export interface ILease extends Document {
   };
   specialRequests: string[];
   documents: string[]; // URLs to uploaded documents (PDF/DOC)
+  leaseAgreement?: string; // URL to the signed lease agreement document
   notes: string;
   isActive: boolean;
   isDeleted: boolean;
@@ -63,6 +64,7 @@ export interface ICreateLease {
   };
   specialRequests?: string[];
   documents?: string[];
+  leaseAgreement?: string; // URL to the signed lease agreement document
   notes?: string;
 }
 
@@ -86,5 +88,6 @@ export interface IUpdateLease {
   };
   specialRequests?: string[];
   documents?: string[];
+  leaseAgreement?: string; // URL to the signed lease agreement document
   notes?: string;
 }
