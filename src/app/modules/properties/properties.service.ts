@@ -41,15 +41,31 @@ export const calculatePropertyLotData = async (propertyId: string) => {
 export const addLotDataToProperty = async (
   property: IProperty,
 ): Promise<IProperty> => {
-  // Keeping the original document shape for compatibility across modules
-  // Lot data is computed ad-hoc where needed using calculatePropertyLotData
-  return property;
+  const lotData = await calculatePropertyLotData(
+    (property._id as Types.ObjectId).toString(),
+  );
+  const propertyObj = property.toObject();
+  return {
+    ...propertyObj,
+    ...lotData,
+  } as IProperty;
 };
 
 // Helper function to add lot data to multiple properties
 export const addLotDataToProperties = async (properties: IProperty[]) => {
-  // Preserve original docs; other services rely on Document methods
-  return properties;
+  const propertiesWithLotData = await Promise.all(
+    properties.map(async property => {
+      const lotData = await calculatePropertyLotData(
+        (property._id as Types.ObjectId).toString(),
+      );
+      const propertyObj = property.toObject();
+      return {
+        ...propertyObj,
+        ...lotData,
+      };
+    }),
+  );
+  return propertiesWithLotData;
 };
 
 // Fetch all properties and join with their Stripe details

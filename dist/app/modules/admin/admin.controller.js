@@ -722,6 +722,22 @@ const getArchivedSpots = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         data: result,
     });
 }));
+const removeLeaseAgreement = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { leaseId } = req.params;
+    const { reason } = req.body;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield admin_service_1.AdminService.removeLeaseAgreement(leaseId, reason, adminId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Lease agreement removed successfully",
+        data: result,
+    });
+}));
 exports.AdminController = {
     inviteTenant,
     getAllTenants,
@@ -755,4 +771,5 @@ exports.AdminController = {
     getArchivedProperties,
     getArchivedSpots,
     getPayments,
+    removeLeaseAgreement,
 };

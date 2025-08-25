@@ -16,6 +16,8 @@ router.use(adminAuth_1.adminAuth);
 router.post("/invite-tenant", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.inviteTenantValidationSchema), admin_controller_1.AdminController.inviteTenant);
 // Get all tenants
 router.get("/tenants", admin_controller_1.AdminController.getAllTenants);
+// Lease management routes
+router.patch("/leases/:leaseId/remove-agreement", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.removeLeaseAgreementValidationSchema), admin_controller_1.AdminController.removeLeaseAgreement);
 // Property management routes
 // Create a property
 router.post("/properties", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.createPropertyValidationSchema), admin_controller_1.AdminController.createProperty);

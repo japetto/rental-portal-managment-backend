@@ -449,6 +449,8 @@ const updateEmergencyContact = (0, catchAsync_1.default)((req, res) => __awaiter
             data: null,
         });
     }
+    // Debug: Log the request body
+    console.log("Emergency contact update request body:", JSON.stringify(req.body, null, 2));
     const result = yield users_service_1.UserService.updateEmergencyContact(userId, req.body);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,

@@ -65,15 +65,19 @@ const calculatePropertyLotData = (propertyId) => __awaiter(void 0, void 0, void 
 exports.calculatePropertyLotData = calculatePropertyLotData;
 // Helper function to add lot data to property object
 const addLotDataToProperty = (property) => __awaiter(void 0, void 0, void 0, function* () {
-    // Keeping the original document shape for compatibility across modules
-    // Lot data is computed ad-hoc where needed using calculatePropertyLotData
-    return property;
+    const lotData = yield (0, exports.calculatePropertyLotData)(property._id.toString());
+    const propertyObj = property.toObject();
+    return Object.assign(Object.assign({}, propertyObj), lotData);
 });
 exports.addLotDataToProperty = addLotDataToProperty;
 // Helper function to add lot data to multiple properties
 const addLotDataToProperties = (properties) => __awaiter(void 0, void 0, void 0, function* () {
-    // Preserve original docs; other services rely on Document methods
-    return properties;
+    const propertiesWithLotData = yield Promise.all(properties.map((property) => __awaiter(void 0, void 0, void 0, function* () {
+        const lotData = yield (0, exports.calculatePropertyLotData)(property._id.toString());
+        const propertyObj = property.toObject();
+        return Object.assign(Object.assign({}, propertyObj), lotData);
+    })));
+    return propertiesWithLotData;
 });
 exports.addLotDataToProperties = addLotDataToProperties;
 // Fetch all properties and join with their Stripe details

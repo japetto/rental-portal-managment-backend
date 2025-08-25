@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdminValidation = exports.adminGetPaymentsValidationSchema = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
+exports.AdminValidation = exports.removeLeaseAgreementValidationSchema = exports.adminGetPaymentsValidationSchema = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
 const zod_1 = require("zod");
 // Custom ObjectId validation
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -292,6 +292,15 @@ exports.adminGetPaymentsValidationSchema = zod_1.z.object({
         sortOrder: zod_1.z.enum(["asc", "desc"]).optional(),
     }),
 });
+// Lease Management Validation Schema
+exports.removeLeaseAgreementValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        leaseId: zod_1.z.string().regex(objectIdRegex, "Invalid lease ID format"),
+    }),
+    body: zod_1.z.object({
+        reason: zod_1.z.string().min(1, "Reason for removal is required"),
+    }),
+});
 exports.AdminValidation = {
     inviteTenantValidationSchema: exports.inviteTenantValidationSchema,
     createSpotValidationSchema: exports.createSpotValidationSchema,
@@ -309,4 +318,5 @@ exports.AdminValidation = {
     adminUpdateUserValidationSchema: exports.adminUpdateUserValidationSchema,
     adminDeleteUserValidationSchema: exports.adminDeleteUserValidationSchema,
     adminGetPaymentsValidationSchema: exports.adminGetPaymentsValidationSchema,
+    removeLeaseAgreementValidationSchema: exports.removeLeaseAgreementValidationSchema,
 };

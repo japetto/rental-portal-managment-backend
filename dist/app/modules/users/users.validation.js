@@ -218,11 +218,13 @@ exports.getUserAnnouncementsValidationSchema = zod_1.z.object({
     }),
 });
 exports.updateEmergencyContactValidationSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        name: zod_1.z.string().min(1, "Emergency contact name is required"),
-        phone: zod_1.z.string().min(1, "Emergency contact phone is required"),
-        relationship: zod_1.z.string().min(1, "Relationship is required"),
-    }),
+    body: zod_1.z
+        .object({
+        name: zod_1.z.string().optional(),
+        phone: zod_1.z.string().optional(),
+        relationship: zod_1.z.string().optional(),
+    })
+        .strict(),
 });
 exports.UserValidation = {
     usersZodSchema,

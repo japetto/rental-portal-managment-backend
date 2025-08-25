@@ -451,90 +451,27 @@ const isTenantDataComplete = (user, activeLease) => {
     if (user.role !== "TENANT") {
         return false;
     }
-    // 1. Check ALL required user fields are filled
-    const hasRequiredUserFields = !!(user.name &&
-        user.name.trim() !== "" &&
-        user.email &&
-        user.email.trim() !== "" &&
-        user.phoneNumber &&
-        user.phoneNumber.trim() !== "" &&
-        user.preferredLocation &&
-        user.preferredLocation.trim() !== "");
-    // 2. Check if tenant is assigned to a property and spot
-    const hasPropertyAndSpot = !!(user.propertyId &&
-        user.propertyId._id &&
-        user.spotId &&
-        user.spotId._id);
-    // 3. Check if tenant has an active lease with ACTIVE status
-    const hasActiveLease = !!activeLease && activeLease.leaseStatus === "ACTIVE";
-    // 4. Check if lease information is complete (if lease exists)
-    const hasCompleteLeaseInfo = !activeLease ||
-        (() => {
-            var _a, _b, _c, _d, _e;
-            // Check if ALL required lease fields are filled
-            const hasRequiredLeaseFields = !!(activeLease.tenantId &&
-                activeLease.spotId &&
-                activeLease.propertyId &&
-                activeLease.leaseType &&
-                activeLease.leaseStart &&
-                activeLease.occupants &&
-                activeLease.occupants > 0);
-            // Check lease type specific requirements
-            const hasValidLeaseType = (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd) ||
-                (activeLease.leaseType === "MONTHLY" && !activeLease.leaseEnd);
-            // Check pet information if pets are present
-            const hasValidPetInfo = !((_a = activeLease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) ||
-                (((_b = activeLease.pets) === null || _b === void 0 ? void 0 : _b.hasPets) &&
-                    ((_c = activeLease.pets) === null || _c === void 0 ? void 0 : _c.petDetails) &&
-                    ((_d = activeLease.pets) === null || _d === void 0 ? void 0 : _d.petDetails.length) > 0 &&
-                    ((_e = activeLease.pets) === null || _e === void 0 ? void 0 : _e.petDetails.every((pet) => pet.type && pet.breed && pet.name)));
-            // Check ALL financial fields are properly set
-            const hasValidFinancials = typeof activeLease.rentAmount === "number" &&
-                activeLease.rentAmount > 0 &&
-                typeof activeLease.depositAmount === "number" &&
-                activeLease.depositAmount >= 0 &&
-                (activeLease.additionalRentAmount === undefined ||
-                    activeLease.additionalRentAmount === null ||
-                    (typeof activeLease.additionalRentAmount === "number" &&
-                        activeLease.additionalRentAmount >= 0));
-            // Check if lease dates are valid
-            const hasValidDates = activeLease.leaseStart &&
-                new Date(activeLease.leaseStart) > new Date() &&
-                (activeLease.leaseType === "MONTHLY" ||
-                    (activeLease.leaseType === "FIXED_TERM" &&
-                        activeLease.leaseEnd &&
-                        new Date(activeLease.leaseEnd) > new Date(activeLease.leaseStart)));
-            return (hasRequiredLeaseFields &&
-                hasValidLeaseType &&
-                hasValidPetInfo &&
-                hasValidFinancials &&
-                hasValidDates);
-        })();
-    // 5. Check if RV information is provided (if user has RV)
-    const hasRvInfo = !user.rvInfo ||
-        !!(user.rvInfo.make &&
-            user.rvInfo.make.trim() !== "" &&
-            user.rvInfo.model &&
-            user.rvInfo.model.trim() !== "" &&
-            user.rvInfo.year &&
-            user.rvInfo.length &&
-            user.rvInfo.licensePlate &&
-            user.rvInfo.licensePlate.trim() !== "");
-    // 6. Check if emergency contact is provided
-    const hasEmergencyContact = !!(user.emergencyContact &&
-        user.emergencyContact.name &&
-        user.emergencyContact.name.trim() !== "" &&
-        user.emergencyContact.phone &&
-        user.emergencyContact.phone.trim() !== "" &&
-        user.emergencyContact.relationship &&
-        user.emergencyContact.relationship.trim() !== "");
+    // Check if tenant has an active lease
+    if (!activeLease || activeLease.leaseStatus !== "ACTIVE") {
+        return false;
+    }
+    // Simplified tenantStatus logic - only check lease-related fields
+    const hasLeaseType = !!activeLease.leaseType;
+    const hasLeaseDates = !!(activeLease.leaseStart &&
+        (activeLease.leaseType === "MONTHLY" ||
+            (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd)));
+    const hasRentAmount = typeof activeLease.rentAmount === "number" && activeLease.rentAmount > 0;
+    const hasDepositAmount = typeof activeLease.depositAmount === "number" &&
+        activeLease.depositAmount >= 0;
+    const hasOccupants = typeof activeLease.occupants === "number" && activeLease.occupants > 0;
+    const hasLeaseAgreement = !!activeLease.leaseAgreement && activeLease.leaseAgreement.trim() !== "";
     // ALL conditions must be met for tenant status to be true
-    return (hasRequiredUserFields &&
-        hasPropertyAndSpot &&
-        hasActiveLease &&
-        hasCompleteLeaseInfo &&
-        hasRvInfo &&
-        hasEmergencyContact);
+    return (hasLeaseType &&
+        hasLeaseDates &&
+        hasRentAmount &&
+        hasDepositAmount &&
+        hasOccupants &&
+        hasLeaseAgreement);
 };
 // Get comprehensive user profile with all related information
 const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -652,17 +589,15 @@ const getComprehensiveUserProfile = (userId) => __awaiter(void 0, void 0, void 0
     console.log(`🔍 User profile for: ${user.name} (${user.role})`);
     if (user.role === "TENANT") {
         console.log(`   - Tenant Status: ${tenantStatus}`);
-        console.log(`   - Has property: ${!!user.propertyId}`);
-        console.log(`   - Has spot: ${!!user.spotId}`);
         console.log(`   - Has lease: ${!!activeLease}`);
         if (activeLease) {
             console.log(`   - Lease type: ${activeLease.leaseType}`);
             console.log(`   - Lease status: ${activeLease.leaseStatus}`);
             console.log(`   - Rent amount: ${activeLease.rentAmount}`);
             console.log(`   - Deposit amount: ${activeLease.depositAmount}`);
+            console.log(`   - Occupants: ${activeLease.occupants}`);
+            console.log(`   - Has lease agreement: ${!!activeLease.leaseAgreement}`);
         }
-        console.log(`   - Has RV info: ${!!user.rvInfo}`);
-        console.log(`   - Has emergency contact: ${!!user.emergencyContact}`);
     }
     // Build comprehensive profile
     const comprehensiveProfile = {
@@ -905,6 +840,7 @@ const getDeletedRecords = (model_1, ...args_1) => __awaiter(void 0, [model_1, ..
 });
 // Update emergency contact for tenant
 const updateEmergencyContact = (userId, emergencyContactData) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("🚀 ~ emergencyContactData:", emergencyContactData);
     // Check if user exists and is a tenant
     const user = yield users_schema_1.Users.findById(userId);
     if (!user) {
@@ -913,17 +849,21 @@ const updateEmergencyContact = (userId, emergencyContactData) => __awaiter(void 
     if (user.role !== "TENANT") {
         throw new ApiError_1.default(http_status_1.default.FORBIDDEN, "Only tenants can update emergency contact information");
     }
-    // Validate emergency contact data
-    if (!emergencyContactData.name || !emergencyContactData.phone || !emergencyContactData.relationship) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Emergency contact name, phone, and relationship are required");
+    // Build emergency contact update object with only provided fields
+    const emergencyContactUpdate = {};
+    if (emergencyContactData.name !== undefined) {
+        emergencyContactUpdate.name = emergencyContactData.name.trim();
+    }
+    if (emergencyContactData.phone !== undefined) {
+        emergencyContactUpdate.phone = emergencyContactData.phone.trim();
+    }
+    if (emergencyContactData.relationship !== undefined) {
+        emergencyContactUpdate.relationship =
+            emergencyContactData.relationship.trim();
     }
     // Update the emergency contact
     const updatedUser = yield users_schema_1.Users.findByIdAndUpdate(userId, {
-        emergencyContact: {
-            name: emergencyContactData.name.trim(),
-            phone: emergencyContactData.phone.trim(),
-            relationship: emergencyContactData.relationship.trim(),
-        },
+        emergencyContact: emergencyContactUpdate,
     }, {
         new: true,
         runValidators: true,
