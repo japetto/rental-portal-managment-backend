@@ -212,12 +212,59 @@ const createProperty = async (
   }
 };
 
+// Helper function to calculate income for a property
+const calculatePropertyIncome = async (propertyId: string) => {
+  const { Leases } = await import("../leases/leases.schema");
+  const { Spots } = await import("../spots/spots.schema");
+
+  // Calculate total current active income (sum of all active leases' total rent amounts)
+  const activeLeases = await Leases.find({
+    propertyId: propertyId,
+    leaseStatus: "ACTIVE",
+    isDeleted: false,
+  });
+
+  const totalCurrentActiveIncome = activeLeases.reduce((sum, lease) => {
+    return sum + (lease.rentAmount + (lease.additionalRentAmount || 0));
+  }, 0);
+
+  // Calculate total max income (sum of all spots' monthly prices)
+  const allSpots = await Spots.find({
+    propertyId: propertyId,
+    isDeleted: false,
+  });
+
+  const totalMaxIncome = allSpots.reduce((sum, spot) => {
+    return sum + (spot.price.monthly || 0);
+  }, 0);
+
+  return {
+    totalCurrentActiveIncome,
+    totalMaxIncome,
+  };
+};
+
 const getAllProperties = async (): Promise<IProperty[]> => {
   const properties = await Properties.find({ isDeleted: false }).sort({
     createdAt: -1,
   });
   const propertiesWithLotData = await addLotDataToProperties(properties);
-  return propertiesWithLotData;
+
+  // Add income calculations for each property
+  const propertiesWithIncome = await Promise.all(
+    propertiesWithLotData.map(async property => {
+      const { totalCurrentActiveIncome, totalMaxIncome } =
+        await calculatePropertyIncome(property._id);
+
+      return {
+        ...property,
+        totalCurrentActiveIncome,
+        totalMaxIncome,
+      };
+    }),
+  );
+
+  return propertiesWithIncome;
 };
 
 const getPropertyById = async (propertyId: string): Promise<IProperty> => {
@@ -234,7 +281,16 @@ const getPropertyById = async (propertyId: string): Promise<IProperty> => {
   }
 
   const propertyWithLotData = await addLotDataToProperty(property);
-  return propertyWithLotData;
+
+  // Add income calculations for the property
+  const { totalCurrentActiveIncome, totalMaxIncome } =
+    await calculatePropertyIncome(propertyId);
+
+  return {
+    ...propertyWithLotData,
+    totalCurrentActiveIncome,
+    totalMaxIncome,
+  } as IProperty;
 };
 
 const updateProperty = async (

@@ -24,6 +24,9 @@ export interface IProperty extends Document {
   totalSpots: number;
   availableSpots: number;
   stripeAccount?: unknown; // Virtual field for assigned Stripe account
+  // Income calculations
+  totalCurrentActiveIncome?: number; // Sum of all active leases' total rent amounts
+  totalMaxIncome?: number; // Sum of all spots' monthly prices
 }
 
 export interface ICreateProperty {
@@ -89,6 +92,9 @@ export interface IPropertyWithStripeSummary {
   maintenanceSpots: number;
   stripeAccount: IStripeAccountSummary | null;
   hasStripeAccount: boolean;
+  // Income calculations
+  totalCurrentActiveIncome?: number; // Sum of all active leases' total rent amounts
+  totalMaxIncome?: number; // Sum of all spots' monthly prices
 }
 
 export interface IAvailableStripeAccounts {

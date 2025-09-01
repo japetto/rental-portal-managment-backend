@@ -183,7 +183,32 @@ const getAllProperties = () => __awaiter(void 0, void 0, void 0, function* () {
         createdAt: -1,
     });
     const propertiesWithLotData = yield (0, properties_service_1.addLotDataToProperties)(properties);
-    return propertiesWithLotData;
+    // Add income calculations for each property
+    const propertiesWithIncome = yield Promise.all(propertiesWithLotData.map((property) => __awaiter(void 0, void 0, void 0, function* () {
+        const propertyObj = property.toObject();
+        // Calculate total current active income (sum of all active leases' total rent amounts)
+        const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+        const activeLeases = yield Leases.find({
+            propertyId: property._id,
+            leaseStatus: "ACTIVE",
+            isDeleted: false,
+        });
+        const totalCurrentActiveIncome = activeLeases.reduce((sum, lease) => {
+            return sum + (lease.rentAmount + (lease.additionalRentAmount || 0));
+        }, 0);
+        // Calculate total max income (sum of all spots' monthly prices)
+        const { Spots } = yield Promise.resolve().then(() => __importStar(require("../spots/spots.schema")));
+        const allSpots = yield Spots.find({
+            propertyId: property._id,
+            isDeleted: false,
+        });
+        const totalMaxIncome = allSpots.reduce((sum, spot) => {
+            return sum + (spot.price.monthly || 0);
+        }, 0);
+        return Object.assign(Object.assign({}, propertyObj), { totalCurrentActiveIncome,
+            totalMaxIncome });
+    })));
+    return propertiesWithIncome;
 });
 const getPropertyById = (propertyId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!mongoose_1.default.Types.ObjectId.isValid(propertyId)) {

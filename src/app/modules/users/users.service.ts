@@ -515,12 +515,94 @@ const deleteUser = async (
       });
     }
 
+    // Delete all associated leases for this tenant
+    const { Leases } = await import("../leases/leases.schema");
+    const userLeases = await Leases.find({
+      tenantId: userId,
+      isDeleted: false,
+    });
+
+    if (userLeases.length > 0) {
+      console.log(
+        `🗑️ Found ${userLeases.length} lease(s) to delete for user ${userId}`,
+      );
+
+      // Soft delete all leases associated with this tenant
+      await Promise.all(
+        userLeases.map(async (lease: any) => {
+          const leaseId = lease._id.toString();
+          await softDelete(Leases, leaseId, adminId);
+          console.log(`✅ Deleted lease ${leaseId} for tenant ${userId}`);
+        }),
+      );
+
+      console.log(
+        `✅ Successfully deleted ${userLeases.length} lease(s) for tenant ${userId}`,
+      );
+    }
+
+    // Delete all service requests for this tenant
+    const { ServiceRequests } = await import(
+      "../service-requests/service-requests.schema"
+    );
+    const userServiceRequests = await ServiceRequests.find({
+      tenantId: userId,
+      isDeleted: false,
+    });
+
+    if (userServiceRequests.length > 0) {
+      console.log(
+        `🗑️ Found ${userServiceRequests.length} service request(s) to delete for user ${userId}`,
+      );
+
+      // Soft delete all service requests associated with this tenant
+      await Promise.all(
+        userServiceRequests.map(async (serviceRequest: any) => {
+          const serviceRequestId = serviceRequest._id.toString();
+          await softDelete(ServiceRequests, serviceRequestId, adminId);
+          console.log(
+            `✅ Deleted service request ${serviceRequestId} for tenant ${userId}`,
+          );
+        }),
+      );
+
+      console.log(
+        `✅ Successfully deleted ${userServiceRequests.length} service request(s) for tenant ${userId}`,
+      );
+    }
+
+    // Delete all payments for this tenant
+    const { Payments } = await import("../payments/payments.schema");
+    const userPayments = await Payments.find({
+      tenantId: userId,
+      isDeleted: false,
+    });
+
+    if (userPayments.length > 0) {
+      console.log(
+        `🗑️ Found ${userPayments.length} payment(s) to delete for user ${userId}`,
+      );
+
+      // Soft delete all payments associated with this tenant
+      await Promise.all(
+        userPayments.map(async (payment: any) => {
+          const paymentId = payment._id.toString();
+          await softDelete(Payments, paymentId, adminId);
+          console.log(`✅ Deleted payment ${paymentId} for tenant ${userId}`);
+        }),
+      );
+
+      console.log(
+        `✅ Successfully deleted ${userPayments.length} payment(s) for tenant ${userId}`,
+      );
+    }
+
     // Soft delete the user
     await softDelete(Users, userId, adminId);
 
     return {
       message:
-        "User has been soft deleted successfully. All associated assignments have been updated.",
+        "User has been soft deleted successfully. All associated assignments, leases, service requests, and payments have been updated.",
     };
   } catch (error) {
     throw new ApiError(
