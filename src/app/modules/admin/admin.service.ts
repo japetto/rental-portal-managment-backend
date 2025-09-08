@@ -6,6 +6,7 @@ import {
   restoreRecord,
   softDelete,
 } from "../../../shared/softDeleteUtils";
+import { Leases } from "../leases/leases.schema";
 import { Payments } from "../payments/payments.schema";
 import { IProperty } from "../properties/properties.interface";
 import { Properties } from "../properties/properties.schema";
@@ -624,127 +625,247 @@ const getAllTenants = async (): Promise<IUser[]> => {
     return [];
   }
 
-  // Transform the data to include lot number and lease info more prominently
-  const tenantsWithLotNumber = tenants.map(tenant => {
-    const tenantData = tenant.toObject() as any;
+  // Transform the data to include lot number, lease info, and payment status
+  const tenantsWithLotNumber = await Promise.all(
+    tenants.map(async tenant => {
+      const tenantData = tenant.toObject() as any;
 
-    // Check tenant status - simplified validation
-    const isTenantDataComplete = (user: any, activeLease?: any): boolean => {
-      // Check if user is a tenant
-      if (user.role !== "TENANT") {
-        return false;
+      // Check tenant status - simplified validation
+      const isTenantDataComplete = (user: any, activeLease?: any): boolean => {
+        // Check if user is a tenant
+        if (user.role !== "TENANT") {
+          return false;
+        }
+
+        // Check if tenant has an active lease
+        if (!activeLease || activeLease.leaseStatus !== "ACTIVE") {
+          return false;
+        }
+
+        // Simplified tenantStatus logic - only check lease-related fields
+        const hasLeaseType = !!activeLease.leaseType;
+
+        const hasLeaseDates = !!(
+          activeLease.leaseStart &&
+          (activeLease.leaseType === "MONTHLY" ||
+            (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd))
+        );
+
+        const hasRentAmount =
+          typeof activeLease.rentAmount === "number" &&
+          activeLease.rentAmount > 0;
+
+        const hasDepositAmount =
+          typeof activeLease.depositAmount === "number" &&
+          activeLease.depositAmount >= 0;
+
+        const hasOccupants =
+          typeof activeLease.occupants === "number" &&
+          activeLease.occupants > 0;
+
+        const hasLeaseAgreement =
+          !!activeLease.leaseAgreement &&
+          activeLease.leaseAgreement.trim() !== "";
+
+        // ALL conditions must be met for tenant status to be true
+        return (
+          hasLeaseType &&
+          hasLeaseDates &&
+          hasRentAmount &&
+          hasDepositAmount &&
+          hasOccupants &&
+          hasLeaseAgreement
+        );
+      };
+
+      // Get active lease for tenant status check
+      const activeLease = tenantData.leaseId;
+      const tenantStatus = isTenantDataComplete(tenantData, activeLease);
+
+      // Add tenant status to the response
+      tenantData.tenantStatus = tenantStatus;
+
+      // Calculate payment status for the tenant
+      let paymentStatus: {
+        currentStatus: string;
+        lastPaymentDate: Date | null;
+        nextDueDate: Date | null;
+        overdueAmount: number;
+        totalOutstanding: number;
+        paymentHistory: Array<{
+          id: unknown;
+          amount: number;
+          totalAmount: number;
+          status: string;
+          dueDate: Date;
+          paidDate: Date | undefined;
+          type: string;
+          description: string;
+        }>;
+      } = {
+        currentStatus: "NO_PAYMENTS",
+        lastPaymentDate: null,
+        nextDueDate: null,
+        overdueAmount: 0,
+        totalOutstanding: 0,
+        paymentHistory: [],
+      };
+
+      if (activeLease && tenantStatus) {
+        try {
+          // Get current date
+          const currentDate = new Date();
+
+          // Get all payments for this tenant
+          const allPayments = await Payments.find({
+            tenantId: tenantData._id,
+            isDeleted: false,
+          }).sort({ dueDate: -1 });
+
+          if (allPayments.length > 0) {
+            // Get the most recent payment
+            const lastPayment = allPayments[0];
+
+            // Get pending/overdue payments
+            const pendingPayments = allPayments.filter(
+              payment =>
+                payment.status === "PENDING" || payment.status === "OVERDUE",
+            );
+
+            // Get paid payments
+            const paidPayments = allPayments.filter(
+              payment => payment.status === "PAID",
+            );
+
+            // Calculate overdue amount
+            const overdueAmount = pendingPayments.reduce((sum, payment) => {
+              if (payment.dueDate < currentDate) {
+                return sum + payment.totalAmount;
+              }
+              return sum;
+            }, 0);
+
+            // Calculate total outstanding
+            const totalOutstanding = pendingPayments.reduce(
+              (sum, payment) => sum + payment.totalAmount,
+              0,
+            );
+
+            // Determine current payment status
+            let currentStatus = "UP_TO_DATE";
+            if (overdueAmount > 0) {
+              currentStatus = "OVERDUE";
+            } else if (totalOutstanding > 0) {
+              currentStatus = "PENDING";
+            } else if (paidPayments.length > 0) {
+              currentStatus = "PAID";
+            }
+
+            // Get next due date (from pending payments)
+            const nextDuePayment = pendingPayments
+              .filter(payment => payment.dueDate >= currentDate)
+              .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0];
+
+            paymentStatus = {
+              currentStatus,
+              lastPaymentDate:
+                paidPayments.length > 0
+                  ? (paidPayments[0].paidDate ?? null)
+                  : null,
+              nextDueDate: nextDuePayment ? nextDuePayment.dueDate : null,
+              overdueAmount,
+              totalOutstanding,
+              paymentHistory: allPayments.slice(0, 5).map(payment => ({
+                id: payment._id,
+                amount: payment.amount,
+                totalAmount: payment.totalAmount,
+                status: payment.status,
+                dueDate: payment.dueDate,
+                paidDate: payment.paidDate,
+                type: payment.type,
+                description: payment.description,
+              })),
+            };
+          }
+        } catch (error) {
+          console.error(
+            `Error calculating payment status for tenant ${tenantData.name}:`,
+            error,
+          );
+          // Keep default payment status if there's an error
+        }
       }
 
-      // Check if tenant has an active lease
-      if (!activeLease || activeLease.leaseStatus !== "ACTIVE") {
-        return false;
+      // Add payment status to the response
+      tenantData.paymentStatus = paymentStatus;
+
+      console.log(`👤 Tenant: ${tenantData.name} - Status: ${tenantStatus}`);
+      console.log(`   💰 Payment Status: ${paymentStatus.currentStatus}`);
+      if (activeLease) {
+        console.log(`   - Lease type: ${activeLease.leaseType}`);
+        console.log(`   - Lease status: ${activeLease.leaseStatus}`);
+        console.log(`   - Rent amount: ${activeLease.rentAmount}`);
+        console.log(`   - Deposit amount: ${activeLease.depositAmount}`);
+        console.log(`   - Occupants: ${activeLease.occupants}`);
+        console.log(
+          `   - Has lease agreement: ${!!activeLease.leaseAgreement}`,
+        );
       }
 
-      // Simplified tenantStatus logic - only check lease-related fields
-      const hasLeaseType = !!activeLease.leaseType;
+      // Add property info as a direct field for easier access
+      if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
+        tenantData.property = {
+          id: tenantData.propertyId._id,
+          name: tenantData.propertyId.name,
+          address: tenantData.propertyId.address,
+        };
+        // Remove the original propertyId to avoid duplication
+        delete tenantData.propertyId;
+      }
 
-      const hasLeaseDates = !!(
-        activeLease.leaseStart &&
-        (activeLease.leaseType === "MONTHLY" ||
-          (activeLease.leaseType === "FIXED_TERM" && activeLease.leaseEnd))
-      );
+      // Add lot number as a direct field for easier access
+      if (tenantData.spotId && typeof tenantData.spotId === "object") {
+        tenantData.lotNumber = tenantData.spotId.spotNumber;
+        tenantData.lotStatus = tenantData.spotId.status;
+        tenantData.lotSize = tenantData.spotId.size;
+        tenantData.lotPrice = tenantData.spotId.price;
+        tenantData.lotDescription = tenantData.spotId.description;
+        // Remove the original spotId to avoid duplication
+        delete tenantData.spotId;
+      }
 
-      const hasRentAmount =
-        typeof activeLease.rentAmount === "number" &&
-        activeLease.rentAmount > 0;
+      // Add lease info as a direct field for easier access
+      if (tenantData.leaseId && typeof tenantData.leaseId === "object") {
+        tenantData.lease = {
+          id: tenantData.leaseId._id,
+          leaseType: tenantData.leaseId.leaseType,
+          leaseStart: tenantData.leaseId.leaseStart,
+          leaseEnd: tenantData.leaseId.leaseEnd,
+          rentAmount: tenantData.leaseId.rentAmount, // Base rent amount
+          additionalRentAmount: tenantData.leaseId.additionalRentAmount || 0, // Additional rent amount
+          totalRentAmount:
+            (tenantData.leaseId.rentAmount || 0) +
+            (tenantData.leaseId.additionalRentAmount || 0), // Total rent amount
+          depositAmount: tenantData.leaseId.depositAmount,
+          leaseStatus: tenantData.leaseId.leaseStatus,
+          occupants: tenantData.leaseId.occupants,
+          pets: tenantData.leaseId.pets,
+          specialRequests: tenantData.leaseId.specialRequests,
+          documents: tenantData.leaseId.documents,
+          leaseAgreement: tenantData.leaseId.leaseAgreement, // Add lease agreement field
+          notes: tenantData.leaseId.notes,
+        };
+        // Remove the original leaseId to avoid duplication
+        delete tenantData.leaseId;
+      } else {
+        tenantData.lease = null;
+        // Remove the original leaseId to avoid duplication
+        delete tenantData.leaseId;
+      }
 
-      const hasDepositAmount =
-        typeof activeLease.depositAmount === "number" &&
-        activeLease.depositAmount >= 0;
-
-      const hasOccupants =
-        typeof activeLease.occupants === "number" && activeLease.occupants > 0;
-
-      const hasLeaseAgreement =
-        !!activeLease.leaseAgreement &&
-        activeLease.leaseAgreement.trim() !== "";
-
-      // ALL conditions must be met for tenant status to be true
-      return (
-        hasLeaseType &&
-        hasLeaseDates &&
-        hasRentAmount &&
-        hasDepositAmount &&
-        hasOccupants &&
-        hasLeaseAgreement
-      );
-    };
-
-    // Get active lease for tenant status check
-    const activeLease = tenantData.leaseId;
-    const tenantStatus = isTenantDataComplete(tenantData, activeLease);
-
-    // Add tenant status to the response
-    tenantData.tenantStatus = tenantStatus;
-
-    console.log(`👤 Tenant: ${tenantData.name} - Status: ${tenantStatus}`);
-    if (activeLease) {
-      console.log(`   - Lease type: ${activeLease.leaseType}`);
-      console.log(`   - Lease status: ${activeLease.leaseStatus}`);
-      console.log(`   - Rent amount: ${activeLease.rentAmount}`);
-      console.log(`   - Deposit amount: ${activeLease.depositAmount}`);
-      console.log(`   - Occupants: ${activeLease.occupants}`);
-      console.log(`   - Has lease agreement: ${!!activeLease.leaseAgreement}`);
-    }
-
-    // Add property info as a direct field for easier access
-    if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
-      tenantData.property = {
-        id: tenantData.propertyId._id,
-        name: tenantData.propertyId.name,
-        address: tenantData.propertyId.address,
-      };
-      // Remove the original propertyId to avoid duplication
-      delete tenantData.propertyId;
-    }
-
-    // Add lot number as a direct field for easier access
-    if (tenantData.spotId && typeof tenantData.spotId === "object") {
-      tenantData.lotNumber = tenantData.spotId.spotNumber;
-      tenantData.lotStatus = tenantData.spotId.status;
-      tenantData.lotSize = tenantData.spotId.size;
-      tenantData.lotPrice = tenantData.spotId.price;
-      tenantData.lotDescription = tenantData.spotId.description;
-      // Remove the original spotId to avoid duplication
-      delete tenantData.spotId;
-    }
-
-    // Add lease info as a direct field for easier access
-    if (tenantData.leaseId && typeof tenantData.leaseId === "object") {
-      tenantData.lease = {
-        id: tenantData.leaseId._id,
-        leaseType: tenantData.leaseId.leaseType,
-        leaseStart: tenantData.leaseId.leaseStart,
-        leaseEnd: tenantData.leaseId.leaseEnd,
-        rentAmount: tenantData.leaseId.rentAmount, // Base rent amount
-        additionalRentAmount: tenantData.leaseId.additionalRentAmount || 0, // Additional rent amount
-        totalRentAmount:
-          (tenantData.leaseId.rentAmount || 0) +
-          (tenantData.leaseId.additionalRentAmount || 0), // Total rent amount
-        depositAmount: tenantData.leaseId.depositAmount,
-        leaseStatus: tenantData.leaseId.leaseStatus,
-        occupants: tenantData.leaseId.occupants,
-        pets: tenantData.leaseId.pets,
-        specialRequests: tenantData.leaseId.specialRequests,
-        documents: tenantData.leaseId.documents,
-        leaseAgreement: tenantData.leaseId.leaseAgreement, // Add lease agreement field
-        notes: tenantData.leaseId.notes,
-      };
-      // Remove the original leaseId to avoid duplication
-      delete tenantData.leaseId;
-    } else {
-      tenantData.lease = null;
-      // Remove the original leaseId to avoid duplication
-      delete tenantData.leaseId;
-    }
-
-    return tenantData;
-  });
+      return tenantData;
+    }),
+  );
 
   return tenantsWithLotNumber;
 };
@@ -1603,6 +1724,7 @@ export const AdminService = {
   getArchivedSpots,
   createTestLease,
   getPayments,
+  updatePayment,
   removeLeaseAgreement,
 };
 
@@ -1717,5 +1839,284 @@ async function getPayments(
       totalPages: Math.ceil(total / limit),
     },
     data,
+  };
+}
+
+// Update payment manually (Admin) - Handles both updating existing and creating new payments
+async function updatePayment(
+  tenantId: string,
+  updateData: {
+    amount: number;
+    paidDate: string;
+    description?: string;
+    notes?: string;
+    type?: string;
+    dueDate?: string;
+  },
+  adminId: string,
+) {
+  // Validate ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid tenant ID format");
+  }
+
+  // Validate payment date
+  const paidDate = new Date(updateData.paidDate);
+  if (isNaN(paidDate.getTime())) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid payment date format");
+  }
+
+  // Get tenant and lease information
+  const tenant = await Users.findById(tenantId);
+  if (!tenant || tenant.isDeleted || !tenant.isActive) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Tenant not found or inactive");
+  }
+
+  const activeLease = await Leases.findOne({
+    tenantId: tenantId,
+    leaseStatus: "ACTIVE",
+    isDeleted: false,
+  }).populate("propertyId spotId");
+
+  if (!activeLease) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      "No active lease found for this tenant",
+    );
+  }
+
+  // Try to find existing pending or overdue payment first
+  let existingPayment = await Payments.findOne({
+    tenantId: tenantId,
+    status: { $in: ["PENDING", "OVERDUE"] },
+    isDeleted: false,
+  }).sort({ dueDate: 1 });
+
+  let updatedPayment;
+
+  if (existingPayment) {
+    // Scenario 1: Update existing pending/overdue payment
+    console.log("Updating existing payment:", existingPayment._id);
+
+    const updateFields: any = {
+      amount: updateData.amount,
+      paidDate: paidDate,
+      status: "PAID", // Mark as paid when manually updated
+      paymentMethod: "MANUAL", // Mark as manual payment
+      updatedAt: new Date(),
+    };
+
+    // Add optional fields if provided
+    if (updateData.description) {
+      updateFields.description = updateData.description;
+    }
+
+    if (updateData.notes) {
+      updateFields.notes = updateData.notes;
+    }
+
+    // Update the existing payment
+    updatedPayment = await Payments.findByIdAndUpdate(
+      existingPayment._id,
+      updateFields,
+      { new: true, runValidators: true },
+    ).populate([
+      {
+        path: "tenantId",
+        select: "name email phoneNumber",
+      },
+      {
+        path: "propertyId",
+        select: "name address",
+      },
+      {
+        path: "spotId",
+        select: "spotNumber lotIdentifier",
+      },
+    ]);
+  } else {
+    // Scenario 2: Create new payment record
+    console.log("Creating new payment for tenant:", tenantId);
+
+    // Determine payment type and due date
+    const paymentType = updateData.type || "RENT";
+
+    // For first-time payments, default due date should be lease start date
+    // For regular payments, default to current date
+    const existingPayments = await Payments.find({
+      tenantId: tenantId,
+      type: "RENT",
+      isDeleted: false,
+    });
+    const isFirstTimePayment = existingPayments.length === 0;
+
+    const dueDate = updateData.dueDate
+      ? new Date(updateData.dueDate)
+      : isFirstTimePayment
+        ? activeLease.leaseStart // First payment due on lease start date
+        : new Date(); // Regular payment due today
+
+    // Debug logging for dates
+    console.log("🔍 DEBUG - Date Information:");
+    console.log("  - Lease Start Date:", activeLease.leaseStart);
+    console.log("  - Lease End Date:", activeLease.leaseEnd);
+    console.log("  - Payment Due Date:", dueDate);
+    console.log("  - Current Date:", new Date());
+    console.log(
+      "  - Due Date < Lease Start?",
+      dueDate < activeLease.leaseStart,
+    );
+    console.log(
+      "  - Due Date > Lease End?",
+      activeLease.leaseEnd
+        ? dueDate > activeLease.leaseEnd
+        : "No lease end date",
+    );
+    console.log("  - Update Data Due Date:", updateData.dueDate);
+
+    // Validate due date
+    if (isNaN(dueDate.getTime())) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Invalid due date format");
+    }
+
+    // Generate receipt number
+    const timestamp = Date.now().toString();
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0");
+    const receiptNumber = `RCP-${timestamp}-${random}`;
+
+    // isFirstTimePayment already determined above
+
+    // Calculate pro-rated amount for first-time payments if needed
+    let finalAmount = updateData.amount;
+    let description = updateData.description;
+
+    if (isFirstTimePayment && paymentType === "RENT" && !description) {
+      const leaseStart = activeLease.leaseStart;
+      const leaseStartDay = leaseStart.getDate();
+
+      if (leaseStartDay > 1) {
+        // Pro-rated first month calculation
+        const daysInMonth = new Date(
+          leaseStart.getFullYear(),
+          leaseStart.getMonth() + 1,
+          0,
+        ).getDate();
+        const remainingDays = daysInMonth - leaseStartDay + 1;
+        const totalRentAmount =
+          activeLease.rentAmount + (activeLease.additionalRentAmount || 0);
+        const proRatedRent = Math.round(
+          (totalRentAmount / daysInMonth) * remainingDays,
+        );
+        const expectedAmount = proRatedRent + activeLease.depositAmount;
+
+        // If the provided amount matches the expected pro-rated amount, use pro-rated description
+        if (Math.abs(updateData.amount - expectedAmount) < 1) {
+          // Allow for small rounding differences
+          description = `Pro-rated First Month Rent (${remainingDays} days) + Deposit`;
+        } else {
+          description = "First Month Rent + Deposit";
+        }
+      } else {
+        // Full first month
+        description = "First Month Rent + Deposit";
+      }
+    } else if (!description) {
+      description = `Manual ${paymentType} Payment`;
+    }
+
+    // Create new payment record
+    const newPaymentData = {
+      tenantId: tenantId,
+      propertyId: activeLease.propertyId._id,
+      spotId: activeLease.spotId._id,
+      amount: updateData.amount,
+      type: paymentType,
+      status: "PAID", // Mark as paid since it's a manual payment
+      dueDate: dueDate,
+      paidDate: paidDate,
+      paymentMethod: "MANUAL",
+      description: description,
+      notes: updateData.notes,
+      lateFeeAmount: 0,
+      totalAmount: updateData.amount,
+      receiptNumber: receiptNumber,
+      createdBy: adminId,
+      isActive: true,
+      isDeleted: false,
+    };
+
+    // Create the new payment
+    updatedPayment = await Payments.create(newPaymentData);
+
+    // Populate the created payment
+    updatedPayment = await Payments.findById(updatedPayment._id).populate([
+      {
+        path: "tenantId",
+        select: "name email phoneNumber",
+      },
+      {
+        path: "propertyId",
+        select: "name address",
+      },
+      {
+        path: "spotId",
+        select: "spotNumber lotIdentifier",
+      },
+    ]);
+  }
+
+  if (!updatedPayment) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to process payment",
+    );
+  }
+
+  // Return the payment in the same format as getPayments
+  const paymentData: any = updatedPayment.toObject();
+  return {
+    id: paymentData._id,
+    type: paymentData.type,
+    status: paymentData.status,
+    amount: paymentData.amount,
+    lateFeeAmount: paymentData.lateFeeAmount || 0,
+    totalAmount: paymentData.totalAmount,
+    dueDate: paymentData.dueDate,
+    paidDate: paymentData.paidDate,
+    receiptNumber: paymentData.receiptNumber,
+    description: paymentData.description,
+    notes: paymentData.notes,
+    paymentMethod: paymentData.paymentMethod,
+    createdAt: paymentData.createdAt,
+    updatedAt: paymentData.updatedAt,
+    tenant: paymentData.tenantId
+      ? {
+          id: paymentData.tenantId._id,
+          name: paymentData.tenantId.name,
+          email: paymentData.tenantId.email,
+          phoneNumber: paymentData.tenantId.phoneNumber,
+        }
+      : null,
+    property: paymentData.propertyId
+      ? {
+          id: paymentData.propertyId._id,
+          name: paymentData.propertyId.name,
+          address: paymentData.propertyId.address,
+        }
+      : null,
+    spot: paymentData.spotId
+      ? {
+          id: paymentData.spotId._id,
+          spotNumber: paymentData.spotId.spotNumber,
+          lotIdentifier: paymentData.spotId.lotIdentifier,
+        }
+      : null,
+    stripe: {
+      paymentLinkId: paymentData.stripePaymentLinkId,
+      paymentIntentId: paymentData.stripePaymentIntentId,
+      transactionId: paymentData.stripeTransactionId,
+    },
   };
 }

@@ -27,6 +27,7 @@ var PaymentMethod;
     PaymentMethod["DEBIT_CARD"] = "DEBIT_CARD";
     PaymentMethod["BANK_TRANSFER"] = "BANK_TRANSFER";
     PaymentMethod["ONLINE"] = "ONLINE";
+    PaymentMethod["MANUAL"] = "MANUAL";
 })(PaymentMethod || (exports.PaymentMethod = PaymentMethod = {}));
 var LeaseStatus;
 (function (LeaseStatus) {

@@ -124,7 +124,7 @@ exports.paymentsSchema.pre("save", function (next) {
                 // Check if this is a first-time payment (includes deposit)
                 const isFirstTimePayment = ((_a = this.description) === null || _a === void 0 ? void 0 : _a.includes("Deposit")) ||
                     ((_b = this.description) === null || _b === void 0 ? void 0 : _b.includes("First Month")) ||
-                    this.amount > totalRentAmount + lease.depositAmount;
+                    this.amount >= totalRentAmount + lease.depositAmount;
                 // For first-time payments, allow amount up to total rent + deposit
                 if (isFirstTimePayment) {
                     if (this.amount > totalRentAmount + lease.depositAmount) {
@@ -160,7 +160,14 @@ exports.paymentsSchema.pre("save", function (next) {
                 isDeleted: false,
             });
             if (lease) {
+                console.log("🔍 SCHEMA DEBUG - Date Validation:");
+                console.log("  - Payment Due Date:", this.dueDate);
+                console.log("  - Lease Start Date:", lease.leaseStart);
+                console.log("  - Due Date < Lease Start?", this.dueDate < lease.leaseStart);
+                console.log("  - Due Date Type:", typeof this.dueDate);
+                console.log("  - Lease Start Type:", typeof lease.leaseStart);
                 if (this.dueDate < lease.leaseStart) {
+                    console.log("❌ VALIDATION FAILED: Due date is before lease start date");
                     return next(new Error("Payment due date cannot be before lease start date"));
                 }
                 if (lease.leaseEnd && this.dueDate > lease.leaseEnd) {

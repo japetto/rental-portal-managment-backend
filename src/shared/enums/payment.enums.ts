@@ -23,6 +23,7 @@ export enum PaymentMethod {
   DEBIT_CARD = "DEBIT_CARD",
   BANK_TRANSFER = "BANK_TRANSFER",
   ONLINE = "ONLINE",
+  MANUAL = "MANUAL",
 }
 
 export enum LeaseStatus {

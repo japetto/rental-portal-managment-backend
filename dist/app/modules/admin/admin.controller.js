@@ -633,6 +633,23 @@ const getPayments = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         },
     });
 }));
+// Update payment manually (Admin) - Handles both updating existing and creating new payments
+const updatePayment = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { tenantId } = req.params;
+    const updateData = req.body;
+    const adminId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!adminId) {
+        throw new Error("Admin ID not found");
+    }
+    const result = yield admin_service_1.AdminService.updatePayment(tenantId, updateData, adminId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: "Payment processed successfully",
+        data: result,
+    });
+}));
 // Archive and Restore Controllers
 const archiveProperty = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -771,5 +788,6 @@ exports.AdminController = {
     getArchivedProperties,
     getArchivedSpots,
     getPayments,
+    updatePayment,
     removeLeaseAgreement,
 };

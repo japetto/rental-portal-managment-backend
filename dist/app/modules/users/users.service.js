@@ -358,10 +358,58 @@ const deleteUser = (userId, adminId) => __awaiter(void 0, void 0, void 0, functi
                 status: "AVAILABLE",
             });
         }
+        // Delete all associated leases for this tenant
+        const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+        const userLeases = yield Leases.find({
+            tenantId: userId,
+            isDeleted: false,
+        });
+        if (userLeases.length > 0) {
+            console.log(`🗑️ Found ${userLeases.length} lease(s) to delete for user ${userId}`);
+            // Soft delete all leases associated with this tenant
+            yield Promise.all(userLeases.map((lease) => __awaiter(void 0, void 0, void 0, function* () {
+                const leaseId = lease._id.toString();
+                yield softDelete(Leases, leaseId, adminId);
+                console.log(`✅ Deleted lease ${leaseId} for tenant ${userId}`);
+            })));
+            console.log(`✅ Successfully deleted ${userLeases.length} lease(s) for tenant ${userId}`);
+        }
+        // Delete all service requests for this tenant
+        const { ServiceRequests } = yield Promise.resolve().then(() => __importStar(require("../service-requests/service-requests.schema")));
+        const userServiceRequests = yield ServiceRequests.find({
+            tenantId: userId,
+            isDeleted: false,
+        });
+        if (userServiceRequests.length > 0) {
+            console.log(`🗑️ Found ${userServiceRequests.length} service request(s) to delete for user ${userId}`);
+            // Soft delete all service requests associated with this tenant
+            yield Promise.all(userServiceRequests.map((serviceRequest) => __awaiter(void 0, void 0, void 0, function* () {
+                const serviceRequestId = serviceRequest._id.toString();
+                yield softDelete(ServiceRequests, serviceRequestId, adminId);
+                console.log(`✅ Deleted service request ${serviceRequestId} for tenant ${userId}`);
+            })));
+            console.log(`✅ Successfully deleted ${userServiceRequests.length} service request(s) for tenant ${userId}`);
+        }
+        // Delete all payments for this tenant
+        const { Payments } = yield Promise.resolve().then(() => __importStar(require("../payments/payments.schema")));
+        const userPayments = yield Payments.find({
+            tenantId: userId,
+            isDeleted: false,
+        });
+        if (userPayments.length > 0) {
+            console.log(`🗑️ Found ${userPayments.length} payment(s) to delete for user ${userId}`);
+            // Soft delete all payments associated with this tenant
+            yield Promise.all(userPayments.map((payment) => __awaiter(void 0, void 0, void 0, function* () {
+                const paymentId = payment._id.toString();
+                yield softDelete(Payments, paymentId, adminId);
+                console.log(`✅ Deleted payment ${paymentId} for tenant ${userId}`);
+            })));
+            console.log(`✅ Successfully deleted ${userPayments.length} payment(s) for tenant ${userId}`);
+        }
         // Soft delete the user
         yield softDelete(users_schema_1.Users, userId, adminId);
         return {
-            message: "User has been soft deleted successfully. All associated assignments have been updated.",
+            message: "User has been soft deleted successfully. All associated assignments, leases, service requests, and payments have been updated.",
         };
     }
     catch (error) {

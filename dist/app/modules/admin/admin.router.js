@@ -53,6 +53,8 @@ router.patch("/spots/:id/restore", admin_controller_1.AdminController.restoreSpo
 router.get("/spots/archived", admin_controller_1.AdminController.getArchivedSpots);
 // Payments management (Admin)
 router.get("/payments", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetPaymentsValidationSchema), admin_controller_1.AdminController.getPayments);
+// Update payment manually (Admin)
+router.patch("/payments/tenant/:tenantId", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminUpdatePaymentValidationSchema), admin_controller_1.AdminController.updatePayment);
 // Tenant payments history should be retrieved from user module routes
 // Service Request Management Routes (Admin only)
 router.get("/service-requests", (0, zodValidationRequest_1.default)(admin_validation_1.AdminValidation.adminGetServiceRequestsValidationSchema), admin_controller_1.AdminController.getAllServiceRequests);

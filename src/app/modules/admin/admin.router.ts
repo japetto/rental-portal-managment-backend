@@ -98,6 +98,13 @@ router.get(
   AdminController.getPayments,
 );
 
+// Update payment manually (Admin)
+router.patch(
+  "/payments/tenant/:tenantId",
+  zodValidationRequest(AdminValidation.adminUpdatePaymentValidationSchema),
+  AdminController.updatePayment,
+);
+
 // Tenant payments history should be retrieved from user module routes
 
 // Service Request Management Routes (Admin only)

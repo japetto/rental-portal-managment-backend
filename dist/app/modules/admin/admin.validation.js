@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdminValidation = exports.removeLeaseAgreementValidationSchema = exports.adminGetPaymentsValidationSchema = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
+exports.AdminValidation = exports.adminUpdatePaymentValidationSchema = exports.removeLeaseAgreementValidationSchema = exports.adminGetPaymentsValidationSchema = exports.adminDeleteUserValidationSchema = exports.adminUpdateUserValidationSchema = exports.adminGetUserValidationSchema = exports.adminGetUrgentServiceRequestsValidationSchema = exports.adminGetServiceRequestsByTenantValidationSchema = exports.adminGetServiceRequestsByPropertyValidationSchema = exports.adminAddCommentValidationSchema = exports.adminUpdateServiceRequestValidationSchema = exports.adminGetServiceRequestValidationSchema = exports.adminGetServiceRequestsValidationSchema = exports.updatePropertyValidationSchema = exports.createPropertyValidationSchema = exports.updateSpotValidationSchema = exports.createSpotValidationSchema = exports.inviteTenantValidationSchema = void 0;
 const zod_1 = require("zod");
 // Custom ObjectId validation
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -301,6 +301,23 @@ exports.removeLeaseAgreementValidationSchema = zod_1.z.object({
         reason: zod_1.z.string().min(1, "Reason for removal is required"),
     }),
 });
+// Admin Manual Payment Update Validation Schema
+exports.adminUpdatePaymentValidationSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        tenantId: zod_1.z.string().regex(objectIdRegex, "Invalid tenant ID format"),
+    }),
+    body: zod_1.z.object({
+        amount: zod_1.z.number().min(0, "Amount must be non-negative"),
+        paidDate: zod_1.z.string().datetime("Invalid payment date format"),
+        description: zod_1.z.string().min(1, "Description is required").optional(),
+        notes: zod_1.z.string().max(500, "Notes cannot exceed 500 characters").optional(),
+        // Additional fields for creating new payments
+        type: zod_1.z
+            .enum(["RENT", "DEPOSIT", "LATE_FEE", "UTILITY", "MAINTENANCE", "OTHER"])
+            .optional(),
+        dueDate: zod_1.z.string().datetime("Invalid due date format").optional(),
+    }),
+});
 exports.AdminValidation = {
     inviteTenantValidationSchema: exports.inviteTenantValidationSchema,
     createSpotValidationSchema: exports.createSpotValidationSchema,
@@ -319,4 +336,5 @@ exports.AdminValidation = {
     adminDeleteUserValidationSchema: exports.adminDeleteUserValidationSchema,
     adminGetPaymentsValidationSchema: exports.adminGetPaymentsValidationSchema,
     removeLeaseAgreementValidationSchema: exports.removeLeaseAgreementValidationSchema,
+    adminUpdatePaymentValidationSchema: exports.adminUpdatePaymentValidationSchema,
 };
