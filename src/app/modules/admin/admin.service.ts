@@ -136,8 +136,8 @@ const inviteTenant = async (
 
   const user = await Users.create(userData);
 
-  // Update spot status to MAINTENANCE (temporarily unavailable)
-  await Spots.findByIdAndUpdate(inviteData.spotId, { status: "MAINTENANCE" });
+  // Update spot status to RESERVED (reserved for the invited tenant)
+  await Spots.findByIdAndUpdate(inviteData.spotId, { status: "RESERVED" });
 
   // Property lots are now calculated from spots, no need to update manually
 
@@ -495,11 +495,11 @@ const getSpotsByProperty = async (
 
   // Add status filter if provided
   if (status) {
-    const validStatuses = ["AVAILABLE", "MAINTENANCE"];
+    const validStatuses = ["AVAILABLE", "MAINTENANCE", "RESERVED", "BOOKED"];
     if (!validStatuses.includes(status.toUpperCase())) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        "Invalid status. Must be one of: AVAILABLE, MAINTENANCE",
+        "Invalid status. Must be one of: AVAILABLE, MAINTENANCE, RESERVED, BOOKED",
       );
     }
     query.status = status.toUpperCase();

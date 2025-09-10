@@ -127,8 +127,8 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
         spotId: inviteData.spotId,
     };
     const user = yield users_schema_1.Users.create(userData);
-    // Update spot status to MAINTENANCE (temporarily unavailable)
-    yield spots_schema_1.Spots.findByIdAndUpdate(inviteData.spotId, { status: "MAINTENANCE" });
+    // Update spot status to RESERVED (reserved for the invited tenant)
+    yield spots_schema_1.Spots.findByIdAndUpdate(inviteData.spotId, { status: "RESERVED" });
     // Property lots are now calculated from spots, no need to update manually
     const propertyWithLotData = yield (0, properties_service_1.addLotDataToProperty)(property);
     return {
@@ -368,9 +368,9 @@ const getSpotsByProperty = (propertyId, status) => __awaiter(void 0, void 0, voi
     const query = { propertyId, isDeleted: false };
     // Add status filter if provided
     if (status) {
-        const validStatuses = ["AVAILABLE", "MAINTENANCE"];
+        const validStatuses = ["AVAILABLE", "MAINTENANCE", "RESERVED", "BOOKED"];
         if (!validStatuses.includes(status.toUpperCase())) {
-            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Must be one of: AVAILABLE, MAINTENANCE");
+            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid status. Must be one of: AVAILABLE, MAINTENANCE, RESERVED, BOOKED");
         }
         query.status = status.toUpperCase();
     }
