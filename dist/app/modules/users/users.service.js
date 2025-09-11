@@ -129,18 +129,25 @@ const setPassword = (payload) => __awaiter(void 0, void 0, void 0, function* () 
     if (user.isDeleted || !user.isActive) {
         throw new ApiError_1.default(http_status_1.default.UNAUTHORIZED, "Account has been deactivated or deleted. Cannot set password.");
     }
-    if (!user.isInvited) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "User is not invited. Cannot set password.");
-    }
-    if (user.password && user.password !== "") {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Password already set. Use update password instead.");
-    }
+    // Allow password setting for:
+    // 1. Currently invited users (isInvited: true)
+    // 2. Users who were invited before (have spotId but isInvited: false)
+    // 3. Regular users who need to set/reset their password (no spotId, isInvited: false)
+    // Only block users who are not active or deleted (already checked above)
+    // Remove the invitation restriction to allow all users to set their password
     const hashedPassword = yield bcrypt_1.default.hash(password, Number(config_1.default.salt_round));
-    yield users_schema_1.Users.findOneAndUpdate({ email }, {
+    // Update user with new password
+    // For invited users: set isInvited to false and isVerified to true
+    // For regular users: keep their existing isInvited and isVerified status
+    const updateData = {
         password: hashedPassword,
-        isInvited: false,
-        isVerified: true,
-    }, { new: true });
+    };
+    // Only update invitation status for users who were originally invited
+    if (user.isInvited || user.spotId) {
+        updateData.isInvited = false;
+        updateData.isVerified = true;
+    }
+    yield users_schema_1.Users.findOneAndUpdate({ email }, updateData, { new: true });
     return {
         message: "Password set successfully. You can now login.",
     };

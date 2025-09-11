@@ -858,6 +858,10 @@ const getComprehensiveUserProfile = async (
       isDeleted: false, // Only get non-deleted announcements
       isActive: true,
       readBy: { $ne: userId }, // Only unread announcements
+      $or: [
+        { expiryDate: { $exists: false } }, // No expiry date set
+        { expiryDate: { $gt: new Date() } }, // Expiry date is in the future
+      ],
     };
 
     // Build target audience conditions

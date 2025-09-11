@@ -342,6 +342,11 @@ const getTenantAnnouncements = async (
   // Build the query for announcements that are relevant to this tenant
   const baseQuery: any = {
     isDeleted: false, // Only get non-deleted announcements
+    isActive: true, // Only get active announcements
+    $or: [
+      { expiryDate: { $exists: false } }, // No expiry date set
+      { expiryDate: { $gt: new Date() } }, // Expiry date is in the future
+    ],
   };
 
   // Build target audience conditions
@@ -363,7 +368,7 @@ const getTenantAnnouncements = async (
   // Combine all conditions
   const query = {
     ...baseQuery,
-    $or: targetAudienceConditions,
+    $and: [{ $or: targetAudienceConditions }],
   };
 
   const announcements = await Announcements.find(query)
@@ -374,6 +379,70 @@ const getTenantAnnouncements = async (
     .sort({ priority: -1, createdAt: -1 });
 
   return announcements;
+};
+
+//* Get Announcement by ID for Tenant (with proper access control and expiry filtering)
+const getTenantAnnouncementById = async (
+  announcementId: string,
+  userId: string,
+): Promise<IAnnouncement> => {
+  // Verify the user exists
+  const user = await Users.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Get user's property ID
+  const userPropertyId = user.propertyId?.toString();
+
+  // Build the query for announcements that are relevant to this tenant
+  const baseQuery: any = {
+    _id: announcementId,
+    isDeleted: false, // Only get non-deleted announcements
+    isActive: true, // Only get active announcements
+    $or: [
+      { expiryDate: { $exists: false } }, // No expiry date set
+      { expiryDate: { $gt: new Date() } }, // Expiry date is in the future
+    ],
+  };
+
+  // Build target audience conditions
+  const targetAudienceConditions: any[] = [
+    { targetAudience: "ALL" },
+    { targetAudience: "TENANTS_ONLY" },
+  ];
+
+  // Include PROPERTY_SPECIFIC announcements for user's property
+  if (userPropertyId) {
+    targetAudienceConditions.push({
+      $and: [
+        { targetAudience: "PROPERTY_SPECIFIC" },
+        { propertyId: userPropertyId },
+      ],
+    });
+  }
+
+  // Combine all conditions
+  const query = {
+    ...baseQuery,
+    $and: [{ $or: targetAudienceConditions }],
+  };
+
+  const announcement = await Announcements.findOne(query)
+    .populate({
+      path: "propertyId",
+      select: "name description address",
+    })
+    .populate({
+      path: "readBy",
+      select: "name email",
+    });
+
+  if (!announcement) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
+  }
+
+  return announcement;
 };
 
 //* Mark announcement as read for a user
@@ -389,9 +458,14 @@ const markAsRead = async (data: {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
 
-  // Validate announcement exists
+  // Validate announcement exists and is not expired
   const announcement = await Announcements.findById(announcementId);
   if (!announcement) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
+  }
+
+  // Check if announcement is expired
+  if (announcement.expiryDate && new Date() > announcement.expiryDate) {
     throw new ApiError(httpStatus.NOT_FOUND, "Announcement not found");
   }
 
@@ -435,5 +509,6 @@ export const AnnouncementService = {
   restoreAnnouncement,
   getArchivedAnnouncements,
   getTenantAnnouncements,
+  getTenantAnnouncementById,
   markAsRead,
 };

@@ -422,7 +422,7 @@ const getUserAnnouncementById = catchAsync(
       "../announcements/announcements.service"
     );
 
-    const result = await AnnouncementService.getAnnouncementById(
+    const result = await AnnouncementService.getTenantAnnouncementById(
       announcementId,
       userId,
     );
@@ -511,7 +511,10 @@ const updateEmergencyContact = catchAsync(
     }
 
     // Debug: Log the request body
-    console.log("Emergency contact update request body:", JSON.stringify(req.body, null, 2));
+    console.log(
+      "Emergency contact update request body:",
+      JSON.stringify(req.body, null, 2),
+    );
 
     const result = await UserService.updateEmergencyContact(userId, req.body);
 
