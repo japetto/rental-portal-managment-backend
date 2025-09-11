@@ -7,6 +7,7 @@ import {
   softDelete,
 } from "../../../shared/softDeleteUtils";
 import { Leases } from "../leases/leases.schema";
+import { PaymentService } from "../payments/payment.service";
 import { Payments } from "../payments/payments.schema";
 import { IProperty } from "../properties/properties.interface";
 import { Properties } from "../properties/properties.schema";
@@ -2072,6 +2073,18 @@ async function updatePayment(
       httpStatus.INTERNAL_SERVER_ERROR,
       "Failed to process payment",
     );
+  }
+
+  // Update rent summary to reflect the latest payment data
+  try {
+    await PaymentService.getRentSummary(tenantId);
+    console.log(`Rent summary updated for tenant: ${tenantId}`);
+  } catch (error) {
+    console.error(
+      `Failed to update rent summary for tenant ${tenantId}:`,
+      error,
+    );
+    // Don't throw error here as payment was successful, just log the issue
   }
 
   // Return the payment in the same format as getPayments

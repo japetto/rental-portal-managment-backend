@@ -51,6 +51,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const softDeleteUtils_1 = require("../../../shared/softDeleteUtils");
 const leases_schema_1 = require("../leases/leases.schema");
+const payment_service_1 = require("../payments/payment.service");
 const payments_schema_1 = require("../payments/payments.schema");
 const properties_schema_1 = require("../properties/properties.schema");
 const properties_service_1 = require("../properties/properties.service");
@@ -1465,6 +1466,15 @@ function updatePayment(tenantId, updateData, adminId) {
         }
         if (!updatedPayment) {
             throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Failed to process payment");
+        }
+        // Update rent summary to reflect the latest payment data
+        try {
+            yield payment_service_1.PaymentService.getRentSummary(tenantId);
+            console.log(`Rent summary updated for tenant: ${tenantId}`);
+        }
+        catch (error) {
+            console.error(`Failed to update rent summary for tenant ${tenantId}:`, error);
+            // Don't throw error here as payment was successful, just log the issue
         }
         // Return the payment in the same format as getPayments
         const paymentData = updatedPayment.toObject();

@@ -1420,6 +1420,15 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
                 if (updatedPayment) {
                     payment = updatedPayment;
                     console.log("✅ Payment status updated to PAID");
+                    // Update rent summary to reflect the latest payment data
+                    try {
+                        yield exports.PaymentService.getRentSummary(payment.tenantId.toString());
+                        console.log(`✅ Rent summary updated for tenant: ${payment.tenantId}`);
+                    }
+                    catch (error) {
+                        console.error(`❌ Failed to update rent summary for tenant ${payment.tenantId}:`, error);
+                        // Don't throw error here as payment was successful, just log the issue
+                    }
                 }
                 else {
                     throw new Error("Failed to update payment status");

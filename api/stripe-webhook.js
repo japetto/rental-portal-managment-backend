@@ -9,6 +9,9 @@ const {
   StripeAccounts,
 } = require("../dist/app/modules/stripe/stripe.schema.js");
 const { PaymentStatus } = require("../dist/shared/enums/payment.enums.js");
+const {
+  PaymentService,
+} = require("../dist/app/modules/payments/payment.service.js");
 
 // Connect to MongoDB (reuse logic similar to api/index.js)
 let mongoConnected = false;
@@ -87,6 +90,21 @@ async function handleSucceeded(paymentIntent, stripeAccountId) {
         receiptNumber: updatedPayment.receiptNumber,
         paidDate: updatedPayment.paidDate,
       });
+
+      // Update rent summary to reflect the latest payment data
+      try {
+        await PaymentService.getRentSummary(updatedPayment.tenantId.toString());
+        console.log(
+          `✅ Rent summary updated for tenant: ${updatedPayment.tenantId}`,
+        );
+      } catch (error) {
+        console.error(
+          `❌ Failed to update rent summary for tenant ${updatedPayment.tenantId}:`,
+          error,
+        );
+        // Don't throw error here as payment was successful, just log the issue
+      }
+
       return;
     }
 
@@ -117,6 +135,20 @@ async function handleSucceeded(paymentIntent, stripeAccountId) {
         status: savedPayment.status,
         paidDate: savedPayment.paidDate,
       });
+
+      // Update rent summary to reflect the latest payment data
+      try {
+        await PaymentService.getRentSummary(savedPayment.tenantId.toString());
+        console.log(
+          `✅ Rent summary updated for tenant: ${savedPayment.tenantId}`,
+        );
+      } catch (error) {
+        console.error(
+          `❌ Failed to update rent summary for tenant ${savedPayment.tenantId}:`,
+          error,
+        );
+        // Don't throw error here as payment was successful, just log the issue
+      }
     } else {
       console.error(
         "❌ No payment record found for PaymentIntent ID:",

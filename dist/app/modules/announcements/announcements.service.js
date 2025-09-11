@@ -266,6 +266,11 @@ const getTenantAnnouncements = (tenantId) => __awaiter(void 0, void 0, void 0, f
     // Build the query for announcements that are relevant to this tenant
     const baseQuery = {
         isDeleted: false, // Only get non-deleted announcements
+        isActive: true, // Only get active announcements
+        $or: [
+            { expiryDate: { $exists: false } }, // No expiry date set
+            { expiryDate: { $gt: new Date() } }, // Expiry date is in the future
+        ],
     };
     // Build target audience conditions
     const targetAudienceConditions = [
@@ -282,7 +287,7 @@ const getTenantAnnouncements = (tenantId) => __awaiter(void 0, void 0, void 0, f
         });
     }
     // Combine all conditions
-    const query = Object.assign(Object.assign({}, baseQuery), { $or: targetAudienceConditions });
+    const query = Object.assign(Object.assign({}, baseQuery), { $and: [{ $or: targetAudienceConditions }] });
     const announcements = yield announcements_schema_1.Announcements.find(query)
         .populate({
         path: "propertyId",
@@ -290,6 +295,56 @@ const getTenantAnnouncements = (tenantId) => __awaiter(void 0, void 0, void 0, f
     })
         .sort({ priority: -1, createdAt: -1 });
     return announcements;
+});
+//* Get Announcement by ID for Tenant (with proper access control and expiry filtering)
+const getTenantAnnouncementById = (announcementId, userId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    // Verify the user exists
+    const user = yield users_schema_1.Users.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
+    }
+    // Get user's property ID
+    const userPropertyId = (_a = user.propertyId) === null || _a === void 0 ? void 0 : _a.toString();
+    // Build the query for announcements that are relevant to this tenant
+    const baseQuery = {
+        _id: announcementId,
+        isDeleted: false, // Only get non-deleted announcements
+        isActive: true, // Only get active announcements
+        $or: [
+            { expiryDate: { $exists: false } }, // No expiry date set
+            { expiryDate: { $gt: new Date() } }, // Expiry date is in the future
+        ],
+    };
+    // Build target audience conditions
+    const targetAudienceConditions = [
+        { targetAudience: "ALL" },
+        { targetAudience: "TENANTS_ONLY" },
+    ];
+    // Include PROPERTY_SPECIFIC announcements for user's property
+    if (userPropertyId) {
+        targetAudienceConditions.push({
+            $and: [
+                { targetAudience: "PROPERTY_SPECIFIC" },
+                { propertyId: userPropertyId },
+            ],
+        });
+    }
+    // Combine all conditions
+    const query = Object.assign(Object.assign({}, baseQuery), { $and: [{ $or: targetAudienceConditions }] });
+    const announcement = yield announcements_schema_1.Announcements.findOne(query)
+        .populate({
+        path: "propertyId",
+        select: "name description address",
+    })
+        .populate({
+        path: "readBy",
+        select: "name email",
+    });
+    if (!announcement) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
+    }
+    return announcement;
 });
 //* Mark announcement as read for a user
 const markAsRead = (data) => __awaiter(void 0, void 0, void 0, function* () {
@@ -299,9 +354,13 @@ const markAsRead = (data) => __awaiter(void 0, void 0, void 0, function* () {
     if (!user) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "User not found");
     }
-    // Validate announcement exists
+    // Validate announcement exists and is not expired
     const announcement = yield announcements_schema_1.Announcements.findById(announcementId);
     if (!announcement) {
+        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
+    }
+    // Check if announcement is expired
+    if (announcement.expiryDate && new Date() > announcement.expiryDate) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Announcement not found");
     }
     // Check if user has already read this announcement
@@ -333,5 +392,6 @@ exports.AnnouncementService = {
     restoreAnnouncement,
     getArchivedAnnouncements,
     getTenantAnnouncements,
+    getTenantAnnouncementById,
     markAsRead,
 };
