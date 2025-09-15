@@ -5,8 +5,6 @@ import { PaymentController } from "./payments.controller";
 import {
   createPaymentWithLinkSchema,
   getPaymentLinkDetailsSchema,
-  getTenantPaymentHistorySchema,
-  getTenantPaymentStatusSchema,
 } from "./payments.validation";
 
 const router = express.Router();
@@ -43,9 +41,8 @@ router.get(
 
 // Get tenant payment status (User authenticated)
 router.get(
-  "/tenant-payment-status/:tenantId",
+  "/tenant-payment-status",
   userAuth,
-  zodValidationRequest(getTenantPaymentStatusSchema),
   PaymentController.getTenantPaymentStatus,
 );
 
@@ -58,17 +55,5 @@ router.get("/payment-history", userAuth, PaymentController.getPaymentHistory);
 
 // Get user's rent summary
 router.get("/rent-summary", userAuth, PaymentController.getRentSummary);
-
-// ========================================
-// ADMIN PAYMENT ROUTES
-// ========================================
-
-// Get a specific tenant's payment history (Admin only)
-router.get(
-  "/tenants/:tenantId/payment-history",
-  userAuth,
-  zodValidationRequest(getTenantPaymentHistorySchema),
-  PaymentController.getTenantPaymentHistory,
-);
 
 export const paymentRoutes = router;

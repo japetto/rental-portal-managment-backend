@@ -16,16 +16,6 @@ export const getPaymentLinkDetailsSchema = z.object({
   }),
 });
 
-// Get Tenant Payment Status validation
-export const getTenantPaymentStatusSchema = z.object({
-  params: z.object({
-    tenantId: z.string().min(1, "Tenant ID is required"),
-  }),
-});
+// Get Tenant Payment Status validation (removed - now uses token user ID)
 
-// Admin: Get specific tenant payment history
-export const getTenantPaymentHistorySchema = z.object({
-  params: z.object({
-    tenantId: z.string().min(1, "Tenant ID is required"),
-  }),
-});
+// Get tenant payment history validation (removed - now uses token user ID)

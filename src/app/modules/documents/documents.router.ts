@@ -55,11 +55,6 @@ router.delete(
 );
 
 // Tenant-specific route to get documents for their property
-router.get(
-  "/tenant/:tenantId",
-  userAuth,
-  zodValidationRequest(DocumentsValidation.getTenantDocumentsZodSchema),
-  DocumentsController.getTenantDocuments,
-);
+router.get("/tenant", userAuth, DocumentsController.getTenantDocuments);
 
 export const DocumentsRoutes = router;

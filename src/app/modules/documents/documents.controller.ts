@@ -60,7 +60,12 @@ const getAllDocuments = catchAsync(async (req: Request, res: Response) => {
 
 // Get documents for a tenant's property (Tenants can access their property documents)
 const getTenantDocuments = catchAsync(async (req: Request, res: Response) => {
-  const { tenantId } = req.params;
+  const tenantId = req.user?._id?.toString();
+
+  if (!tenantId) {
+    throw new Error("User ID not found in token");
+  }
+
   const paginationOptions: IPaginationOptions = {
     page: Number(req.query.page) || 1,
     limit: Number(req.query.limit) || 10,

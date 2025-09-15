@@ -229,44 +229,7 @@ const getDocumentStatsZodSchema = z.object({
   }),
 });
 
-// Get tenant documents validation schema
-const getTenantDocumentsZodSchema = z.object({
-  params: z.object({
-    tenantId: z
-      .string({
-        required_error: "Tenant ID is required",
-      })
-      .min(1, "Tenant ID cannot be empty"),
-  }),
-  query: z.object({
-    page: z
-      .string()
-      .transform(val => parseInt(val, 10))
-      .refine(val => !isNaN(val) && val > 0, {
-        message: "Page must be a positive number",
-      })
-      .optional(),
-    limit: z
-      .string()
-      .transform(val => parseInt(val, 10))
-      .refine(val => !isNaN(val) && val > 0 && val <= 100, {
-        message: "Limit must be a positive number and cannot exceed 100",
-      })
-      .optional(),
-    sortBy: z
-      .enum([
-        "title",
-        "fileType",
-        "category",
-        "createdAt",
-        "updatedAt",
-        "fileName",
-        "fileSize",
-      ])
-      .optional(),
-    sortOrder: z.enum(["asc", "desc"]).optional(),
-  }),
-});
+// Get tenant documents validation schema (removed - now uses token user ID)
 
 export const DocumentsValidation = {
   createDocumentZodSchema,
@@ -276,5 +239,4 @@ export const DocumentsValidation = {
   getPropertyDocumentsZodSchema,
   deleteDocumentZodSchema,
   getDocumentStatsZodSchema,
-  getTenantDocumentsZodSchema,
 };

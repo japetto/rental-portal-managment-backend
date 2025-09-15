@@ -83,11 +83,15 @@ const getPaymentLinkDetails = catchAsync(
 // Get comprehensive tenant payment status with automatic payment creation
 const getTenantPaymentStatus = catchAsync(
   async (req: Request, res: Response) => {
-    const { tenantId } = req.params;
+    const tenantId = req.user?._id?.toString();
+
+    if (!tenantId) {
+      throw new Error("User ID not found in token");
+    }
 
     const result = await PaymentService.getTenantPaymentStatusEnhanced({
       tenantId,
-      createdBy: req.user?.id || "SYSTEM",
+      createdBy: tenantId,
     });
 
     sendResponse(res, {
@@ -312,17 +316,4 @@ export const PaymentController = {
   getRentSummary,
   createPaymentWithLink,
   verifyPaymentLink,
-  // Admin: get specific tenant payment history
-  getTenantPaymentHistory: catchAsync(async (req: Request, res: Response) => {
-    const { tenantId } = req.params;
-
-    const result = await PaymentService.getPaymentHistory(tenantId);
-
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: "Tenant payment history retrieved successfully",
-      data: result,
-    });
-  }),
 };
