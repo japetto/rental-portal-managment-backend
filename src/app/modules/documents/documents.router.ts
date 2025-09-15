@@ -33,6 +33,9 @@ router.get("/categories", adminAuth, DocumentsController.getDocumentCategories);
 
 router.get("/tags", adminAuth, DocumentsController.getDocumentTags);
 
+// Tenant-specific route to get documents for their property (must be before /:id route)
+router.get("/tenant", userAuth, DocumentsController.getTenantDocuments);
+
 router.get(
   "/:id",
   adminAuth,
@@ -53,8 +56,5 @@ router.delete(
   zodValidationRequest(DocumentsValidation.deleteDocumentZodSchema),
   DocumentsController.deleteDocument,
 );
-
-// Tenant-specific route to get documents for their property
-router.get("/tenant", userAuth, DocumentsController.getTenantDocuments);
 
 export const DocumentsRoutes = router;
