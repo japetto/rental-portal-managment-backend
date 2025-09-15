@@ -90,10 +90,16 @@ paymentsSchema.pre("save", async function (next) {
         lease.rentAmount + (lease.additionalRentAmount || 0);
 
       // Check if this is a first-time payment (includes deposit)
-      const isFirstTimePayment =
-        this.description?.includes("Deposit") ||
-        this.description?.includes("First Month") ||
-        this.amount >= totalRentAmount + lease.depositAmount;
+      // First, check if there are any existing paid rent payments
+      const { Payments } = await import("./payments.schema");
+      const existingPaidRentPayments = await Payments.countDocuments({
+        tenantId: this.tenantId,
+        type: "RENT",
+        status: "PAID",
+        isDeleted: false,
+      });
+
+      const isFirstTimePayment = existingPaidRentPayments === 0;
 
       // For first-time payments, allow amount up to total rent + deposit
       if (isFirstTimePayment) {
