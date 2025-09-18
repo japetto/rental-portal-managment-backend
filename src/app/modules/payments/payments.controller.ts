@@ -141,6 +141,7 @@ const getRentSummary = catchAsync(async (req: Request, res: Response) => {
 
   try {
     const result = await PaymentService.getRentSummary(userId);
+    console.log("🚀 ~ result:", result);
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
