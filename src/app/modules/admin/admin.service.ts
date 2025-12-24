@@ -112,7 +112,7 @@ const inviteTenant = async (
   }
 
   // Check if spot is already assigned to another user
-  const existingSpotUser = await Users.findOne({ spotId: inviteData.spotId });
+  const existingSpotUser = await Users.findOne({ spotId: inviteData.spotId, isDeleted: false });
   if (existingSpotUser) {
     throw new ApiError(
       httpStatus.CONFLICT,
