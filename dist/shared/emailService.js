@@ -54,9 +54,9 @@ const sendEmail = (emailOptions) => __awaiter(void 0, void 0, void 0, function* 
                 },
             ],
         });
-        console.log("Attempting to send email to:", emailOptions.to);
+        console.log("Attempting to send email to:", JSON.stringify(emailOptions, null, 2));
         const result = yield request;
-        console.log("Email sent successfully. Result:", result.body);
+        console.log("Email sent successfully. Result:", JSON.stringify(result.body, null, 2));
     }
     catch (error) {
         console.error("Error sending email:", error);

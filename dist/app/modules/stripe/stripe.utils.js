@@ -55,12 +55,14 @@ exports.formatAddress = formatAddress;
 // Verify Stripe secret key with Stripe API
 const verifyStripeAccountId = (secretKey) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // Validate the secret key format
-        if (!secretKey.startsWith("sk_")) {
-            throw new Error("Invalid Stripe secret key format. Must start with 'sk_'");
+        // Trim whitespace and validate the secret key format
+        const trimmedSecretKey = secretKey.trim();
+        if (!trimmedSecretKey.startsWith("sk_") &&
+            !trimmedSecretKey.startsWith("rk_")) {
+            throw new Error(`Invalid Stripe key format. Must start with 'sk_' (secret key) or 'rk_' (restricted key). Received: ${trimmedSecretKey.substring(0, 10)}...`);
         }
         // Create Stripe instance with account-specific secret key
-        const stripe = (0, stripe_service_1.createStripeInstance)(secretKey);
+        const stripe = (0, stripe_service_1.createStripeInstance)(trimmedSecretKey);
         // Verify the secret key by making a test API call
         // Using balance.retrieve() is more reliable than paymentLinks.list()
         yield stripe.balance.retrieve();

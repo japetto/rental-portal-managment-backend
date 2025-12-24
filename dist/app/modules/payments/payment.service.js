@@ -340,10 +340,16 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
                 currentMonthDescription = "First Month Rent + Deposit";
             }
         }
-        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) !== "PAID") {
-            // Regular monthly payment
+        else if (!currentMonthPayment ||
+            currentMonthPayment.status === "OVERDUE") {
+            // Regular monthly payment - only if no payment exists or payment is overdue
             currentMonthAmount = totalRentAmount;
             currentMonthDescription = `Monthly Rent - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+        }
+        else if (currentMonthPayment.status === "PENDING") {
+            // Pending payment exists - no additional amount due
+            currentMonthAmount = 0;
+            currentMonthDescription = `Payment Pending - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
         }
         // Calculate total amount due
         const totalDue = currentMonthAmount + totalOverdueAmount;
@@ -354,8 +360,9 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
         let warningMessage = "";
         // Build payment options array
         const paymentOptions = [];
-        // Option 1: Current month payment (if not paid)
-        if (currentMonthAmount > 0) {
+        // Option 1: Current month payment (if not paid and no pending payment exists)
+        if (currentMonthAmount > 0 &&
+            (!currentMonthPayment || currentMonthPayment.status === "OVERDUE")) {
             paymentOptions.push({
                 type: "CURRENT_MONTH",
                 amount: currentMonthAmount,
@@ -378,8 +385,10 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
                 dueDate: (_a = overduePayments[0]) === null || _a === void 0 ? void 0 : _a.dueDate,
             });
         }
-        // Option 3: Combined current + overdue
-        if (currentMonthAmount > 0 && overduePayments.length > 0) {
+        // Option 3: Combined current + overdue (only if no pending payment for current month)
+        if (currentMonthAmount > 0 &&
+            overduePayments.length > 0 &&
+            (!currentMonthPayment || currentMonthPayment.status === "OVERDUE")) {
             const overdueMonths = overduePayments
                 .map(payment => payment.dueDate.toLocaleDateString("en-US", {
                 month: "short",
@@ -394,7 +403,30 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             });
             canPayCurrentAndOverdue = true;
         }
-        // Option 4: Next month (if current is paid and no next month payment)
+        // Option 4: Pending payment (if current month has pending payment)
+        if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PENDING") {
+            paymentOptions.push({
+                type: "PENDING_PAYMENT",
+                amount: currentMonthPayment.totalAmount,
+                description: `Pending Payment - ${currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
+                dueDate: currentMonthPayment.dueDate,
+                paymentId: currentMonthPayment._id,
+                paymentLinkUrl: currentMonthPayment.paymentLinkUrl,
+            });
+        }
+        // Option 5: Next month pending payment (if current is paid and next month has pending payment)
+        if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" &&
+            (nextMonthPayment === null || nextMonthPayment === void 0 ? void 0 : nextMonthPayment.status) === "PENDING") {
+            paymentOptions.push({
+                type: "NEXT_MONTH_PENDING",
+                amount: nextMonthPayment.totalAmount,
+                description: `Pending Next Month Payment - ${nextMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
+                dueDate: nextMonthPayment.dueDate,
+                paymentId: nextMonthPayment._id,
+                paymentLinkUrl: nextMonthPayment.paymentLinkUrl,
+            });
+        }
+        // Option 6: Next month (if current is paid and no next month payment)
         if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && !nextMonthPayment) {
             paymentOptions.push({
                 type: "NEXT_MONTH",
@@ -439,7 +471,13 @@ const getRentSummaryEnhanced = (tenantId) => __awaiter(void 0, void 0, void 0, f
             paymentAction = "CAN_PAY_NEXT_MONTH";
             canPayNextMonth = true;
         }
-        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" && nextMonthPayment) {
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" &&
+            (nextMonthPayment === null || nextMonthPayment === void 0 ? void 0 : nextMonthPayment.status) === "PENDING") {
+            // Current month is paid, next month has pending payment
+            paymentAction = "NEXT_MONTH_PENDING";
+        }
+        else if ((currentMonthPayment === null || currentMonthPayment === void 0 ? void 0 : currentMonthPayment.status) === "PAID" &&
+            (nextMonthPayment === null || nextMonthPayment === void 0 ? void 0 : nextMonthPayment.status) === "PAID") {
             // Already paid for current and next month
             paymentAction = "PAYMENT_LIMIT_REACHED";
             const currentMonthName = currentMonth.toLocaleDateString("en-US", {
@@ -630,7 +668,6 @@ const getPendingPaymentDetails = (tenantId) => __awaiter(void 0, void 0, void 0,
     }
 });
 const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         // First, check if user already has a pending payment
         const pendingPaymentDetails = yield getPendingPaymentDetails(paymentData.tenantId);
@@ -755,14 +792,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     `📅 Pro-rated First Month (${remainingDays} days): $${proRatedRent}\n` +
                         `💰 Security Deposit: $${activeLease.depositAmount}\n` +
                         `📍 ${propertyInfo}`;
-                console.log("📊 Pro-rated calculation:", {
-                    daysInMonth,
-                    remainingDays,
-                    originalAmount: totalRentAmount,
-                    proRatedAmount: proRatedRent,
-                    depositAmount: activeLease.depositAmount,
-                    totalAmount: paymentAmount,
-                });
             }
             else {
                 // If lease starts on the 1st of the month, charge full rent + deposit
@@ -771,9 +800,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     `📅 First Month Rent: $${totalRentAmount}\n` +
                         `💰 Security Deposit: $${activeLease.depositAmount}\n` +
                         `📍 ${propertyInfo}`;
-                console.log("💰 Full rent + deposit charged:", {
-                    amount: paymentAmount,
-                });
             }
         }
         else {
@@ -816,10 +842,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
                 paymentDescription =
                     `📅 Monthly Rent: $${totalRentAmount}\n` + `📍 ${propertyInfo}`;
-                console.log("💰 Creating payment for current month:", {
-                    amount: paymentAmount,
-                    dueDate: paymentDueDate.toISOString(),
-                });
             }
             else if (currentMonthPayment.status === "PAID" && !nextMonthPayment) {
                 // Current month is paid, no payment for next month - create next month payment
@@ -834,10 +856,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
                     : `${property.name} - ${spot.spotNumber || spot.lotIdentifier}`;
                 paymentDescription =
                     `📅 Monthly Rent: $${totalRentAmount}\n` + `📍 ${propertyInfo}`;
-                console.log("💰 Creating payment for next month (one month ahead):", {
-                    amount: paymentAmount,
-                    dueDate: paymentDueDate.toISOString(),
-                });
             }
             else if (currentMonthPayment.status === "PAID" && nextMonthPayment) {
                 // Current month is paid AND next month already has payment - show warning
@@ -905,7 +923,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         }).select("+stripeSecretKey");
         // If no property-specific account found, try to find a default account
         if (!stripeAccount) {
-            console.log("🔍 No property-specific Stripe account found, looking for default account...");
             stripeAccount = yield StripeAccounts.findOne({
                 isDefaultAccount: true,
                 isActive: true,
@@ -914,7 +931,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         }
         // If still no account found, try to find any active and verified account
         if (!stripeAccount) {
-            console.log("🔍 No default account found, looking for any active account...");
             stripeAccount = yield StripeAccounts.findOne({
                 isActive: true,
                 isVerified: true,
@@ -923,23 +939,11 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
         if (!stripeAccount) {
             throw new Error("No active Stripe account found for this property or as fallback");
         }
-        // Debug: Check if secret key exists
-        console.log("🔍 Stripe account found:", {
-            accountId: stripeAccount._id,
-            name: stripeAccount.name,
-            hasSecretKey: !!stripeAccount.stripeSecretKey,
-            secretKeyLength: ((_a = stripeAccount.stripeSecretKey) === null || _a === void 0 ? void 0 : _a.length) || 0,
-            accountType: stripeAccount.isDefaultAccount
-                ? "DEFAULT"
-                : "PROPERTY_SPECIFIC",
-            propertyIds: stripeAccount.propertyIds,
-        });
         if (!stripeAccount.stripeSecretKey) {
             throw new Error("Stripe account secret key is not configured");
         }
         // Create Stripe payment link first (without saving payment record)
         const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
-        console.log("🔧 Creating Stripe instance with secret key...");
         const stripe = createStripeInstance(stripeAccount.stripeSecretKey);
         // Create a temporary payment record to store metadata
         const tempPaymentRecord = yield payments_schema_1.Payments.create({
@@ -1010,13 +1014,6 @@ const createPaymentWithLink = (paymentData) => __awaiter(void 0, void 0, void 0,
             stripeAccountId: stripeAccount._id,
             paymentLinkUrl: paymentLink.url, // Save the payment link URL
             status: "PENDING",
-        });
-        console.log("✅ Payment link created successfully:", {
-            paymentLinkId: paymentLink.id,
-            tempPaymentId: tempPaymentRecord._id,
-            amount: paymentAmount,
-            isFirstTimePayment,
-            includeDeposit,
         });
         return {
             hasPendingPayment: false,
@@ -1303,10 +1300,6 @@ const getTenantPaymentStatusEnhanced = (paymentData) => __awaiter(void 0, void 0
 const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log("🔍 Retrieving receipt by session ID:", {
-            sessionId,
-            accountId,
-        });
         // Import required modules
         const { StripeAccounts } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.schema")));
         const { createStripeInstance } = yield Promise.resolve().then(() => __importStar(require("../stripe/stripe.service")));
@@ -1387,10 +1380,8 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
         }
         // Check if payment is completed or if we need to update it based on Stripe session
         if (payment.status !== payment_enums_1.PaymentStatus.PAID) {
-            console.log("⚠️ Payment status is not PAID, checking Stripe session status...");
             // Check if the Stripe session is actually successful
             if (session.payment_status === "paid") {
-                console.log("✅ Stripe session shows payment is successful, updating database...");
                 // Update the payment status to PAID
                 const updatedPayment = yield payments_schema_1.Payments.findByIdAndUpdate(payment._id, {
                     status: payment_enums_1.PaymentStatus.PAID,
@@ -1419,11 +1410,9 @@ const getReceiptBySessionId = (sessionId, accountId) => __awaiter(void 0, void 0
                 ]);
                 if (updatedPayment) {
                     payment = updatedPayment;
-                    console.log("✅ Payment status updated to PAID");
                     // Update rent summary to reflect the latest payment data
                     try {
                         yield exports.PaymentService.getRentSummary(payment.tenantId.toString());
-                        console.log(`✅ Rent summary updated for tenant: ${payment.tenantId}`);
                     }
                     catch (error) {
                         console.error(`❌ Failed to update rent summary for tenant ${payment.tenantId}:`, error);

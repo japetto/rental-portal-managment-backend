@@ -10,7 +10,10 @@ exports.createStripeAccountSchema = zod_1.z.object({
             .min(1, "Name is required")
             .max(100, "Name must be less than 100 characters"),
         description: zod_1.z.string().optional(),
-        stripeSecretKey: zod_1.z.string().min(1, "Stripe Secret Key is required"),
+        stripeSecretKey: zod_1.z
+            .string()
+            .min(1, "Stripe Secret Key is required")
+            .refine(val => val.trim().startsWith("sk_") || val.trim().startsWith("rk_"), "Stripe Key must start with 'sk_' (secret key) or 'rk_' (restricted key)"),
         isDefaultAccount: zod_1.z.boolean().optional(),
         metadata: zod_1.z.any().optional(),
     }),
@@ -59,6 +62,7 @@ exports.updateStripeAccountSchema = zod_1.z.object({
         stripeSecretKey: zod_1.z
             .string()
             .min(1, "Stripe Secret Key is required")
+            .refine(val => val.trim().startsWith("sk_") || val.trim().startsWith("rk_"), "Stripe Key must start with 'sk_' (secret key) or 'rk_' (restricted key)")
             .optional(),
         isActive: zod_1.z.boolean().optional(),
         isDefaultAccount: zod_1.z.boolean().optional(),

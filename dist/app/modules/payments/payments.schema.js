@@ -109,7 +109,6 @@ exports.paymentsSchema.pre("save", function (next) {
 // Pre-save middleware for payment validation
 exports.paymentsSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
         // Validate payment amount against lease for rent payments
         if (this.type === payment_enums_1.PaymentType.RENT) {
             const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
@@ -122,9 +121,15 @@ exports.paymentsSchema.pre("save", function (next) {
                 // Use totalRentAmount (rentAmount + additionalRentAmount) for payment calculations
                 const totalRentAmount = lease.rentAmount + (lease.additionalRentAmount || 0);
                 // Check if this is a first-time payment (includes deposit)
-                const isFirstTimePayment = ((_a = this.description) === null || _a === void 0 ? void 0 : _a.includes("Deposit")) ||
-                    ((_b = this.description) === null || _b === void 0 ? void 0 : _b.includes("First Month")) ||
-                    this.amount >= totalRentAmount + lease.depositAmount;
+                // First, check if there are any existing paid rent payments
+                const { Payments } = yield Promise.resolve().then(() => __importStar(require("./payments.schema")));
+                const existingPaidRentPayments = yield Payments.countDocuments({
+                    tenantId: this.tenantId,
+                    type: "RENT",
+                    status: "PAID",
+                    isDeleted: false,
+                });
+                const isFirstTimePayment = existingPaidRentPayments === 0;
                 // For first-time payments, allow amount up to total rent + deposit
                 if (isFirstTimePayment) {
                     if (this.amount > totalRentAmount + lease.depositAmount) {

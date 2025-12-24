@@ -109,7 +109,7 @@ const inviteTenant = (inviteData) => __awaiter(void 0, void 0, void 0, function*
         throw new ApiError_1.default(http_status_1.default.CONFLICT, `A tenant with phone number "${inviteData.phoneNumber}" already exists in the system. Please use a different phone number or contact the existing tenant.`);
     }
     // Check if spot is already assigned to another user
-    const existingSpotUser = yield users_schema_1.Users.findOne({ spotId: inviteData.spotId });
+    const existingSpotUser = yield users_schema_1.Users.findOne({ spotId: inviteData.spotId, isDeleted: false });
     if (existingSpotUser) {
         throw new ApiError_1.default(http_status_1.default.CONFLICT, `Spot is already assigned to tenant: ${existingSpotUser.name}`);
     }
@@ -448,20 +448,16 @@ const deleteSpot = (spotId) => __awaiter(void 0, void 0, void 0, function* () {
     });
 });
 const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("🔍 Fetching all tenants...");
     const tenants = yield users_schema_1.Users.find({ role: "TENANT", isDeleted: false })
         .populate("propertyId", "name address")
         .populate("spotId", "spotNumber status size price description")
         .populate("leaseId", "leaseType leaseStart leaseEnd rentAmount additionalRentAmount depositAmount leaseStatus occupants pets specialRequests documents notes leaseAgreement")
         .sort({ createdAt: -1 });
-    console.log(`📊 Found ${tenants.length} tenants`);
     if (tenants.length === 0) {
-        console.log("⚠️ No tenants found in database");
         return [];
     }
-    // Transform the data to include lot number, lease info, and payment status
+    // Transform the data to include lot number, lease info, and rent summary
     const tenantsWithLotNumber = yield Promise.all(tenants.map((tenant) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a;
         const tenantData = tenant.toObject();
         // Check tenant status - simplified validation
         const isTenantDataComplete = (user, activeLease) => {
@@ -499,93 +495,19 @@ const getAllTenants = () => __awaiter(void 0, void 0, void 0, function* () {
         const tenantStatus = isTenantDataComplete(tenantData, activeLease);
         // Add tenant status to the response
         tenantData.tenantStatus = tenantStatus;
-        // Calculate payment status for the tenant
-        let paymentStatus = {
-            currentStatus: "NO_PAYMENTS",
-            lastPaymentDate: null,
-            nextDueDate: null,
-            overdueAmount: 0,
-            totalOutstanding: 0,
-            paymentHistory: [],
-        };
+        // Add rent summary for each tenant using the existing service
+        let rentSummary = null;
         if (activeLease && tenantStatus) {
             try {
-                // Get current date
-                const currentDate = new Date();
-                // Get all payments for this tenant
-                const allPayments = yield payments_schema_1.Payments.find({
-                    tenantId: tenantData._id,
-                    isDeleted: false,
-                }).sort({ dueDate: -1 });
-                if (allPayments.length > 0) {
-                    // Get the most recent payment
-                    const lastPayment = allPayments[0];
-                    // Get pending/overdue payments
-                    const pendingPayments = allPayments.filter(payment => payment.status === "PENDING" || payment.status === "OVERDUE");
-                    // Get paid payments
-                    const paidPayments = allPayments.filter(payment => payment.status === "PAID");
-                    // Calculate overdue amount
-                    const overdueAmount = pendingPayments.reduce((sum, payment) => {
-                        if (payment.dueDate < currentDate) {
-                            return sum + payment.totalAmount;
-                        }
-                        return sum;
-                    }, 0);
-                    // Calculate total outstanding
-                    const totalOutstanding = pendingPayments.reduce((sum, payment) => sum + payment.totalAmount, 0);
-                    // Determine current payment status
-                    let currentStatus = "UP_TO_DATE";
-                    if (overdueAmount > 0) {
-                        currentStatus = "OVERDUE";
-                    }
-                    else if (totalOutstanding > 0) {
-                        currentStatus = "PENDING";
-                    }
-                    else if (paidPayments.length > 0) {
-                        currentStatus = "PAID";
-                    }
-                    // Get next due date (from pending payments)
-                    const nextDuePayment = pendingPayments
-                        .filter(payment => payment.dueDate >= currentDate)
-                        .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0];
-                    paymentStatus = {
-                        currentStatus,
-                        lastPaymentDate: paidPayments.length > 0
-                            ? ((_a = paidPayments[0].paidDate) !== null && _a !== void 0 ? _a : null)
-                            : null,
-                        nextDueDate: nextDuePayment ? nextDuePayment.dueDate : null,
-                        overdueAmount,
-                        totalOutstanding,
-                        paymentHistory: allPayments.slice(0, 5).map(payment => ({
-                            id: payment._id,
-                            amount: payment.amount,
-                            totalAmount: payment.totalAmount,
-                            status: payment.status,
-                            dueDate: payment.dueDate,
-                            paidDate: payment.paidDate,
-                            type: payment.type,
-                            description: payment.description,
-                        })),
-                    };
-                }
+                rentSummary = yield payment_service_1.PaymentService.getRentSummary(tenantData._id);
             }
             catch (error) {
-                console.error(`Error calculating payment status for tenant ${tenantData.name}:`, error);
-                // Keep default payment status if there's an error
+                console.error(`Error getting rent summary for tenant ${tenantData.name}:`, error);
+                // Keep rentSummary as null if there's an error
             }
         }
-        // Add payment status to the response
-        tenantData.paymentStatus = paymentStatus;
-        console.log(`👤 Tenant: ${tenantData.name} - Status: ${tenantStatus}`);
-        console.log(`   💰 Payment Status: ${paymentStatus.currentStatus}`);
-        if (activeLease) {
-            console.log(`   - Lease type: ${activeLease.leaseType}`);
-            console.log(`   - Lease status: ${activeLease.leaseStatus}`);
-            console.log(`   - Rent amount: ${activeLease.rentAmount}`);
-            console.log(`   - Deposit amount: ${activeLease.depositAmount}`);
-            console.log(`   - Occupants: ${activeLease.occupants}`);
-            console.log(`   - Has lease agreement: ${!!activeLease.leaseAgreement}`);
-        }
+        // Add rent summary to the response
+        tenantData.rentSummary = rentSummary;
         // Add property info as a direct field for easier access
         if (tenantData.propertyId && typeof tenantData.propertyId === "object") {
             tenantData.property = {
@@ -1303,6 +1225,11 @@ function updatePayment(tenantId, updateData, adminId) {
         if (isNaN(paidDate.getTime())) {
             throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid payment date format");
         }
+        // Validate due date (now required)
+        const dueDate = new Date(updateData.dueDate);
+        if (isNaN(dueDate.getTime())) {
+            throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid due date format");
+        }
         // Get tenant and lease information
         const tenant = yield users_schema_1.Users.findById(tenantId);
         if (!tenant || tenant.isDeleted || !tenant.isActive) {
@@ -1359,36 +1286,23 @@ function updatePayment(tenantId, updateData, adminId) {
         else {
             // Scenario 2: Create new payment record
             console.log("Creating new payment for tenant:", tenantId);
-            // Determine payment type and due date
+            // Determine payment type
             const paymentType = updateData.type || "RENT";
-            // For first-time payments, default due date should be lease start date
-            // For regular payments, default to current date
+            // Check if this is a first-time payment for description purposes
             const existingPayments = yield payments_schema_1.Payments.find({
                 tenantId: tenantId,
                 type: "RENT",
                 isDeleted: false,
             });
             const isFirstTimePayment = existingPayments.length === 0;
-            const dueDate = updateData.dueDate
-                ? new Date(updateData.dueDate)
-                : isFirstTimePayment
-                    ? activeLease.leaseStart // First payment due on lease start date
-                    : new Date(); // Regular payment due today
             // Debug logging for dates
             console.log("🔍 DEBUG - Date Information:");
             console.log("  - Lease Start Date:", activeLease.leaseStart);
             console.log("  - Lease End Date:", activeLease.leaseEnd);
             console.log("  - Payment Due Date:", dueDate);
+            console.log("  - Payment Paid Date:", paidDate);
             console.log("  - Current Date:", new Date());
-            console.log("  - Due Date < Lease Start?", dueDate < activeLease.leaseStart);
-            console.log("  - Due Date > Lease End?", activeLease.leaseEnd
-                ? dueDate > activeLease.leaseEnd
-                : "No lease end date");
-            console.log("  - Update Data Due Date:", updateData.dueDate);
-            // Validate due date
-            if (isNaN(dueDate.getTime())) {
-                throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Invalid due date format");
-            }
+            console.log("  - Is First Time Payment:", isFirstTimePayment);
             // Generate receipt number
             const timestamp = Date.now().toString();
             const random = Math.floor(Math.random() * 1000)

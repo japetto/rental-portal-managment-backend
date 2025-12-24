@@ -309,13 +309,13 @@ exports.adminUpdatePaymentValidationSchema = zod_1.z.object({
     body: zod_1.z.object({
         amount: zod_1.z.number().min(0, "Amount must be non-negative"),
         paidDate: zod_1.z.string().datetime("Invalid payment date format"),
+        dueDate: zod_1.z.string().datetime("Invalid due date format"),
         description: zod_1.z.string().min(1, "Description is required").optional(),
         notes: zod_1.z.string().max(500, "Notes cannot exceed 500 characters").optional(),
         // Additional fields for creating new payments
         type: zod_1.z
             .enum(["RENT", "DEPOSIT", "LATE_FEE", "UTILITY", "MAINTENANCE", "OTHER"])
             .optional(),
-        dueDate: zod_1.z.string().datetime("Invalid due date format").optional(),
     }),
 });
 exports.AdminValidation = {

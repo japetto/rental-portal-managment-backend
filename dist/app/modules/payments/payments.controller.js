@@ -75,11 +75,14 @@ const getPaymentLinkDetails = (0, catchAsync_1.default)((req, res) => __awaiter(
 }));
 // Get comprehensive tenant payment status with automatic payment creation
 const getTenantPaymentStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { tenantId } = req.params;
+    var _a, _b;
+    const tenantId = (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id) === null || _b === void 0 ? void 0 : _b.toString();
+    if (!tenantId) {
+        throw new Error("User ID not found in token");
+    }
     const result = yield payment_service_1.PaymentService.getTenantPaymentStatusEnhanced({
         tenantId,
-        createdBy: ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || "SYSTEM",
+        createdBy: tenantId,
     });
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
@@ -122,6 +125,7 @@ const getRentSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
     }
     try {
         const result = yield payment_service_1.PaymentService.getRentSummary(userId);
+        console.log("🚀 ~ result:", result);
         (0, sendResponse_1.default)(res, {
             statusCode: http_status_1.default.OK,
             success: true,
@@ -281,15 +285,4 @@ exports.PaymentController = {
     getRentSummary,
     createPaymentWithLink,
     verifyPaymentLink,
-    // Admin: get specific tenant payment history
-    getTenantPaymentHistory: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-        const { tenantId } = req.params;
-        const result = yield payment_service_1.PaymentService.getPaymentHistory(tenantId);
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.OK,
-            success: true,
-            message: "Tenant payment history retrieved successfully",
-            data: result,
-        });
-    })),
 };

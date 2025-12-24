@@ -22,7 +22,7 @@ router.get("/verify-payment-link/:paymentLinkId", userAuth_1.userAuth, payments_
 // Get payment link details (User authenticated)
 router.get("/payment-link/:paymentLinkId", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(payments_validation_1.getPaymentLinkDetailsSchema), payments_controller_1.PaymentController.getPaymentLinkDetails);
 // Get tenant payment status (User authenticated)
-router.get("/tenant-payment-status/:tenantId", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(payments_validation_1.getTenantPaymentStatusSchema), payments_controller_1.PaymentController.getTenantPaymentStatus);
+router.get("/tenant-payment-status", userAuth_1.userAuth, payments_controller_1.PaymentController.getTenantPaymentStatus);
 // ========================================
 // USER PAYMENT ROUTES (moved from users module)
 // ========================================
@@ -30,9 +30,4 @@ router.get("/tenant-payment-status/:tenantId", userAuth_1.userAuth, (0, zodValid
 router.get("/payment-history", userAuth_1.userAuth, payments_controller_1.PaymentController.getPaymentHistory);
 // Get user's rent summary
 router.get("/rent-summary", userAuth_1.userAuth, payments_controller_1.PaymentController.getRentSummary);
-// ========================================
-// ADMIN PAYMENT ROUTES
-// ========================================
-// Get a specific tenant's payment history (Admin only)
-router.get("/tenants/:tenantId/payment-history", userAuth_1.userAuth, (0, zodValidationRequest_1.default)(payments_validation_1.getTenantPaymentHistorySchema), payments_controller_1.PaymentController.getTenantPaymentHistory);
 exports.paymentRoutes = router;

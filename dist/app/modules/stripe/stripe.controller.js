@@ -20,11 +20,20 @@ const stripe_service_1 = require("./stripe.service");
 // Create a new Stripe account for a property
 exports.createStripeAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { name, description, stripeSecretKey, isDefaultAccount = false, metadata, } = req.body;
+    // Validate and trim the Stripe secret key
+    if (!stripeSecretKey || typeof stripeSecretKey !== "string") {
+        throw new Error("Stripe secret key is required and must be a string");
+    }
+    const trimmedSecretKey = stripeSecretKey.trim();
+    if (!trimmedSecretKey.startsWith("sk_") &&
+        !trimmedSecretKey.startsWith("rk_")) {
+        throw new Error(`Invalid Stripe key format. Must start with 'sk_' (secret key) or 'rk_' (restricted key). Received: ${trimmedSecretKey.substring(0, 10)}...`);
+    }
     // Prepare account data with proper defaults
     const accountData = {
         name,
         description: description || undefined,
-        stripeSecretKey,
+        stripeSecretKey: trimmedSecretKey,
         isDefaultAccount: Boolean(isDefaultAccount),
         propertyIds: [], // Start with empty property array
         metadata: metadata || undefined,
