@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendTenantInvitationEmail = exports.sendEmail = exports.verifyEmailConnection = void 0;
+exports.sendLeaseReadyNotification = exports.sendTenantInvitationEmail = exports.sendEmail = exports.verifyEmailConnection = void 0;
 const node_mailjet_1 = __importDefault(require("node-mailjet"));
 const config_1 = __importDefault(require("../config/config"));
 // Initialize Mailjet client
@@ -183,8 +183,131 @@ const sendTenantInvitationEmail = (tenantEmail, tenantName, autoFillUrl, propert
     });
 });
 exports.sendTenantInvitationEmail = sendTenantInvitationEmail;
+// Send lease ready notification email
+const sendLeaseReadyNotification = (tenantEmail, tenantName, propertyName, spotNumber, dashboardUrl) => __awaiter(void 0, void 0, void 0, function* () {
+    const subject = `Your Lease is Ready - ${propertyName}`;
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Your Lease is Ready</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .header {
+          background-color: #2196F3;
+          color: white;
+          padding: 20px;
+          text-align: center;
+          border-radius: 5px 5px 0 0;
+        }
+        .content {
+          background-color: #f9f9f9;
+          padding: 20px;
+          border-radius: 0 0 5px 5px;
+        }
+        .button {
+          display: inline-block;
+          background-color: #2196F3;
+          color: white;
+          padding: 12px 24px;
+          text-decoration: none;
+          border-radius: 5px;
+          margin: 20px 0;
+        }
+        .button:hover {
+          background-color: #1976D2;
+        }
+        .footer {
+          margin-top: 20px;
+          padding-top: 20px;
+          border-top: 1px solid #ddd;
+          font-size: 12px;
+          color: #666;
+        }
+        .highlight {
+          background-color: #e3f2fd;
+          padding: 15px;
+          border-left: 4px solid #2196F3;
+          margin: 15px 0;
+        }
+        .action-list {
+          background-color: white;
+          padding: 15px;
+          border-radius: 5px;
+          margin: 15px 0;
+        }
+        .action-list ul {
+          margin: 10px 0;
+          padding-left: 20px;
+        }
+        .action-list li {
+          margin: 8px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Your Lease is Ready! 🎉</h1>
+      </div>
+      
+      <div class="content">
+        <p>Dear ${tenantName},</p>
+        
+        <p>Great news! Your lease profile has been updated with all required information and is now ready for review.</p>
+        
+        <div class="highlight">
+          <strong>Property Details:</strong><br>
+          Property: ${propertyName}<br>
+          Spot Number: ${spotNumber}
+        </div>
+        
+        <p>You can now access your lease information and take the following actions:</p>
+        
+        <div class="action-list">
+          <ul>
+            <li><strong>Review your lease details</strong> - Check all lease information, terms, and conditions</li>
+            <li><strong>Make payments</strong> - Pay rent, deposits, or other fees</li>
+            <li><strong>View documents</strong> - Access lease agreements and related documents</li>
+            <li><strong>Update your profile</strong> - Complete any additional information if needed</li>
+          </ul>
+        </div>
+        
+        <p>To access your lease and dashboard, please click the button below:</p>
+        
+        <a href="${dashboardUrl}" class="button">View My Lease & Dashboard</a>
+        
+        <p>If you have any questions about your lease or need assistance, please don't hesitate to contact our support team.</p>
+        
+        <p>Best regards,<br>
+        Your Property Management Team</p>
+      </div>
+      
+      <div class="footer">
+        <p>This is an automated message. Please do not reply to this email.</p>
+        <p>If you have any questions, please contact our support team.</p>
+      </div>
+    </body>
+    </html>
+  `;
+    yield (0, exports.sendEmail)({
+        to: tenantEmail,
+        subject,
+        html,
+    });
+});
+exports.sendLeaseReadyNotification = sendLeaseReadyNotification;
 exports.default = {
     sendEmail: exports.sendEmail,
     sendTenantInvitationEmail: exports.sendTenantInvitationEmail,
+    sendLeaseReadyNotification: exports.sendLeaseReadyNotification,
     verifyEmailConnection: exports.verifyEmailConnection,
 };

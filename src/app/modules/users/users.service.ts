@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
 import { LeaseStatus } from "../../../shared/enums/payment.enums";
+import { checkAndSendLeaseReadyNotification } from "../leases/leases.service";
 import { Spots } from "../spots/spots.schema";
 import {
   IAuthUser,
@@ -270,7 +271,7 @@ const updateTenantData = async (
 
   try {
     let updatedUser: IUser = user!;
-    let updatedLease = null;
+    let updatedLease: any = null;
 
     // 1. Update user information if provided
     if (payload.user) {
@@ -461,6 +462,40 @@ const updateTenantData = async (
 
     // Commit the transaction
     await session.commitTransaction();
+
+    // Check if lease is complete and send notification to tenant
+    // Do this after transaction commit to avoid blocking
+    // Only send if lease became complete (not if it was already complete)
+    if (updatedLease && updatedLease._id) {
+      console.log(`🔔 Checking notification for lease ${updatedLease._id}`);
+
+      // Get previous lease state if it existed
+      let previousLease: any = null;
+      if (user.leaseId) {
+        const { Leases } = await import("../leases/leases.schema");
+        const existingLease = await Leases.findById(user.leaseId);
+        if (existingLease) {
+          previousLease = existingLease.toObject();
+          console.log(`📝 Found previous lease state for comparison`);
+        }
+      } else {
+        console.log(`📝 No previous lease found - this is a new lease`);
+      }
+
+      // Check and send notification (using same pattern as invite email)
+      const leaseId = updatedLease._id.toString();
+      try {
+        await checkAndSendLeaseReadyNotification(leaseId, previousLease);
+      } catch (error) {
+        console.error(
+          `❌ Error in notification check for lease ${leaseId}:`,
+          error,
+        );
+        // Continue even if notification fails
+      }
+    } else {
+      console.log(`ℹ️ No lease updated, skipping notification check`);
+    }
 
     return {
       user: updatedUser,

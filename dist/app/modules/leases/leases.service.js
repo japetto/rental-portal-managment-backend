@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -23,11 +56,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LeasesService = void 0;
+exports.LeasesService = exports.checkAndSendLeaseReadyNotification = void 0;
 const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = require("mongoose");
+const config_1 = __importDefault(require("../../../config/config"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const paginationHelpers_1 = require("../../../helpers/paginationHelpers");
+const emailService_1 = require("../../../shared/emailService");
 const payment_enums_1 = require("../../../shared/enums/payment.enums");
 const leases_schema_1 = require("./leases.schema");
 const createLease = (leaseData) => __awaiter(void 0, void 0, void 0, function* () {
@@ -188,12 +223,119 @@ const getLeasesByTenant = (tenantId, filters, paginationOptions) => __awaiter(vo
         data: result,
     };
 });
+// Helper function to check if lease is complete
+const isLeaseComplete = (lease) => {
+    // Check if all required fields are filled
+    const hasRequiredFields = lease.tenantId &&
+        lease.spotId &&
+        lease.propertyId &&
+        lease.leaseType &&
+        lease.leaseStart &&
+        lease.occupants;
+    // Check that depositAmount is provided and valid (required)
+    const hasValidDepositAmount = typeof lease.depositAmount === "number" && lease.depositAmount >= 0;
+    // Check lease type specific requirements
+    const hasValidLeaseType = (lease.leaseType === payment_enums_1.LeaseType.FIXED_TERM && lease.leaseEnd) ||
+        (lease.leaseType === payment_enums_1.LeaseType.MONTHLY && !lease.leaseEnd);
+    // Check pet information if pets are present
+    const hasValidPetInfo = !lease.pets.hasPets ||
+        (lease.pets.hasPets &&
+            lease.pets.petDetails &&
+            lease.pets.petDetails.length > 0);
+    // Check that additional rent amount is valid (optional - only validate if provided)
+    const hasValidAdditionalRent = lease.additionalRentAmount === undefined ||
+        lease.additionalRentAmount === null ||
+        lease.additionalRentAmount >= 0;
+    // Check that leaseAgreement is provided (required)
+    const hasLeaseAgreement = !!lease.leaseAgreement && lease.leaseAgreement.trim() !== "";
+    return (hasRequiredFields &&
+        hasValidLeaseType &&
+        hasValidPetInfo &&
+        hasValidAdditionalRent &&
+        hasLeaseAgreement &&
+        hasValidDepositAmount);
+};
+// Helper function to check and send lease ready notification
+const checkAndSendLeaseReadyNotification = (leaseId, previousLease) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    console.log(`🔔 Starting lease notification check for lease ${leaseId}`);
+    try {
+        const { Leases } = yield Promise.resolve().then(() => __importStar(require("./leases.schema")));
+        // Populate the lease with tenant, property, and spot information
+        const populatedLease = yield Leases.findById(leaseId)
+            .populate("tenantId", "name email phoneNumber profileImage bio preferredLocation")
+            .populate("spotId", "spotNumber spotType spotIdentifier")
+            .populate("propertyId", "name address");
+        if (!populatedLease) {
+            console.warn(`⚠️ Lease ${leaseId} not found for notification check`);
+            return;
+        }
+        console.log(`📋 Lease found: ${leaseId}`);
+        console.log(`   - Tenant: ${((_a = populatedLease.tenantId) === null || _a === void 0 ? void 0 : _a.email) || "N/A"}`);
+        console.log(`   - Property: ${((_b = populatedLease.propertyId) === null || _b === void 0 ? void 0 : _b.name) || "N/A"}`);
+        console.log(`   - Spot: ${((_c = populatedLease.spotId) === null || _c === void 0 ? void 0 : _c.spotNumber) || ((_d = populatedLease.spotId) === null || _d === void 0 ? void 0 : _d.spotIdentifier) || "N/A"}`);
+        console.log(`   - Lease Agreement: ${populatedLease.leaseAgreement ? "Present" : "Missing"}`);
+        console.log(`   - Deposit Amount: ${populatedLease.depositAmount}`);
+        // Check if lease is complete
+        const isComplete = isLeaseComplete(populatedLease);
+        console.log(`   - Is Complete: ${isComplete}`);
+        // Only send notification if:
+        // 1. Lease is now complete AND
+        // 2. It wasn't complete before (or it's a new lease)
+        const wasCompleteBefore = previousLease
+            ? isLeaseComplete(previousLease)
+            : false;
+        console.log(`   - Was Complete Before: ${wasCompleteBefore}`);
+        if (isComplete && !wasCompleteBefore) {
+            const tenant = populatedLease.tenantId;
+            const property = populatedLease.propertyId;
+            const spot = populatedLease.spotId;
+            console.log(`📧 Preparing to send notification...`);
+            console.log(`   - Tenant Email: ${(tenant === null || tenant === void 0 ? void 0 : tenant.email) || "Missing"}`);
+            console.log(`   - Tenant Name: ${(tenant === null || tenant === void 0 ? void 0 : tenant.name) || "Missing"}`);
+            console.log(`   - Property Name: ${(property === null || property === void 0 ? void 0 : property.name) || "Missing"}`);
+            console.log(`   - Spot Number: ${(spot === null || spot === void 0 ? void 0 : spot.spotNumber) || (spot === null || spot === void 0 ? void 0 : spot.spotIdentifier) || "Missing"}`);
+            // Only send notification if we have all required information
+            if ((tenant === null || tenant === void 0 ? void 0 : tenant.email) &&
+                (tenant === null || tenant === void 0 ? void 0 : tenant.name) &&
+                (property === null || property === void 0 ? void 0 : property.name) &&
+                ((spot === null || spot === void 0 ? void 0 : spot.spotNumber) || (spot === null || spot === void 0 ? void 0 : spot.spotIdentifier))) {
+                const dashboardUrl = `${config_1.default.client_url}/my-info`;
+                const spotNumber = spot.spotNumber || spot.spotIdentifier || "N/A";
+                console.log(`📤 Sending email to ${tenant.email}...`);
+                yield (0, emailService_1.sendLeaseReadyNotification)(tenant.email, tenant.name, property.name, spotNumber, dashboardUrl);
+                console.log(`✅ Lease ready notification sent successfully to tenant ${tenant.email} for lease ${leaseId}`);
+            }
+            else {
+                console.warn(`⚠️ Cannot send lease ready notification: missing required information for lease ${leaseId}`);
+                console.warn(`   Missing: ${!(tenant === null || tenant === void 0 ? void 0 : tenant.email) ? "email, " : ""}${!(tenant === null || tenant === void 0 ? void 0 : tenant.name) ? "name, " : ""}${!(property === null || property === void 0 ? void 0 : property.name) ? "property name, " : ""}${!(spot === null || spot === void 0 ? void 0 : spot.spotNumber) && !(spot === null || spot === void 0 ? void 0 : spot.spotIdentifier) ? "spot number" : ""}`);
+            }
+        }
+        else if (!isComplete) {
+            console.log(`ℹ️ Lease ${leaseId} is not complete yet. Missing required fields.`);
+        }
+        else if (wasCompleteBefore) {
+            console.log(`ℹ️ Lease ${leaseId} was already complete. Notification not sent to avoid duplicates.`);
+        }
+    }
+    catch (error) {
+        // Log error but don't fail the lease update if email fails
+        console.error(`❌ Error checking/sending lease ready notification for lease ${leaseId}:`, error);
+        if (error instanceof Error) {
+            console.error(`   Error message: ${error.message}`);
+            console.error(`   Error stack: ${error.stack}`);
+        }
+    }
+});
+exports.checkAndSendLeaseReadyNotification = checkAndSendLeaseReadyNotification;
 const updateLease = (id, updateData) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const lease = yield leases_schema_1.Leases.findOne({ _id: id, isDeleted: false });
     if (!lease) {
         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
     }
+    // Store previous lease state to check if it was complete before
+    const previousLease = lease.toObject();
     // Validate lease type and end date logic for updates
     if (updateData.leaseType === "FIXED_TERM" &&
         !updateData.leaseEnd &&
@@ -230,6 +372,13 @@ const updateLease = (id, updateData) => __awaiter(void 0, void 0, void 0, functi
         .populate("tenantId", "name email phoneNumber profileImage bio preferredLocation")
         .populate("spotId", "spotNumber spotType")
         .populate("propertyId", "name address");
+    // Check if lease is complete and send notification (only if it became complete)
+    if (updatedLease) {
+        // Check notification asynchronously to avoid blocking
+        (0, exports.checkAndSendLeaseReadyNotification)(id, previousLease).catch(error => {
+            console.error(`Error in notification check for lease ${id}:`, error);
+        });
+    }
     return updatedLease;
 });
 const deleteLease = (id) => __awaiter(void 0, void 0, void 0, function* () {

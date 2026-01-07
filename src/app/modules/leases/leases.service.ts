@@ -1,8 +1,10 @@
 import httpStatus from "http-status";
 import { Types } from "mongoose";
+import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
 import { calculatePaginationFunction } from "../../../helpers/paginationHelpers";
 import { IPaginationOptions } from "../../../interface/pagination";
+import { sendLeaseReadyNotification } from "../../../shared/emailService";
 import { LeaseStatus, LeaseType } from "../../../shared/enums/payment.enums";
 import { ICreateLease, ILease, IUpdateLease } from "./leases.interface";
 import { Leases } from "./leases.schema";
@@ -250,6 +252,170 @@ const getLeasesByTenant = async (
   };
 };
 
+// Helper function to check if lease is complete
+const isLeaseComplete = (lease: any): boolean => {
+  // Check if all required fields are filled
+  const hasRequiredFields =
+    lease.tenantId &&
+    lease.spotId &&
+    lease.propertyId &&
+    lease.leaseType &&
+    lease.leaseStart &&
+    lease.occupants;
+
+  // Check that depositAmount is provided and valid (required)
+  const hasValidDepositAmount =
+    typeof lease.depositAmount === "number" && lease.depositAmount >= 0;
+
+  // Check lease type specific requirements
+  const hasValidLeaseType =
+    (lease.leaseType === LeaseType.FIXED_TERM && lease.leaseEnd) ||
+    (lease.leaseType === LeaseType.MONTHLY && !lease.leaseEnd);
+
+  // Check pet information if pets are present
+  const hasValidPetInfo =
+    !lease.pets.hasPets ||
+    (lease.pets.hasPets &&
+      lease.pets.petDetails &&
+      lease.pets.petDetails.length > 0);
+
+  // Check that additional rent amount is valid (optional - only validate if provided)
+  const hasValidAdditionalRent =
+    lease.additionalRentAmount === undefined ||
+    lease.additionalRentAmount === null ||
+    lease.additionalRentAmount >= 0;
+
+  // Check that leaseAgreement is provided (required)
+  const hasLeaseAgreement =
+    !!lease.leaseAgreement && lease.leaseAgreement.trim() !== "";
+
+  return (
+    hasRequiredFields &&
+    hasValidLeaseType &&
+    hasValidPetInfo &&
+    hasValidAdditionalRent &&
+    hasLeaseAgreement &&
+    hasValidDepositAmount
+  );
+};
+
+// Helper function to check and send lease ready notification
+export const checkAndSendLeaseReadyNotification = async (
+  leaseId: string,
+  previousLease?: any,
+): Promise<void> => {
+  console.log(`🔔 Starting lease notification check for lease ${leaseId}`);
+
+  try {
+    const { Leases } = await import("./leases.schema");
+
+    // Populate the lease with tenant, property, and spot information
+    const populatedLease = await Leases.findById(leaseId)
+      .populate(
+        "tenantId",
+        "name email phoneNumber profileImage bio preferredLocation",
+      )
+      .populate("spotId", "spotNumber spotType spotIdentifier")
+      .populate("propertyId", "name address");
+
+    if (!populatedLease) {
+      console.warn(`⚠️ Lease ${leaseId} not found for notification check`);
+      return;
+    }
+
+    console.log(`📋 Lease found: ${leaseId}`);
+    console.log(
+      `   - Tenant: ${(populatedLease.tenantId as any)?.email || "N/A"}`,
+    );
+    console.log(
+      `   - Property: ${(populatedLease.propertyId as any)?.name || "N/A"}`,
+    );
+    console.log(
+      `   - Spot: ${(populatedLease.spotId as any)?.spotNumber || (populatedLease.spotId as any)?.spotIdentifier || "N/A"}`,
+    );
+    console.log(
+      `   - Lease Agreement: ${populatedLease.leaseAgreement ? "Present" : "Missing"}`,
+    );
+    console.log(`   - Deposit Amount: ${populatedLease.depositAmount}`);
+
+    // Check if lease is complete
+    const isComplete = isLeaseComplete(populatedLease);
+    console.log(`   - Is Complete: ${isComplete}`);
+
+    // Only send notification if:
+    // 1. Lease is now complete AND
+    // 2. It wasn't complete before (or it's a new lease)
+    const wasCompleteBefore = previousLease
+      ? isLeaseComplete(previousLease)
+      : false;
+    console.log(`   - Was Complete Before: ${wasCompleteBefore}`);
+
+    if (isComplete && !wasCompleteBefore) {
+      const tenant = populatedLease.tenantId as any;
+      const property = populatedLease.propertyId as any;
+      const spot = populatedLease.spotId as any;
+
+      console.log(`📧 Preparing to send notification...`);
+      console.log(`   - Tenant Email: ${tenant?.email || "Missing"}`);
+      console.log(`   - Tenant Name: ${tenant?.name || "Missing"}`);
+      console.log(`   - Property Name: ${property?.name || "Missing"}`);
+      console.log(
+        `   - Spot Number: ${spot?.spotNumber || spot?.spotIdentifier || "Missing"}`,
+      );
+
+      // Only send notification if we have all required information
+      if (
+        tenant?.email &&
+        tenant?.name &&
+        property?.name &&
+        (spot?.spotNumber || spot?.spotIdentifier)
+      ) {
+        const dashboardUrl = `${config.client_url}/my-info`;
+        const spotNumber = spot.spotNumber || spot.spotIdentifier || "N/A";
+
+        console.log(`📤 Sending email to ${tenant.email}...`);
+
+        await sendLeaseReadyNotification(
+          tenant.email,
+          tenant.name,
+          property.name,
+          spotNumber,
+          dashboardUrl,
+        );
+
+        console.log(
+          `✅ Lease ready notification sent successfully to tenant ${tenant.email} for lease ${leaseId}`,
+        );
+      } else {
+        console.warn(
+          `⚠️ Cannot send lease ready notification: missing required information for lease ${leaseId}`,
+        );
+        console.warn(
+          `   Missing: ${!tenant?.email ? "email, " : ""}${!tenant?.name ? "name, " : ""}${!property?.name ? "property name, " : ""}${!spot?.spotNumber && !spot?.spotIdentifier ? "spot number" : ""}`,
+        );
+      }
+    } else if (!isComplete) {
+      console.log(
+        `ℹ️ Lease ${leaseId} is not complete yet. Missing required fields.`,
+      );
+    } else if (wasCompleteBefore) {
+      console.log(
+        `ℹ️ Lease ${leaseId} was already complete. Notification not sent to avoid duplicates.`,
+      );
+    }
+  } catch (error) {
+    // Log error but don't fail the lease update if email fails
+    console.error(
+      `❌ Error checking/sending lease ready notification for lease ${leaseId}:`,
+      error,
+    );
+    if (error instanceof Error) {
+      console.error(`   Error message: ${error.message}`);
+      console.error(`   Error stack: ${error.stack}`);
+    }
+  }
+};
+
 const updateLease = async (
   id: string,
   updateData: IUpdateLease,
@@ -259,6 +425,9 @@ const updateLease = async (
   if (!lease) {
     throw new ApiError(httpStatus.NOT_FOUND, "Lease not found");
   }
+
+  // Store previous lease state to check if it was complete before
+  const previousLease = lease.toObject();
 
   // Validate lease type and end date logic for updates
   if (
@@ -315,6 +484,14 @@ const updateLease = async (
     )
     .populate("spotId", "spotNumber spotType")
     .populate("propertyId", "name address");
+
+  // Check if lease is complete and send notification (only if it became complete)
+  if (updatedLease) {
+    // Check notification asynchronously to avoid blocking
+    checkAndSendLeaseReadyNotification(id, previousLease).catch(error => {
+      console.error(`Error in notification check for lease ${id}:`, error);
+    });
+  }
 
   return updatedLease;
 };

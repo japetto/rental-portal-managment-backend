@@ -136,6 +136,8 @@ exports.leasesSchema.methods.isLeaseInformationComplete = function () {
         this.leaseType &&
         this.leaseStart &&
         this.occupants;
+    // Check that depositAmount is provided and valid (required)
+    const hasValidDepositAmount = typeof this.depositAmount === "number" && this.depositAmount >= 0;
     // Check lease type specific requirements
     const hasValidLeaseType = (this.leaseType === payment_enums_1.LeaseType.FIXED_TERM && this.leaseEnd) ||
         (this.leaseType === payment_enums_1.LeaseType.MONTHLY && !this.leaseEnd);
@@ -144,14 +146,18 @@ exports.leasesSchema.methods.isLeaseInformationComplete = function () {
         (this.pets.hasPets &&
             this.pets.petDetails &&
             this.pets.petDetails.length > 0);
-    // Check that additional rent amount is valid (not negative)
-    const hasValidAdditionalRent = this.additionalRentAmount !== undefined &&
-        this.additionalRentAmount !== null &&
+    // Check that additional rent amount is valid (optional - only validate if provided)
+    const hasValidAdditionalRent = this.additionalRentAmount === undefined ||
+        this.additionalRentAmount === null ||
         this.additionalRentAmount >= 0;
+    // Check that leaseAgreement is provided (required)
+    const hasLeaseAgreement = !!this.leaseAgreement && this.leaseAgreement.trim() !== "";
     return (hasRequiredFields &&
         hasValidLeaseType &&
         hasValidPetInfo &&
-        hasValidAdditionalRent);
+        hasValidAdditionalRent &&
+        hasLeaseAgreement &&
+        hasValidDepositAmount);
 };
 // Pre-save middleware for cross-schema validation
 exports.leasesSchema.pre("save", function (next) {

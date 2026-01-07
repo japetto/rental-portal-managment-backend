@@ -52,6 +52,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const config_1 = __importDefault(require("../../../config/config"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const payment_enums_1 = require("../../../shared/enums/payment.enums");
+const leases_service_1 = require("../leases/leases.service");
 const spots_schema_1 = require("../spots/spots.schema");
 const users_schema_1 = require("./users.schema");
 const users_utils_1 = require("./users.utils");
@@ -328,6 +329,37 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
         }
         // Commit the transaction
         yield session.commitTransaction();
+        // Check if lease is complete and send notification to tenant
+        // Do this after transaction commit to avoid blocking
+        // Only send if lease became complete (not if it was already complete)
+        if (updatedLease && updatedLease._id) {
+            console.log(`🔔 Checking notification for lease ${updatedLease._id}`);
+            // Get previous lease state if it existed
+            let previousLease = null;
+            if (user.leaseId) {
+                const { Leases } = yield Promise.resolve().then(() => __importStar(require("../leases/leases.schema")));
+                const existingLease = yield Leases.findById(user.leaseId);
+                if (existingLease) {
+                    previousLease = existingLease.toObject();
+                    console.log(`📝 Found previous lease state for comparison`);
+                }
+            }
+            else {
+                console.log(`📝 No previous lease found - this is a new lease`);
+            }
+            // Check and send notification (using same pattern as invite email)
+            const leaseId = updatedLease._id.toString();
+            try {
+                yield (0, leases_service_1.checkAndSendLeaseReadyNotification)(leaseId, previousLease);
+            }
+            catch (error) {
+                console.error(`❌ Error in notification check for lease ${leaseId}:`, error);
+                // Continue even if notification fails
+            }
+        }
+        else {
+            console.log(`ℹ️ No lease updated, skipping notification check`);
+        }
         return {
             user: updatedUser,
             lease: updatedLease,

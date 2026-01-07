@@ -113,6 +113,10 @@ leasesSchema.methods.isLeaseInformationComplete = function (): boolean {
     this.leaseStart &&
     this.occupants;
 
+  // Check that depositAmount is provided and valid (required)
+  const hasValidDepositAmount =
+    typeof this.depositAmount === "number" && this.depositAmount >= 0;
+
   // Check lease type specific requirements
   const hasValidLeaseType =
     (this.leaseType === LeaseType.FIXED_TERM && this.leaseEnd) ||
@@ -125,17 +129,23 @@ leasesSchema.methods.isLeaseInformationComplete = function (): boolean {
       this.pets.petDetails &&
       this.pets.petDetails.length > 0);
 
-  // Check that additional rent amount is valid (not negative)
+  // Check that additional rent amount is valid (optional - only validate if provided)
   const hasValidAdditionalRent =
-    this.additionalRentAmount !== undefined &&
-    this.additionalRentAmount !== null &&
+    this.additionalRentAmount === undefined ||
+    this.additionalRentAmount === null ||
     this.additionalRentAmount >= 0;
+
+  // Check that leaseAgreement is provided (required)
+  const hasLeaseAgreement =
+    !!this.leaseAgreement && this.leaseAgreement.trim() !== "";
 
   return (
     hasRequiredFields &&
     hasValidLeaseType &&
     hasValidPetInfo &&
-    hasValidAdditionalRent
+    hasValidAdditionalRent &&
+    hasLeaseAgreement &&
+    hasValidDepositAmount
   );
 };
 
