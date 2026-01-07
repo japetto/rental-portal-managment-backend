@@ -270,12 +270,26 @@ const checkAndSendLeaseReadyNotification = (leaseId, previousLease) => __awaiter
             console.warn(`⚠️ Lease ${leaseId} not found for notification check`);
             return;
         }
+        // Safely extract values to avoid circular reference issues
+        const tenantEmail = populatedLease.tenantId
+            ? ((_a = populatedLease.tenantId) === null || _a === void 0 ? void 0 : _a.email) || "N/A"
+            : "N/A";
+        const propertyName = populatedLease.propertyId
+            ? ((_b = populatedLease.propertyId) === null || _b === void 0 ? void 0 : _b.name) || "N/A"
+            : "N/A";
+        const spotNumber = populatedLease.spotId
+            ? ((_c = populatedLease.spotId) === null || _c === void 0 ? void 0 : _c.spotNumber) ||
+                ((_d = populatedLease.spotId) === null || _d === void 0 ? void 0 : _d.spotIdentifier) ||
+                "N/A"
+            : "N/A";
         console.log(`📋 Lease found: ${leaseId}`);
-        console.log(`   - Tenant: ${((_a = populatedLease.tenantId) === null || _a === void 0 ? void 0 : _a.email) || "N/A"}`);
-        console.log(`   - Property: ${((_b = populatedLease.propertyId) === null || _b === void 0 ? void 0 : _b.name) || "N/A"}`);
-        console.log(`   - Spot: ${((_c = populatedLease.spotId) === null || _c === void 0 ? void 0 : _c.spotNumber) || ((_d = populatedLease.spotId) === null || _d === void 0 ? void 0 : _d.spotIdentifier) || "N/A"}`);
+        console.log(`   - Tenant: ${tenantEmail}`);
+        console.log(`   - Property: ${propertyName}`);
+        console.log(`   - Spot: ${spotNumber}`);
         console.log(`   - Lease Agreement: ${populatedLease.leaseAgreement ? "Present" : "Missing"}`);
-        console.log(`   - Deposit Amount: ${populatedLease.depositAmount}`);
+        console.log(`   - Deposit Amount: ${populatedLease.depositAmount || 0}`);
+        console.log(`   - Lease Type: ${populatedLease.leaseType || "N/A"}`);
+        console.log(`   - Lease End: ${populatedLease.leaseEnd ? populatedLease.leaseEnd.toISOString() : "N/A"}`);
         // Check if lease is complete
         const isComplete = isLeaseComplete(populatedLease);
         console.log(`   - Is Complete: ${isComplete}`);

@@ -323,20 +323,31 @@ export const checkAndSendLeaseReadyNotification = async (
       return;
     }
 
+    // Safely extract values to avoid circular reference issues
+    const tenantEmail = populatedLease.tenantId
+      ? (populatedLease.tenantId as any)?.email || "N/A"
+      : "N/A";
+    const propertyName = populatedLease.propertyId
+      ? (populatedLease.propertyId as any)?.name || "N/A"
+      : "N/A";
+    const spotNumber = populatedLease.spotId
+      ? (populatedLease.spotId as any)?.spotNumber ||
+        (populatedLease.spotId as any)?.spotIdentifier ||
+        "N/A"
+      : "N/A";
+
     console.log(`📋 Lease found: ${leaseId}`);
-    console.log(
-      `   - Tenant: ${(populatedLease.tenantId as any)?.email || "N/A"}`,
-    );
-    console.log(
-      `   - Property: ${(populatedLease.propertyId as any)?.name || "N/A"}`,
-    );
-    console.log(
-      `   - Spot: ${(populatedLease.spotId as any)?.spotNumber || (populatedLease.spotId as any)?.spotIdentifier || "N/A"}`,
-    );
+    console.log(`   - Tenant: ${tenantEmail}`);
+    console.log(`   - Property: ${propertyName}`);
+    console.log(`   - Spot: ${spotNumber}`);
     console.log(
       `   - Lease Agreement: ${populatedLease.leaseAgreement ? "Present" : "Missing"}`,
     );
-    console.log(`   - Deposit Amount: ${populatedLease.depositAmount}`);
+    console.log(`   - Deposit Amount: ${populatedLease.depositAmount || 0}`);
+    console.log(`   - Lease Type: ${populatedLease.leaseType || "N/A"}`);
+    console.log(
+      `   - Lease End: ${populatedLease.leaseEnd ? populatedLease.leaseEnd.toISOString() : "N/A"}`,
+    );
 
     // Check if lease is complete
     const isComplete = isLeaseComplete(populatedLease);

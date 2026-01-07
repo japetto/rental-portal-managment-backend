@@ -374,13 +374,42 @@ const updateTenantData = async (
         if (!existingLease) {
           console.log("⚠️ Lease not found, creating new lease instead...");
           // If lease doesn't exist, create a new one
+
+          // Convert date strings to Date objects if needed
+          let leaseStart = payload.lease.leaseStart;
+          if (leaseStart && typeof leaseStart === "string") {
+            leaseStart = new Date(leaseStart);
+          }
+
+          let leaseEnd = payload.lease.leaseEnd;
+          if (leaseEnd && typeof leaseEnd === "string") {
+            leaseEnd = new Date(leaseEnd);
+          }
+
+          // Validate FIXED_TERM lease has leaseEnd
+          if (payload.lease.leaseType === "FIXED_TERM" && !leaseEnd) {
+            throw new ApiError(
+              httpStatus.BAD_REQUEST,
+              "Lease end date is required for FIXED_TERM leases",
+            );
+          }
+
+          // Validate MONTHLY lease doesn't have leaseEnd
+          if (payload.lease.leaseType === "MONTHLY" && leaseEnd) {
+            throw new ApiError(
+              httpStatus.BAD_REQUEST,
+              "Lease end date should not be provided for MONTHLY leases",
+            );
+          }
+
           const newLeaseData = {
             ...payload.lease,
             tenantId: userId,
             propertyId: user.propertyId,
             spotId: user.spotId,
             // Add default values for required fields
-            leaseStart: payload.lease.leaseStart || new Date(),
+            leaseStart: leaseStart || new Date(),
+            leaseEnd: leaseEnd || undefined,
             occupants: payload.lease.occupants || 1,
             rentAmount: payload.lease.rentAmount || 0,
             depositAmount: payload.lease.depositAmount || 0,
@@ -402,7 +431,7 @@ const updateTenantData = async (
           );
         } else {
           // Convert date strings to Date objects
-          const leaseUpdateData = { ...payload.lease };
+          const leaseUpdateData: any = { ...payload.lease };
           if (
             leaseUpdateData.leaseStart &&
             typeof leaseUpdateData.leaseStart === "string"
@@ -414,6 +443,18 @@ const updateTenantData = async (
             typeof leaseUpdateData.leaseEnd === "string"
           ) {
             leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
+          }
+
+          // Ensure leaseEnd is set for FIXED_TERM leases
+          if (
+            leaseUpdateData.leaseType === "FIXED_TERM" &&
+            !leaseUpdateData.leaseEnd &&
+            !existingLease.leaseEnd
+          ) {
+            throw new ApiError(
+              httpStatus.BAD_REQUEST,
+              "Lease end date is required for FIXED_TERM leases",
+            );
           }
 
           updatedLease = await Leases.findByIdAndUpdate(
@@ -429,13 +470,42 @@ const updateTenantData = async (
       } else {
         // Create new lease
         console.log("🆕 Creating new lease...");
+
+        // Convert date strings to Date objects if needed
+        let leaseStart = payload.lease.leaseStart;
+        if (leaseStart && typeof leaseStart === "string") {
+          leaseStart = new Date(leaseStart);
+        }
+
+        let leaseEnd = payload.lease.leaseEnd;
+        if (leaseEnd && typeof leaseEnd === "string") {
+          leaseEnd = new Date(leaseEnd);
+        }
+
+        // Validate FIXED_TERM lease has leaseEnd
+        if (payload.lease.leaseType === "FIXED_TERM" && !leaseEnd) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            "Lease end date is required for FIXED_TERM leases",
+          );
+        }
+
+        // Validate MONTHLY lease doesn't have leaseEnd
+        if (payload.lease.leaseType === "MONTHLY" && leaseEnd) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            "Lease end date should not be provided for MONTHLY leases",
+          );
+        }
+
         const newLeaseData = {
           ...payload.lease,
           tenantId: userId,
           propertyId: user.propertyId,
           spotId: user.spotId,
           // Add default values for required fields
-          leaseStart: payload.lease.leaseStart || new Date(),
+          leaseStart: leaseStart || new Date(),
+          leaseEnd: leaseEnd || undefined,
           occupants: payload.lease.occupants || 1,
           rentAmount: payload.lease.rentAmount || 0,
           depositAmount: payload.lease.depositAmount || 0,

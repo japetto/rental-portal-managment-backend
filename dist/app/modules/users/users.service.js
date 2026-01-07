@@ -283,9 +283,26 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                 if (!existingLease) {
                     console.log("⚠️ Lease not found, creating new lease instead...");
                     // If lease doesn't exist, create a new one
+                    // Convert date strings to Date objects if needed
+                    let leaseStart = payload.lease.leaseStart;
+                    if (leaseStart && typeof leaseStart === "string") {
+                        leaseStart = new Date(leaseStart);
+                    }
+                    let leaseEnd = payload.lease.leaseEnd;
+                    if (leaseEnd && typeof leaseEnd === "string") {
+                        leaseEnd = new Date(leaseEnd);
+                    }
+                    // Validate FIXED_TERM lease has leaseEnd
+                    if (payload.lease.leaseType === "FIXED_TERM" && !leaseEnd) {
+                        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Lease end date is required for FIXED_TERM leases");
+                    }
+                    // Validate MONTHLY lease doesn't have leaseEnd
+                    if (payload.lease.leaseType === "MONTHLY" && leaseEnd) {
+                        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Lease end date should not be provided for MONTHLY leases");
+                    }
                     const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
                         // Add default values for required fields
-                        leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, leaseStatus: payment_enums_1.LeaseStatus.ACTIVE, pets: {
+                        leaseStart: leaseStart || new Date(), leaseEnd: leaseEnd || undefined, occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, leaseStatus: payment_enums_1.LeaseStatus.ACTIVE, pets: {
                             hasPets: ((_a = payload.lease.pets) === null || _a === void 0 ? void 0 : _a.hasPets) || false,
                             petDetails: ((_b = payload.lease.pets) === null || _b === void 0 ? void 0 : _b.petDetails) || [],
                         } });
@@ -305,6 +322,12 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
                         typeof leaseUpdateData.leaseEnd === "string") {
                         leaseUpdateData.leaseEnd = new Date(leaseUpdateData.leaseEnd);
                     }
+                    // Ensure leaseEnd is set for FIXED_TERM leases
+                    if (leaseUpdateData.leaseType === "FIXED_TERM" &&
+                        !leaseUpdateData.leaseEnd &&
+                        !existingLease.leaseEnd) {
+                        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Lease end date is required for FIXED_TERM leases");
+                    }
                     updatedLease = yield Leases.findByIdAndUpdate(user.leaseId, leaseUpdateData, { new: true, runValidators: true, session });
                     if (!updatedLease) {
                         throw new ApiError_1.default(http_status_1.default.NOT_FOUND, "Lease not found");
@@ -314,9 +337,26 @@ const updateTenantData = (userId, payload, adminId) => __awaiter(void 0, void 0,
             else {
                 // Create new lease
                 console.log("🆕 Creating new lease...");
+                // Convert date strings to Date objects if needed
+                let leaseStart = payload.lease.leaseStart;
+                if (leaseStart && typeof leaseStart === "string") {
+                    leaseStart = new Date(leaseStart);
+                }
+                let leaseEnd = payload.lease.leaseEnd;
+                if (leaseEnd && typeof leaseEnd === "string") {
+                    leaseEnd = new Date(leaseEnd);
+                }
+                // Validate FIXED_TERM lease has leaseEnd
+                if (payload.lease.leaseType === "FIXED_TERM" && !leaseEnd) {
+                    throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Lease end date is required for FIXED_TERM leases");
+                }
+                // Validate MONTHLY lease doesn't have leaseEnd
+                if (payload.lease.leaseType === "MONTHLY" && leaseEnd) {
+                    throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Lease end date should not be provided for MONTHLY leases");
+                }
                 const newLeaseData = Object.assign(Object.assign({}, payload.lease), { tenantId: userId, propertyId: user.propertyId, spotId: user.spotId, 
                     // Add default values for required fields
-                    leaseStart: payload.lease.leaseStart || new Date(), occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, leaseStatus: payment_enums_1.LeaseStatus.ACTIVE, pets: {
+                    leaseStart: leaseStart || new Date(), leaseEnd: leaseEnd || undefined, occupants: payload.lease.occupants || 1, rentAmount: payload.lease.rentAmount || 0, depositAmount: payload.lease.depositAmount || 0, leaseStatus: payment_enums_1.LeaseStatus.ACTIVE, pets: {
                         hasPets: ((_c = payload.lease.pets) === null || _c === void 0 ? void 0 : _c.hasPets) || false,
                         petDetails: ((_d = payload.lease.pets) === null || _d === void 0 ? void 0 : _d.petDetails) || [],
                     } });

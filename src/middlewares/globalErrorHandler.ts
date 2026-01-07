@@ -10,9 +10,20 @@ import handleCastError from "../errors/handleCastError";
 import handleDuplicationError from "../errors/handleDuplicationError";
 
 const globalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
-  config.node_env === "development"
-    ? console.log(`GlobalErrorHandler~~`, error)
-    : console.error(`GlobalErrorHandler~~`, error);
+  // Safely log error to avoid circular reference issues
+  if (config.node_env === "development") {
+    console.log(`GlobalErrorHandler~~`, {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+    });
+  } else {
+    console.error(`GlobalErrorHandler~~`, {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+    });
+  }
 
   let statusCode = 500;
   let message = "Internal Server Error!";

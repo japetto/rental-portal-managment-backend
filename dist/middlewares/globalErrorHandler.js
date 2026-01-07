@@ -11,9 +11,21 @@ const ApiError_1 = __importDefault(require("../errors/ApiError"));
 const handleCastError_1 = __importDefault(require("../errors/handleCastError"));
 const handleDuplicationError_1 = __importDefault(require("../errors/handleDuplicationError"));
 const globalErrorHandler = (error, req, res, next) => {
-    config_1.default.node_env === "development"
-        ? console.log(`GlobalErrorHandler~~`, error)
-        : console.error(`GlobalErrorHandler~~`, error);
+    // Safely log error to avoid circular reference issues
+    if (config_1.default.node_env === "development") {
+        console.log(`GlobalErrorHandler~~`, {
+            name: error === null || error === void 0 ? void 0 : error.name,
+            message: error === null || error === void 0 ? void 0 : error.message,
+            stack: error === null || error === void 0 ? void 0 : error.stack,
+        });
+    }
+    else {
+        console.error(`GlobalErrorHandler~~`, {
+            name: error === null || error === void 0 ? void 0 : error.name,
+            message: error === null || error === void 0 ? void 0 : error.message,
+            stack: error === null || error === void 0 ? void 0 : error.stack,
+        });
+    }
     let statusCode = 500;
     let message = "Internal Server Error!";
     let errorMessages = [];
