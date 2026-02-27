@@ -43,6 +43,16 @@ export const usersSchema = new Schema<IUser>(
         message: "Password must be at least 6 characters long",
       },
     },
+    passwordResetTokenHash: {
+      type: String,
+      required: false,
+      select: false,
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      required: false,
+      select: false,
+    },
     role: {
       type: String,
       required: true,

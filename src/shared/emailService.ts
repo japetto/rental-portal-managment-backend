@@ -83,6 +83,82 @@ export const sendEmail = async (emailOptions: IEmailOptions): Promise<void> => {
   }
 };
 
+export const sendPasswordResetEmail = async (
+  userEmail: string,
+  userName: string,
+  resetUrl: string,
+): Promise<void> => {
+  const subject = "Reset your password";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Password Reset</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .header {
+          background-color: #1f2937;
+          color: white;
+          padding: 20px;
+          text-align: center;
+          border-radius: 8px 8px 0 0;
+        }
+        .content {
+          background-color: #f9fafb;
+          padding: 20px;
+          border-radius: 0 0 8px 8px;
+        }
+        .button {
+          display: inline-block;
+          background-color: #2563eb;
+          color: white !important;
+          padding: 12px 18px;
+          text-decoration: none;
+          border-radius: 6px;
+          margin: 16px 0;
+        }
+        .muted {
+          color: #6b7280;
+          font-size: 12px;
+        }
+        code {
+          word-break: break-all;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Password Reset</h1>
+      </div>
+      <div class="content">
+        <p>Hi ${userName || "there"},</p>
+        <p>We received a request to reset your password. Click the button below to choose a new password.</p>
+        <p><a href="${resetUrl}" class="button">Reset Password</a></p>
+        <p class="muted">If the button doesn’t work, copy and paste this link into your browser:</p>
+        <p class="muted"><code>${resetUrl}</code></p>
+        <p class="muted">If you didn’t request this, you can ignore this email.</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: userEmail,
+    subject,
+    html,
+  });
+};
+
 // Send tenant invitation email
 export const sendTenantInvitationEmail = async (
   tenantEmail: string,
@@ -330,6 +406,7 @@ export const sendLeaseReadyNotification = async (
 
 export default {
   sendEmail,
+  sendPasswordResetEmail,
   sendTenantInvitationEmail,
   sendLeaseReadyNotification,
   verifyEmailConnection,

@@ -152,6 +152,32 @@ const setPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const requestPasswordReset = catchAsync(async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  const result = await UserService.requestPasswordReset(email);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: result.message,
+    data: null,
+  });
+});
+
+const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  const { ...payload } = req.body;
+
+  const result = await UserService.resetPassword(payload);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: result.message,
+    data: null,
+  });
+});
+
 // Update User Info (Admin only)
 const updateUserInfo = catchAsync(async (req: Request, res: Response) => {
   const { userId } = req.params;
@@ -309,9 +335,8 @@ const getUserServiceRequests = catchAsync(
     };
 
     // Import the service request service
-    const { ServiceRequestService } = await import(
-      "../service-requests/service-requests.service"
-    );
+    const { ServiceRequestService } =
+      await import("../service-requests/service-requests.service");
 
     const result = await ServiceRequestService.getServiceRequests(
       filters,
@@ -350,9 +375,8 @@ const getUserServiceRequestById = catchAsync(
     }
 
     // Import the service request service
-    const { ServiceRequestService } = await import(
-      "../service-requests/service-requests.service"
-    );
+    const { ServiceRequestService } =
+      await import("../service-requests/service-requests.service");
 
     const result = await ServiceRequestService.getServiceRequestById(
       id,
@@ -388,9 +412,8 @@ const getUserAnnouncements = catchAsync(async (req: Request, res: Response) => {
   const propertyId = (queryPropertyId as string) || userPropertyId;
 
   // Import the announcement service
-  const { AnnouncementService } = await import(
-    "../announcements/announcements.service"
-  );
+  const { AnnouncementService } =
+    await import("../announcements/announcements.service");
 
   const result = await AnnouncementService.getTenantAnnouncements(userId);
 
@@ -418,9 +441,8 @@ const getUserAnnouncementById = catchAsync(
     }
 
     // Import the announcement service
-    const { AnnouncementService } = await import(
-      "../announcements/announcements.service"
-    );
+    const { AnnouncementService } =
+      await import("../announcements/announcements.service");
 
     const result = await AnnouncementService.getTenantAnnouncementById(
       announcementId,
@@ -458,9 +480,8 @@ const markAnnouncementAsRead = catchAsync(
     };
 
     // Import the announcement service
-    const { AnnouncementService } = await import(
-      "../announcements/announcements.service"
-    );
+    const { AnnouncementService } =
+      await import("../announcements/announcements.service");
 
     const result = await AnnouncementService.markAsRead(dataWithUserId);
 
@@ -531,6 +552,8 @@ export const UserController = {
   userRegister,
   userLogin,
   setPassword,
+  requestPasswordReset,
+  resetPassword,
   updateUserInfo,
   updateTenantData,
   updateEmergencyContact,

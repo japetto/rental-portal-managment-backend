@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserValidation = exports.updateEmergencyContactValidationSchema = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateTenantDataValidationSchema = exports.updateUserInfoValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
+exports.UserValidation = exports.updateEmergencyContactValidationSchema = exports.getUserAnnouncementsValidationSchema = exports.deleteUserValidationSchema = exports.updateTenantDataValidationSchema = exports.updateUserInfoValidationSchema = exports.resetPasswordValidationSchema = exports.requestPasswordResetValidationSchema = exports.setPasswordValidationSchema = exports.createUserValidationSchema = void 0;
 const zod_1 = require("zod");
 const user_constant_1 = require("./user.constant");
 const usersZodSchema = zod_1.z.object({
@@ -135,6 +135,23 @@ exports.setPasswordValidationSchema = zod_1.z.object({
         confirmPassword: zod_1.z.string().optional(),
     }),
 });
+exports.requestPasswordResetValidationSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        email: zod_1.z.string().email("Invalid email format"),
+    }),
+});
+exports.resetPasswordValidationSchema = zod_1.z
+    .object({
+    body: zod_1.z.object({
+        token: zod_1.z.string().min(1, "Reset token is required"),
+        password: zod_1.z.string().min(6, "Password must be at least 6 characters"),
+        confirmPassword: zod_1.z.string().min(6, "Confirm password is required"),
+    }),
+})
+    .refine(data => data.body.password === data.body.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["body", "confirmPassword"],
+});
 exports.updateUserInfoValidationSchema = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().optional(),
@@ -232,6 +249,8 @@ exports.UserValidation = {
     userUpdateZodSchema,
     updatePasswordZodSchema,
     setPasswordValidationSchema: exports.setPasswordValidationSchema,
+    requestPasswordResetValidationSchema: exports.requestPasswordResetValidationSchema,
+    resetPasswordValidationSchema: exports.resetPasswordValidationSchema,
     updateUserInfoValidationSchema: exports.updateUserInfoValidationSchema,
     updateTenantDataValidationSchema: exports.updateTenantDataValidationSchema,
     updateEmergencyContactValidationSchema: exports.updateEmergencyContactValidationSchema,

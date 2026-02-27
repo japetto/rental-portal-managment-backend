@@ -1,8 +1,10 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import httpStatus from "http-status";
 import mongoose from "mongoose";
 import config from "../../../config/config";
 import ApiError from "../../../errors/ApiError";
+import { sendPasswordResetEmail } from "../../../shared/emailService";
 import { LeaseStatus } from "../../../shared/enums/payment.enums";
 import { checkAndSendLeaseReadyNotification } from "../leases/leases.service";
 import { Spots } from "../spots/spots.schema";
@@ -183,6 +185,87 @@ const setPassword = async (
   return {
     message: "Password set successfully. You can now login.",
   };
+};
+
+const requestPasswordReset = async (
+  email: string,
+): Promise<{ message: string }> => {
+  const safeMessage =
+    "If an account with that email exists, we sent a password reset link.";
+
+  const user = await Users.findOne({ email }).select(
+    "email name isActive isDeleted",
+  );
+
+  if (!user || user.isDeleted || !user.isActive) {
+    return { message: safeMessage };
+  }
+
+  if (!config.client_url) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Client URL is not configured",
+    );
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await Users.findByIdAndUpdate(user._id, {
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: expiresAt,
+  });
+
+  const clientBase = config.client_url.replace(/\/$/, "");
+  const resetUrl = `${clientBase}/auth/reset-password?token=${token}`;
+
+  await sendPasswordResetEmail(user.email, user.name, resetUrl);
+
+  return { message: safeMessage };
+};
+
+const resetPassword = async (payload: {
+  token: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<{ message: string }> => {
+  const { token, password, confirmPassword } = payload;
+
+  if (password !== confirmPassword) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Password and confirm password do not match",
+    );
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await Users.findOne({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: { $gt: new Date() },
+    isDeleted: false,
+    isActive: true,
+  }).select("+password");
+
+  if (!user) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Reset token is invalid or has expired",
+    );
+  }
+
+  const hashedPassword = await bcrypt.hash(password, Number(config.salt_round));
+
+  await Users.findByIdAndUpdate(user._id, {
+    password: hashedPassword,
+    passwordResetTokenHash: undefined,
+    passwordResetExpiresAt: undefined,
+    isInvited: false,
+    isVerified: true,
+  });
+
+  return { message: "Password reset successfully. You can now sign in." };
 };
 
 //* Update User Info (Admin only)
@@ -646,9 +729,8 @@ const deleteUser = async (
     }
 
     // Delete all service requests for this tenant
-    const { ServiceRequests } = await import(
-      "../service-requests/service-requests.schema"
-    );
+    const { ServiceRequests } =
+      await import("../service-requests/service-requests.schema");
     const userServiceRequests = await ServiceRequests.find({
       tenantId: userId,
       isDeleted: false,
@@ -940,9 +1022,8 @@ const getComprehensiveUserProfile = async (
     }
 
     // Get user's service requests
-    const { ServiceRequests } = await import(
-      "../service-requests/service-requests.schema"
-    );
+    const { ServiceRequests } =
+      await import("../service-requests/service-requests.schema");
     recentServiceRequests = await ServiceRequests.find({
       tenantId: userId,
     })
@@ -950,9 +1031,8 @@ const getComprehensiveUserProfile = async (
       .limit(5);
 
     // Get user's unread announcements using proper filtering
-    const { Announcements } = await import(
-      "../announcements/announcements.schema"
-    );
+    const { Announcements } =
+      await import("../announcements/announcements.schema");
 
     // Get user's property ID - handle both populated object and ObjectId
     const userPropertyId =
@@ -1002,9 +1082,8 @@ const getComprehensiveUserProfile = async (
     assignmentHistory = await getUserAssignmentHistory(userId);
   } else if (user.role === "SUPER_ADMIN") {
     // For SUPER_ADMIN, get all announcements (they can see all)
-    const { Announcements } = await import(
-      "../announcements/announcements.schema"
-    );
+    const { Announcements } =
+      await import("../announcements/announcements.schema");
     unreadAnnouncements = await Announcements.find({
       isActive: true,
       targetAudience: { $in: ["ALL", "ADMINS_ONLY"] },
@@ -1418,6 +1497,8 @@ export const UserService = {
   userRegister,
   userLogin,
   setPassword,
+  requestPasswordReset,
+  resetPassword,
   updateUserInfo,
   updateTenantData,
   updateEmergencyContact,

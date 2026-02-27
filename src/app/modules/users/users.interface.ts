@@ -14,6 +14,8 @@ export type userRoleEnums = "SUPER_ADMIN" | "TENANT";
 export interface IUser extends Document {
   email: string;
   password?: string;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: Date;
   name: string;
   role: userRoleEnums;
   isInvited?: boolean;

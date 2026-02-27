@@ -21,6 +21,18 @@ router.post(
   UserController.userLogin,
 );
 
+router.post(
+  "/request-password-reset",
+  zodValidationRequest(UserValidation.requestPasswordResetValidationSchema),
+  UserController.requestPasswordReset,
+);
+
+router.post(
+  "/reset-password",
+  zodValidationRequest(UserValidation.resetPasswordValidationSchema),
+  UserController.resetPassword,
+);
+
 // Set password for invited users
 router.post(
   "/set-password",

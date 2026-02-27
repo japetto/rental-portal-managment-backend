@@ -15,6 +15,8 @@ const users_validation_1 = require("./users.validation");
 const router = express_1.default.Router();
 router.post("/register", (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.usersZodSchema), users_controller_1.UserController.userRegister);
 router.post("/login", (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.loginUserZodSchema), users_controller_1.UserController.userLogin);
+router.post("/request-password-reset", (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.requestPasswordResetValidationSchema), users_controller_1.UserController.requestPasswordReset);
+router.post("/reset-password", (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.resetPasswordValidationSchema), users_controller_1.UserController.resetPassword);
 // Set password for invited users
 router.post("/set-password", (0, zodValidationRequest_1.default)(users_validation_1.UserValidation.setPasswordValidationSchema), users_controller_1.UserController.setPassword);
 // Check user invitation status

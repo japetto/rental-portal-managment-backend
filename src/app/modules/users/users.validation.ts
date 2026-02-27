@@ -143,6 +143,25 @@ export const setPasswordValidationSchema = z.object({
   }),
 });
 
+export const requestPasswordResetValidationSchema = z.object({
+  body: z.object({
+    email: z.string().email("Invalid email format"),
+  }),
+});
+
+export const resetPasswordValidationSchema = z
+  .object({
+    body: z.object({
+      token: z.string().min(1, "Reset token is required"),
+      password: z.string().min(6, "Password must be at least 6 characters"),
+      confirmPassword: z.string().min(6, "Confirm password is required"),
+    }),
+  })
+  .refine(data => data.body.password === data.body.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["body", "confirmPassword"],
+  });
+
 export const updateUserInfoValidationSchema = z.object({
   body: z.object({
     name: z.string().optional(),
@@ -248,6 +267,8 @@ export const UserValidation = {
   userUpdateZodSchema,
   updatePasswordZodSchema,
   setPasswordValidationSchema,
+  requestPasswordResetValidationSchema,
+  resetPasswordValidationSchema,
   updateUserInfoValidationSchema,
   updateTenantDataValidationSchema,
   updateEmergencyContactValidationSchema,

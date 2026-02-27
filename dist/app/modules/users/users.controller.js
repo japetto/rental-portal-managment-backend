@@ -180,6 +180,26 @@ const setPassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         data: result,
     });
 }));
+const requestPasswordReset = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email } = req.body;
+    const result = yield users_service_1.UserService.requestPasswordReset(email);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: result.message,
+        data: null,
+    });
+}));
+const resetPassword = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const payload = __rest(req.body, []);
+    const result = yield users_service_1.UserService.resetPassword(payload);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_1.default.OK,
+        message: result.message,
+        data: null,
+    });
+}));
 // Update User Info (Admin only)
 const updateUserInfo = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -463,6 +483,8 @@ exports.UserController = {
     userRegister,
     userLogin,
     setPassword,
+    requestPasswordReset,
+    resetPassword,
     updateUserInfo,
     updateTenantData,
     updateEmergencyContact,

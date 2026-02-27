@@ -47,10 +47,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserService = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const crypto_1 = __importDefault(require("crypto"));
 const http_status_1 = __importDefault(require("http-status"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const config_1 = __importDefault(require("../../../config/config"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
+const emailService_1 = require("../../../shared/emailService");
 const payment_enums_1 = require("../../../shared/enums/payment.enums");
 const leases_service_1 = require("../leases/leases.service");
 const spots_schema_1 = require("../spots/spots.schema");
@@ -152,6 +154,52 @@ const setPassword = (payload) => __awaiter(void 0, void 0, void 0, function* () 
     return {
         message: "Password set successfully. You can now login.",
     };
+});
+const requestPasswordReset = (email) => __awaiter(void 0, void 0, void 0, function* () {
+    const safeMessage = "If an account with that email exists, we sent a password reset link.";
+    const user = yield users_schema_1.Users.findOne({ email }).select("email name isActive isDeleted");
+    if (!user || user.isDeleted || !user.isActive) {
+        return { message: safeMessage };
+    }
+    if (!config_1.default.client_url) {
+        throw new ApiError_1.default(http_status_1.default.INTERNAL_SERVER_ERROR, "Client URL is not configured");
+    }
+    const token = crypto_1.default.randomBytes(32).toString("hex");
+    const tokenHash = crypto_1.default.createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    yield users_schema_1.Users.findByIdAndUpdate(user._id, {
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: expiresAt,
+    });
+    const clientBase = config_1.default.client_url.replace(/\/$/, "");
+    const resetUrl = `${clientBase}/auth/reset-password?token=${token}`;
+    yield (0, emailService_1.sendPasswordResetEmail)(user.email, user.name, resetUrl);
+    return { message: safeMessage };
+});
+const resetPassword = (payload) => __awaiter(void 0, void 0, void 0, function* () {
+    const { token, password, confirmPassword } = payload;
+    if (password !== confirmPassword) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Password and confirm password do not match");
+    }
+    const tokenHash = crypto_1.default.createHash("sha256").update(token).digest("hex");
+    const user = yield users_schema_1.Users.findOne({
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { $gt: new Date() },
+        isDeleted: false,
+        isActive: true,
+    }).select("+password");
+    if (!user) {
+        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, "Reset token is invalid or has expired");
+    }
+    const hashedPassword = yield bcrypt_1.default.hash(password, Number(config_1.default.salt_round));
+    yield users_schema_1.Users.findByIdAndUpdate(user._id, {
+        password: hashedPassword,
+        passwordResetTokenHash: undefined,
+        passwordResetExpiresAt: undefined,
+        isInvited: false,
+        isVerified: true,
+    });
+    return { message: "Password reset successfully. You can now sign in." };
 });
 //* Update User Info (Admin only)
 const updateUserInfo = (userId, payload, adminId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -1008,6 +1056,8 @@ exports.UserService = {
     userRegister,
     userLogin,
     setPassword,
+    requestPasswordReset,
+    resetPassword,
     updateUserInfo,
     updateTenantData,
     updateEmergencyContact,
