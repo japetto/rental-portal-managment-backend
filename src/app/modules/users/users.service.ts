@@ -210,7 +210,18 @@ const requestPasswordReset = async (
 
   const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  // Expire at the end of the 3rd calendar day from now
+  const now = new Date();
+  const expiresAt = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 3,
+    23,
+    59,
+    59,
+    999,
+  );
 
   await Users.findByIdAndUpdate(user._id, {
     passwordResetTokenHash: tokenHash,
@@ -266,6 +277,21 @@ const resetPassword = async (payload: {
   });
 
   return { message: "Password reset successfully. You can now sign in." };
+};
+
+const validatePasswordResetToken = async (
+  token: string,
+): Promise<{ isValid: boolean }> => {
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await Users.findOne({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: { $gt: new Date() },
+    isDeleted: false,
+    isActive: true,
+  }).select("_id");
+
+  return { isValid: !!user };
 };
 
 //* Update User Info (Admin only)
@@ -1499,6 +1525,7 @@ export const UserService = {
   setPassword,
   requestPasswordReset,
   resetPassword,
+  validatePasswordResetToken,
   updateUserInfo,
   updateTenantData,
   updateEmergencyContact,

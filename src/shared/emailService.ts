@@ -146,6 +146,7 @@ export const sendPasswordResetEmail = async (
         <p><a href="${resetUrl}" class="button">Reset Password</a></p>
         <p class="muted">If the button doesn’t work, copy and paste this link into your browser:</p>
         <p class="muted"><code>${resetUrl}</code></p>
+        <p class="muted">This link will be valid for 3 days, or until you successfully change your password.</p>
         <p class="muted">If you didn’t request this, you can ignore this email.</p>
       </div>
     </body>

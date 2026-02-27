@@ -162,6 +162,12 @@ export const resetPasswordValidationSchema = z
     path: ["body", "confirmPassword"],
   });
 
+export const validateResetTokenValidationSchema = z.object({
+  body: z.object({
+    token: z.string().min(1, "Reset token is required"),
+  }),
+});
+
 export const updateUserInfoValidationSchema = z.object({
   body: z.object({
     name: z.string().optional(),
@@ -269,6 +275,7 @@ export const UserValidation = {
   setPasswordValidationSchema,
   requestPasswordResetValidationSchema,
   resetPasswordValidationSchema,
+  validateResetTokenValidationSchema,
   updateUserInfoValidationSchema,
   updateTenantDataValidationSchema,
   updateEmergencyContactValidationSchema,

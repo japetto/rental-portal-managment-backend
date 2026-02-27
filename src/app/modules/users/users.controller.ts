@@ -178,6 +178,23 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const validatePasswordResetToken = catchAsync(
+  async (req: Request, res: Response) => {
+    const { token } = req.body;
+
+    const result = await UserService.validatePasswordResetToken(token);
+
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: result.isValid
+        ? "Reset token is valid"
+        : "Reset token is invalid or has expired",
+      data: result,
+    });
+  },
+);
+
 // Update User Info (Admin only)
 const updateUserInfo = catchAsync(async (req: Request, res: Response) => {
   const { userId } = req.params;
@@ -554,6 +571,7 @@ export const UserController = {
   setPassword,
   requestPasswordReset,
   resetPassword,
+  validatePasswordResetToken,
   updateUserInfo,
   updateTenantData,
   updateEmergencyContact,

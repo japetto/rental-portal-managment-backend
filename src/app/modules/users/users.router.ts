@@ -33,6 +33,12 @@ router.post(
   UserController.resetPassword,
 );
 
+router.post(
+  "/validate-reset-token",
+  zodValidationRequest(UserValidation.validateResetTokenValidationSchema),
+  UserController.validatePasswordResetToken,
+);
+
 // Set password for invited users
 router.post(
   "/set-password",
